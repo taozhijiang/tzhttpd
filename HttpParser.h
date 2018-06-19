@@ -10,14 +10,14 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
-#include "KeyValueVec.h"
+#include "KVVec.h"
 #include "Log.h"
 
 #include "HttpProto.h"
 
 namespace tzhttpd {
 
-typedef KeyValueVec<std::string, std::string> UriParamContainer;
+typedef KVVec<std::string, std::string> UriParamContainer;
 
 enum HTTP_METHOD {
 GET = 1,

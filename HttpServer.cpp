@@ -1,42 +1,47 @@
 #include <iostream>
 #include <sstream>
-
-#include <boost/format.hpp>
 #include <thread>
 #include <functional>
 
+#include <libconfig.h++>
+
+#include <boost/format.hpp>
+
 #include "HttpHandler.h"
 #include "HttpServer.h"
-
 #include "Log.h"
 
 namespace tzhttpd {
+
+std::string TZ_VERSION = "1.0.0";
 
 static const size_t bucket_size_ = 0xFF;
 static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
     return std::hash<ConnType *>()(ptr.get());
 }
 
-HttpServer::HttpServer(const std::string& address, unsigned short port, size_t t_size) :
-    io_service_(),
-    ep_(ip::tcp::endpoint(ip::address::from_string(address), port)),
-    acceptor_(),
-    conf_({}),
-    conns_alive_("TcpConnAsync"),
-    io_service_threads_(static_cast<uint8_t>(t_size)) {
 
-}
+bool HttpConf::load_config(std::string cfgfile) {
 
-bool HttpServer::init() {
+    libconfig::Config cfg;
 
-    #if 0
-    if (!get_config_value("http.docu_root", conf_.docu_root_)) {
+    try {
+        cfg.readFile(cfgfile.c_str());
+    } catch(libconfig::FileIOException &fioex) {
+        log_err("I/O error while reading file: %s.", cfgfile.c_str());
+        return false;
+    } catch(libconfig::ParseException &pex) {
+        log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
+        return false;
+    }
+
+    if (!cfg.lookupValue("http.docu_root", docu_root_)) {
         log_err("get http.docu_root failed!");
         return false;
     }
 
     std::string docu_index;
-    if (!get_config_value("http.docu_index", docu_index)) {
+    if (!cfg.lookupValue("http.docu_index", docu_index)) {
         log_err("get http.docu_index failed!");
         return false;
     }
@@ -47,60 +52,97 @@ bool HttpServer::init() {
         if (tmp.empty())
             continue;
 
-        conf_.docu_index_.push_back(tmp);
+        docu_index_.push_back(tmp);
     }
-    if (conf_.docu_index_.empty()) {
+    if (docu_index_.empty()) {
         log_err("empty valid docu_index found, previous: %s", docu_index.c_str());
         return false;
     }
 
-    if (!get_config_value("http.conn_time_out", conf_.conn_time_out_) ||
-        !get_config_value("http.conn_time_out_linger", conf_.conn_time_out_linger_)) {
+    if (!cfg.lookupValue("http.conn_time_out", conn_time_out_) ||
+        !cfg.lookupValue("http.conn_time_out_linger", conn_time_out_linger_)) {
         log_err("get http conn_time_out & linger configure value error, using default.");
-        conf_.conn_time_out_ = 5 * 60;
-        conf_.conn_time_out_linger_ = 10;
+        conn_time_out_ = 5 * 60;
+        conn_time_out_linger_ = 10;
     }
 
-    log_debug("socket/session conn time_out: %ds, linger: %ds", conf_.conn_time_out_, conf_.conn_time_out_linger_);
-    conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
-                                  conf_.conn_time_out_, conf_.conn_time_out_linger_);
-
-    if (!get_config_value("http.ops_cancel_time_out", conf_.ops_cancel_time_out_)){
+    if (!cfg.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_)){
         log_err("get http ops_cancel_time_out configure value error, using default.");
-        conf_.ops_cancel_time_out_ = 0;
+        ops_cancel_time_out_ = 0;
     }
-    if (conf_.ops_cancel_time_out_ < 0) {
-        conf_.ops_cancel_time_out_ = 0;
+    if (ops_cancel_time_out_ < 0) {
+        ops_cancel_time_out_ = 0;
     }
-    log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_.ops_cancel_time_out_,
-              conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
-    if (!get_config_value("http.service_enable", conf_.http_service_enabled_) ||
-        !get_config_value("http.service_speed", conf_.http_service_speed_)){
+    if (!cfg.lookupValue("http.service_enable", http_service_enabled_) ||
+        !cfg.lookupValue("http.service_speed", http_service_speed_)){
         log_err("get http service enable/speed configure value error, using default.");
-        conf_.http_service_enabled_ = true;
-        conf_.http_service_speed_ = 0;
+        http_service_enabled_ = true;
+        http_service_speed_ = 0;
     }
-    if (conf_.http_service_speed_ < 0) {
-        conf_.http_service_speed_ = 0;
+    if (http_service_speed_ < 0) {
+        http_service_speed_ = 0;
     }
 
-    if (conf_.http_service_speed_ &&
-        (helper::register_timer_task( std::bind(&HttpConf::feed_http_service_token, &conf_), 5*1000, true, true) == 0) )
-    {
-        log_err("register http token feed task failed!");
+    return true;
+}
+
+void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
+
+    // 再次启动定时器
+    timed_feed_token_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
+    timed_feed_token_->async_wait(std::bind(&HttpConf::timed_feed_token_handler, shared_from_this(), std::placeholders::_1));
+}
+
+
+
+/////////////////
+
+HttpServer::HttpServer(const std::string& address, unsigned short port, size_t t_size) :
+    io_service_(),
+    ep_(ip::tcp::endpoint(ip::address::from_string(address), port)),
+    acceptor_(),
+    timed_checker_(),
+    conf_({}),
+    conns_alive_("TcpConnAsync"),
+    io_service_threads_(static_cast<uint8_t>(t_size)) {
+
+}
+
+bool HttpServer::init(std::string cfgfile) {
+
+    conf_ = std::make_shared<HttpConf>();
+    if (!conf_ || !conf_->load_config(cfgfile)) {
+        log_err("Load cfg_file: %s failed!", cfgfile.c_str());
         return false;
     }
-    log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
-              conf_.http_service_speed_);
 
+    log_debug("socket/session conn time_out: %ds, linger: %ds", conf_->conn_time_out_, conf_->conn_time_out_linger_);
+    conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
+                              conf_->conn_time_out_, conf_->conn_time_out_linger_);
+
+    log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_->ops_cancel_time_out_,
+              conf_->ops_cancel_time_out_ > 0 ? "true" : "false");
+
+    if (conf_->http_service_speed_) {
+        conf_->timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
+                                              boost::posix_time::millisec(5000))); // 5sec
+        if (!conf_->timed_feed_token_) {
+            log_err("Create timed_feed_token_ failed!");
+            return false;
+        }
+
+        conf_->timed_feed_token_->async_wait(std::bind(&HttpConf::timed_feed_token_handler, conf_, std::placeholders::_1));
+    }
+    log_debug("http service enabled: %s, speed: %ld", conf_->http_service_enabled_ ? "true" : "false",
+              conf_->http_service_speed_);
 
     if (!io_service_threads_.init_threads(std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1))) {
         log_err("HttpServer::io_service_run init task failed!");
         return false;
     }
 
-
+#if 0
     // customize route uri handler
     register_http_get_handler("/", http_handler::index_http_get_handler);
     register_http_get_handler("/stat", http_handler::event_stat_http_get_handler);
@@ -110,14 +152,28 @@ bool HttpServer::init() {
 
     register_http_get_handler("/test", http_handler::get_test_handler);
     register_http_post_handler("/test", http_handler::post_test_handler);
-
-    if (helper::register_timer_task( std::bind(&AliveTimer<ConnType>::clean_up, &conns_alive_), 5*1000, true, false) == 0) {
-        log_err("Register alive conn purge task failed!");
-        return false;
-    }
 #endif
 
+    timed_checker_.reset(new boost::asio::deadline_timer (io_service_,
+                                              boost::posix_time::millisec(5000))); // 5sec
+    if (!timed_checker_) {
+        log_err("Create timed_checker_ failed!");
+        return false;
+    }
+
+    timed_checker_->async_wait(std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
+
     return true;
+}
+
+
+void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {
+
+    conns_alive_.clean_up();
+
+    // 再次启动定时器
+    timed_checker_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
+    timed_checker_->async_wait(std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 }
 
 
@@ -194,8 +250,9 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         output << "Client Info-> " << remote.address() << ":" << remote.port();
         log_debug(output.str().c_str());
 
-        if (!conf_.get_http_service_token()) {
-            log_err("request http service token failed, enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false", conf_.http_service_speed_);
+        if (!conf_->get_http_service_token()) {
+            log_err("request http service token failed, enabled: %s, speed: %ld",
+                    conf_->http_service_enabled_ ? "true" : "false", conf_->http_service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);

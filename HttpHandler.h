@@ -5,9 +5,9 @@
 
 #include <string>
 
-class HttpParser;
-
 namespace tzhttpd {
+
+class HttpParser;
 
 typedef std::function<int (const HttpParser& http_parser, const std::string& post_data, std::string& response, std::string& status_line)> HttpPostHandler;
 typedef std::function<int (const HttpParser& http_parser, std::string& response, std::string& status_line)> HttpGetHandler;

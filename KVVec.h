@@ -1,5 +1,5 @@
-#ifndef __TZHTTPD_KEY_VALUE_VEC_H__
-#define __TZHTTPD_KEY_VALUE_VEC_H__
+#ifndef __TZHTTPD_KVVEC_H__
+#define __TZHTTPD_KVVEC_H__
 
 // 不同于map的key value，使用vector保持推入的顺序
 
@@ -12,7 +12,7 @@
 namespace tzhttpd {
 
 template<typename K, typename V>
-class KeyValueVec {
+class KVVec {
 public:
     typedef std::pair<K, V> Entry;
     typedef std::vector<Entry> Container;
@@ -20,11 +20,11 @@ public:
     typedef typename Container::const_iterator const_iterator;
 
 public:
-    KeyValueVec():
+    KVVec():
         lock_(), items_() {
     }
 
-    ~KeyValueVec() {
+    ~KVVec() {
     }
 
 public:
@@ -92,5 +92,5 @@ private:
 
 } // end namespace tzhttpd
 
-#endif // __TZHTTPD_KEY_VALUE_VEC_H__
+#endif // __TZHTTPD_KVVEC_H__
 
