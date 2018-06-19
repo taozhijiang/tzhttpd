@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
     }
     fprintf(stderr, "listen at: %s:%d, thread_pool: %d", bind_addr.c_str(), listen_port, thread_pool_size);
     http_server_ptr.reset(new tzhttpd::HttpServer(bind_addr, static_cast<unsigned short>(listen_port), thread_pool_size));
-    if (!http_server_ptr || !http_server_ptr->init(cfgfile)) {
+    if (!http_server_ptr || !http_server_ptr->init(cfg)) {
         fprintf(stderr, "Init HttpServer failed!");
         return false;
     }

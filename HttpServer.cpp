@@ -3,10 +3,9 @@
 #include <thread>
 #include <functional>
 
-#include <libconfig.h++>
-
 #include <boost/format.hpp>
 
+#include "TCPConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
 #include "Log.h"
@@ -15,48 +14,57 @@ namespace tzhttpd {
 
 std::string TZ_VERSION = "1.0.0";
 
+namespace http_handler {
+// init only once at startup
+extern std::string              http_docu_root;
+extern std::vector<std::string> http_docu_index;
+} // end namespace http_handler
+
 static const size_t bucket_size_ = 0xFF;
 static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
     return std::hash<ConnType *>()(ptr.get());
 }
 
 
-bool HttpConf::load_config(std::string cfgfile) {
+// init http_doc_root/index
+std::once_flag http_docu_once;
+void init_http_docu(const std::string& docu_root, const std::vector<std::string>& docu_index) {
+    http_handler::http_docu_root = docu_root;
+    http_handler::http_docu_index = docu_index;
+}
 
-    libconfig::Config cfg;
 
-    try {
-        cfg.readFile(cfgfile.c_str());
-    } catch(libconfig::FileIOException &fioex) {
-        log_err("I/O error while reading file: %s.", cfgfile.c_str());
-        return false;
-    } catch(libconfig::ParseException &pex) {
-        log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
-        return false;
-    }
+bool HttpConf::load_config(const libconfig::Config& cfg) {
 
-    if (!cfg.lookupValue("http.docu_root", docu_root_)) {
+    std::string docu_root;
+    if (!cfg.lookupValue("http.docu_root", docu_root)) {
         log_err("get http.docu_root failed!");
-        return false;
     }
 
-    std::string docu_index;
-    if (!cfg.lookupValue("http.docu_index", docu_index)) {
+    std::string str_docu_index;
+    std::vector<std::string> docu_index {};
+    if (!cfg.lookupValue("http.docu_index", str_docu_index)) {
         log_err("get http.docu_index failed!");
-        return false;
-    }
-    std::vector<std::string> vec {};
-    boost::split(vec, docu_index, boost::is_any_of(";"));
-    for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
-        std::string tmp = boost::trim_copy(*iter);
-        if (tmp.empty())
-            continue;
+    } else  {
+        std::vector<std::string> vec {};
+        boost::split(vec, str_docu_index, boost::is_any_of(";"));
+        for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
+            std::string tmp = boost::trim_copy(*iter);
+            if (tmp.empty())
+                continue;
 
-        docu_index_.push_back(tmp);
+            docu_index.push_back(tmp);
+        }
+        if (docu_index.empty()) {
+            log_err("empty valid docu_index found, previous: %s", str_docu_index.c_str());
+        }
     }
-    if (docu_index_.empty()) {
-        log_err("empty valid docu_index found, previous: %s", docu_index.c_str());
-        return false;
+
+    // once init
+    if (!docu_root.empty() && !docu_index.empty()) {
+        log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
+                  static_cast<int>(docu_index.size()));
+        std::call_once(http_docu_once, init_http_docu, docu_root, docu_index);
     }
 
     if (!cfg.lookupValue("http.conn_time_out", conn_time_out_) ||
@@ -89,9 +97,13 @@ bool HttpConf::load_config(std::string cfgfile) {
 
 void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
+    // 恢复token
+    feed_http_service_token();
+
     // 再次启动定时器
     timed_feed_token_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
-    timed_feed_token_->async_wait(std::bind(&HttpConf::timed_feed_token_handler, shared_from_this(), std::placeholders::_1));
+    timed_feed_token_->async_wait(
+        std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
 }
 
 
@@ -109,35 +121,37 @@ HttpServer::HttpServer(const std::string& address, unsigned short port, size_t t
 
 }
 
-bool HttpServer::init(std::string cfgfile) {
+bool HttpServer::init(const libconfig::Config& cfg) {
 
-    conf_ = std::make_shared<HttpConf>();
-    if (!conf_ || !conf_->load_config(cfgfile)) {
-        log_err("Load cfg_file: %s failed!", cfgfile.c_str());
+    if (!conf_.load_config(cfg)) {
+        log_err("Load cfg failed!");
         return false;
     }
 
-    log_debug("socket/session conn time_out: %ds, linger: %ds", conf_->conn_time_out_, conf_->conn_time_out_linger_);
+    log_debug("socket/session conn time_out: %ds, linger: %ds",
+              conf_.conn_time_out_, conf_.conn_time_out_linger_);
     conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
-                              conf_->conn_time_out_, conf_->conn_time_out_linger_);
+                              conf_.conn_time_out_, conf_.conn_time_out_linger_);
 
-    log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_->ops_cancel_time_out_,
-              conf_->ops_cancel_time_out_ > 0 ? "true" : "false");
+    log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_.ops_cancel_time_out_,
+              conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
-    if (conf_->http_service_speed_) {
-        conf_->timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
+    if (conf_.http_service_speed_) {
+        conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
                                               boost::posix_time::millisec(5000))); // 5sec
-        if (!conf_->timed_feed_token_) {
+        if (!conf_.timed_feed_token_) {
             log_err("Create timed_feed_token_ failed!");
             return false;
         }
 
-        conf_->timed_feed_token_->async_wait(std::bind(&HttpConf::timed_feed_token_handler, conf_, std::placeholders::_1));
+        conf_.timed_feed_token_->async_wait(
+            std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
-    log_debug("http service enabled: %s, speed: %ld", conf_->http_service_enabled_ ? "true" : "false",
-              conf_->http_service_speed_);
+    log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
+              conf_.http_service_speed_);
 
-    if (!io_service_threads_.init_threads(std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1))) {
+    if (!io_service_threads_.init_threads(
+        std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1))) {
         log_err("HttpServer::io_service_run init task failed!");
         return false;
     }
@@ -161,7 +175,8 @@ bool HttpServer::init(std::string cfgfile) {
         return false;
     }
 
-    timed_checker_->async_wait(std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
+    timed_checker_->async_wait(
+        std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
     return true;
 }
@@ -169,11 +184,13 @@ bool HttpServer::init(std::string cfgfile) {
 
 void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {
 
+    std::cout << "TIMED CHECK" << std::endl;
     conns_alive_.clean_up();
 
     // 再次启动定时器
     timed_checker_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
-    timed_checker_->async_wait(std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
+    timed_checker_->async_wait(
+        std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 }
 
 
@@ -250,9 +267,9 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         output << "Client Info-> " << remote.address() << ":" << remote.port();
         log_debug(output.str().c_str());
 
-        if (!conf_->get_http_service_token()) {
+        if (!conf_.get_http_service_token()) {
             log_err("request http service token failed, enabled: %s, speed: %ld",
-                    conf_->http_service_enabled_ ? "true" : "false", conf_->http_service_speed_);
+                    conf_.http_service_enabled_ ? "true" : "false", conf_.http_service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -337,6 +354,13 @@ int HttpServer::find_http_get_handler(std::string uri, HttpGetHandler& handler){
 
     return -1;
 }
+
+int HttpServer::conn_destroy(ConnTypePtr p_conn) {
+    p_conn->sock_shutdown(ShutdownType::kShutdownBoth);
+    p_conn->sock_close();
+    return 0;
+}
+
 
 int HttpServer::io_service_stop_graceful() {
     log_err("About to stop io_service... ");

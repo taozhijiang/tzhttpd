@@ -15,6 +15,10 @@
 namespace tzhttpd {
 namespace http_handler {
 
+// init only once at startup, these are the default value
+std::string              http_docu_root = "./docs/";
+std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
+
 using namespace http_proto;
 
 static bool check_and_sendfile(const HttpParser& http_parser, std::string regular_file_path,
@@ -54,8 +58,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
         log_err("Default handler just for static file transmit, we can not handler uri parameters...");
     }
 
-//    std::string real_file_path = helper::request_http_docu_root() + "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
-    std::string real_file_path = "/var/www/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
+    std::string real_file_path = http_docu_root +
+        "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
 
     // check dest exist?
     if (::access(real_file_path.c_str(), R_OK) != 0) {
@@ -82,9 +86,10 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
         case S_IFDIR:
             {
                 bool OK = false;
-                // const std::vector<std::string> &indexes = helper::request_http_docu_index();
-                const std::vector<std::string> indexes = {"index.html", "index.htm"};
-                for (std::vector<std::string>::const_iterator iter = indexes.cbegin(); iter != indexes.cend(); ++iter) {
+                const std::vector<std::string>& indexes = http_docu_index;
+                for (std::vector<std::string>::const_iterator iter = indexes.cbegin();
+                      iter != indexes.cend();
+                      ++iter) {
                     std::string file_path = real_file_path + "/" + *iter;
                     log_info("Trying: %s", file_path.c_str());
                     if (check_and_sendfile(http_parser, file_path, response, status_line)) {

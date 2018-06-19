@@ -1,6 +1,9 @@
 #ifndef __TZHTTPD_HTTP_SERVER_H__
 #define __TZHTTPD_HTTP_SERVER_H__
 
+
+#include <libconfig.h++>
+
 #include <set>
 #include <map>
 #include <mutex>
@@ -14,29 +17,26 @@
 #include "ThreadPool.h"
 #include "AliveTimer.h"
 
-#include "TCPConnAsync.h"
 #include "HttpHandler.h"
-
 #include "HttpParser.h"
 
 namespace tzhttpd {
+
+class TCPConnAsync;
 
 typedef TCPConnAsync ConnType;
 typedef std::shared_ptr<ConnType> ConnTypePtr;
 typedef std::weak_ptr<ConnType>   ConnTypeWeakPtr;
 
 class HttpServer;
-class HttpConf: public std::enable_shared_from_this<HttpConf> {
+class HttpConf {
 
     friend class HttpServer;
 
 private:
-    bool load_config(std::string cfg_file);
+    bool load_config(const libconfig::Config& cfg);
 
 private:
-    std::string              docu_root_;
-    std::vector<std::string> docu_index_;
-
     int conn_time_out_;
     int conn_time_out_linger_;
 
@@ -68,10 +68,13 @@ private:
         std::lock_guard<std::mutex> lock(lock_);
         http_service_token_ = http_service_speed_;
     }
-     
+
     std::shared_ptr<boost::asio::deadline_timer> timed_feed_token_;
     void timed_feed_token_handler(const boost::system::error_code& ec);
-};
+
+};  // end class HttpConf
+
+
 
 class HttpServer : public boost::noncopyable,
                    public std::enable_shared_from_this<HttpServer> {
@@ -82,7 +85,7 @@ public:
 
     /// Construct the server to listen on the specified TCP address and port
     HttpServer(const std::string& address, unsigned short port, size_t t_size);
-    bool init(std::string cfgfile);
+    bool init(const libconfig::Config& cfg);
     void service();
 
 private:
@@ -94,8 +97,8 @@ private:
 
     std::shared_ptr<boost::asio::deadline_timer> timed_checker_;
     void timed_checker_handler(const boost::system::error_code& ec);
-    
-    std::shared_ptr<HttpConf> conf_;
+
+    HttpConf conf_;
 
     void do_accept();
     void accept_handler(const boost::system::error_code& ec, SocketPtr ptr);
@@ -112,16 +115,8 @@ public:
     int register_http_get_handler(std::string uri, HttpGetHandler handler);
     int find_http_get_handler(std::string uri, HttpGetHandler& handler);
 
-    const std::string& document_root() const {
-        return conf_->docu_root_;
-    }
-
-    const std::vector<std::string>& document_index() const {
-        return conf_->docu_index_;
-    }
-
     int ops_cancel_time_out() const {
-        return conf_->ops_cancel_time_out_;
+        return conf_.ops_cancel_time_out_;
     }
 
     int conn_add(ConnTypePtr p_conn) {
@@ -141,11 +136,7 @@ public:
         conns_alive_.DROP(ptr);
     }
 
-    int conn_destroy(ConnTypePtr p_conn) {
-        p_conn->sock_shutdown(ShutdownType::kShutdownBoth);
-        p_conn->sock_close();
-        return 0;
-    }
+    int conn_destroy(ConnTypePtr p_conn);
 
 
 public:
