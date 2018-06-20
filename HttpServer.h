@@ -107,21 +107,14 @@ private:
     void timed_checker_handler(const boost::system::error_code& ec);
 
     HttpConf conf_;
+    HttpHandler handler_;
 
     void do_accept();
     void accept_handler(const boost::system::error_code& ec, SocketPtr ptr);
 
-    std::map<std::string, HttpPostHandler> http_post_handler_;
-    std::map<std::string, HttpGetHandler>  http_get_handler_;
-
     AliveTimer<ConnType>    conns_alive_;
 
 public:
-    int register_http_post_handler(std::string uri, HttpPostHandler handler);
-    int find_http_post_handler(std::string uri, HttpPostHandler& handler);
-
-    int register_http_get_handler(std::string uri, HttpGetHandler handler);
-    int find_http_get_handler(std::string uri, HttpGetHandler& handler);
 
     int ops_cancel_time_out() const {
         return conf_.ops_cancel_time_out_;
@@ -145,6 +138,21 @@ public:
     }
 
     int conn_destroy(ConnTypePtr p_conn);
+
+
+    int register_http_get_handler(std::string uri_regex, HttpGetHandler handler) {
+        return handler_.register_http_get_handler(uri_regex, handler);
+    }
+    int register_http_post_handler(std::string uri_regex, HttpPostHandler handler) {
+        return handler_.register_http_post_handler(uri_regex, handler);
+    }
+
+    int find_http_get_handler(std::string uri, HttpGetHandler& handler) {
+        return handler_.find_http_get_handler(uri, handler);
+    }
+    int find_http_post_handler(std::string uri, HttpPostHandler& handler) {
+        return handler_.find_http_post_handler(uri, handler);
+    }
 
 
 public:

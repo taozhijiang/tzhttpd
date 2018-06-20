@@ -19,6 +19,7 @@ namespace http_handler {
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
+
 using namespace http_proto;
 
 static bool check_and_sendfile(const HttpParser& http_parser, std::string regular_file_path,
@@ -113,7 +114,101 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
     return 0;
 }
 
-
 } // end namespace http_handler
+
+
+
+// class HttpHandler
+
+int HttpHandler::register_http_get_handler(std::string uri_regex, HttpGetHandler handler){
+
+    std::string uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri_regex));
+    while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部'/'
+        uri = uri.substr(0, uri.size()-1);
+
+
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpGetHandler>>::iterator it;
+    for (it = get_handler_.begin(); it != get_handler_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
+            it->second = handler;
+            return 0;
+        }
+    }
+
+    UriRegex rgx {uri};
+    get_handler_.push_back({rgx, handler});
+
+    log_alert("Register GetHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
+    return 0;
+}
+
+int HttpHandler::register_http_post_handler(std::string uri_regex, HttpPostHandler handler){
+
+    std::string uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri_regex));
+    while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部'/'
+        uri = uri.substr(0, uri.size()-1);
+
+
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpPostHandler>>::iterator it;
+    for (it = post_handler_.begin(); it != post_handler_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
+            it->second = handler;
+            return 0;
+        }
+    }
+
+    UriRegex rgx {uri};
+    post_handler_.push_back({rgx, handler});
+
+    log_alert("Register PostHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
+    return 0;
+}
+
+int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandler& handler){
+
+    uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri));
+    while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部
+        uri = uri.substr(0, uri.size()-1);
+
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpGetHandler>>::const_iterator it;
+    boost::smatch what;
+    for (it = get_handler_.cbegin(); it != get_handler_.cend(); ++it) {
+        if (boost::regex_match(uri, what, it->first)) {
+            handler = it->second;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandler& handler){
+
+    uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri));
+    while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部
+        uri = uri.substr(0, uri.size()-1);
+
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpPostHandler>>::const_iterator it;
+    boost::smatch what;
+    for (it = post_handler_.cbegin(); it != post_handler_.cend(); ++it) {
+        if (boost::regex_match(uri, what, it->first)) {
+            handler = it->second;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
 } // end namespace tzhttpd
 

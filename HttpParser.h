@@ -8,6 +8,9 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/algorithm/string.hpp>
+
+// The GNU C++ standard library supports <regex>, but not until version 4.9.0.
+// (The headers were present in earlier versions, but were unusable.)
 #include <boost/regex.hpp>
 
 #include "KVVec.h"
@@ -292,10 +295,10 @@ private:
             } else { // HTTP 请求行，特殊处理
                 boost::smatch what;
                 if (boost::regex_match(item, what,
-                                         boost::regex("([a-zA-Z]+)[ ]+([^ ]+)([ ]+(.*))?")))
-                {
+                                       boost::regex("([a-zA-Z]+)[ ]+([^ ]+)([ ]+(.*))?"))) {
                     request_headers_.insert(std::make_pair(http_proto::header_options::request_method,
-                                                       boost::algorithm::trim_copy(boost::to_upper_copy(std::string(what[1])))));
+                                                       boost::algorithm::trim_copy(
+                                                           boost::to_upper_copy(std::string(what[1])))));
 
                     // HTTP Method
                     if (boost::iequals(find_request_header(http_proto::header_options::request_method), "GET") ) {

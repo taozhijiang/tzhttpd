@@ -3,6 +3,18 @@
 
 #include "HttpServer.h"
 
+namespace tzhttpd {
+
+using namespace http_proto;
+
+int get_test_handler(const HttpParser& http_parser, std::string& response, std::string& status_line) {
+    response = "test uri called...";
+    status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
+    return 0;
+}
+
+}
+
 int main(int argc, char* argv[]) {
 
     std::string cfgfile = "../tzhttpd.conf";
@@ -32,6 +44,8 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Init HttpServer failed!");
         return false;
     }
+
+    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

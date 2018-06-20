@@ -48,6 +48,16 @@ public:
         items_.push_back(entry);
     }
 
+    bool EXIST(const K& k) const {
+        std::lock_guard<std::mutex> lock(lock_);
+        for (size_t idx = 0; idx < items_.size(); ++idx) {
+            if (items_[idx].first == k) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool FIND(const K& k, V& v) const {
         std::lock_guard<std::mutex> lock(lock_);
         for (size_t idx = 0; idx < items_.size(); ++idx) {
@@ -83,6 +93,10 @@ public:
     void CLEAR() {
         std::lock_guard<std::mutex> lock(lock_);
         items_.clear();
+    }
+
+    std::mutex& LOCK() {
+        return lock_;
     }
 
 private:
