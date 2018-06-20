@@ -4,11 +4,14 @@
 // 所有的http uri 路由
 #include <vector>
 #include <string>
+#include <memory>
 
 #include <boost/regex.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
+#include "CgiHelper.h"
+#include "SlibLoader.h"
 
 namespace tzhttpd {
 
@@ -58,7 +61,32 @@ namespace http_handler {
 
 int default_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line);
 
+
+// deal with cgi request
+
+class CgiGetWrapper {
+
+public:
+
+    explicit CgiGetWrapper(const std::string& dl_path):
+        dl_path_(dl_path),
+        dl_({}) {
+    }
+
+    bool init();
+    int operator()(const HttpParser& http_parser,
+                   std::string& response, std::string& status_line);
+
+private:
+    std::string dl_path_;
+    std::shared_ptr<SLibLoader> dl_;
+    cgi_handler_t func_;
+};
+
+
 } // end namespace http_handler
+
+
 
 } // end namespace tzhttpd
 

@@ -46,6 +46,13 @@ int main(int argc, char* argv[]) {
     }
 
     http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
+    std::string demo_path = "../cgi-bin/libdemo.so";
+    tzhttpd::http_handler::CgiGetWrapper demo_get(demo_path);
+    if (!demo_get.init()) {
+        fprintf(stderr, "init demo_get failed!");
+        return false;
+    }
+    http_server_ptr->register_http_get_handler("^/demo$", demo_get);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

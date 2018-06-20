@@ -114,6 +114,50 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
     return 0;
 }
 
+
+// http_handler
+
+bool CgiGetWrapper::init() {
+
+    dl_ = std::make_shared<SLibLoader>(dl_path_);
+    if (!dl_) {
+        return false;
+    }
+
+    if (!dl_->init()) {
+        log_err("init dl %s failed!", dl_->get_dl_path().c_str());
+        return false;
+    }
+
+    if (!dl_->load_func<cgi_handler_t>("cgi_handler", &func_)) {
+        log_err("Load func cig_handler failed!");
+        return false;
+    }
+
+    return true;
+}
+
+
+int CgiGetWrapper::operator()(const HttpParser& http_parser,
+               std::string& response, std::string& status_line) {
+    if(func_){
+        msg_t req {};
+        msg_t resp{};
+
+        std::string hello = "hello, from http server";
+        fill_msg(&req, hello.c_str(), hello.size());
+        int ret = func_(&req, &resp);
+        response = std::string(resp.data);
+        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
+
+        free_msg(&req); free_msg(&resp);
+        return ret;
+    }
+    return -1;
+}
+
+
+
 } // end namespace http_handler
 
 
