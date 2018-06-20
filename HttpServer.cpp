@@ -5,6 +5,7 @@
 
 #include <boost/format.hpp>
 
+#include "ConfigHelper.h"
 #include "TCPConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
@@ -30,6 +31,9 @@ static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
 // work with them without protection
 std::once_flag http_docu_once;
 void init_http_docu(const std::string& docu_root, const std::vector<std::string>& docu_index) {
+    log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
+              static_cast<int>(docu_index.size()));
+
     http_handler::http_docu_root = docu_root;
     http_handler::http_docu_index = docu_index;
 }
@@ -68,8 +72,6 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
 
     // once init
     if (!docu_root.empty() && !docu_index.empty()) {
-        log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
-                  static_cast<int>(docu_index.size()));
         std::call_once(http_docu_once, init_http_docu, docu_root, docu_index);
     }
 
@@ -174,15 +176,26 @@ bool HttpServer::init(const libconfig::Config& cfg) {
     timed_checker_->async_wait(
         std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
+    if (ConfigHelper::instance().register_cfg_callback(
+            std::bind(&HttpServer::update_run_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
+        log_err("HttpServer register cfg callback failed!");
+        return false;
+    }
+
+    if (register_http_get_handler("/manage", http_handler::manage_http_get_handler) != 0) {
+        log_err("HttpServer register manage page failed!");
+        return false;
+    }
+
     return true;
 }
 
-bool HttpServer::update_run_cfg(const libconfig::Config& cfg) {
+int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
 
     HttpConf conf {};
     if (!conf.load_config(cfg)) {
         log_err("Load cfg failed!");
-        return false;
+        return -1;
     }
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
@@ -208,7 +221,7 @@ bool HttpServer::update_run_cfg(const libconfig::Config& cfg) {
                                                       boost::posix_time::millisec(5000))); // 5sec
                 if (!conf_.timed_feed_token_) {
                     log_err("Create timed_feed_token_ failed!");
-                    return false;
+                    return -2;
                 }
 
                 conf_.timed_feed_token_->async_wait(
@@ -228,11 +241,11 @@ bool HttpServer::update_run_cfg(const libconfig::Config& cfg) {
         conf_.io_thread_number_ = conf.io_thread_number_;
         if (!io_service_threads_.resize_threads(conf_.io_thread_number_)) {
             log_err("Resize io_thread_num may failed!");
-            return false;
+            return -3;
         }
     }
 
-    return true;
+    return 0;
 }
 
 void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {

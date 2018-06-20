@@ -102,7 +102,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
                 if (!OK) {
                     // default, 404
                     response = http_proto::content_not_found;
-                    status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
+                    status_line = generate_response_status_line(http_parser.get_version(),
+                                                                StatusCode::client_error_not_found);
                 }
             }
             break;
@@ -115,7 +116,47 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 }
 
 
-// http_handler
+int manage_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line) {
+
+    const UriParamContainer& params = http_parser.get_request_uri_params();
+    if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
+        log_err("manage page param check failed!");
+        response = http_proto::content_bad_request;
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::client_error_bad_request);
+        return 0;
+    }
+
+    if (params.VALUE("auth") != "d44bfc666db304b2f72b4918c8b46f78") {
+        log_err("auth check failed!");
+        response = http_proto::content_forbidden;
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::client_error_forbidden);
+        return 0;
+    }
+
+    std::string cmd = params.VALUE("cmd");
+    int ret = 0;
+    if (cmd == "reload") {
+        log_debug("do configure reconfigure ....");
+        ret = ConfigHelper::instance().update_cfg();
+    }
+
+    if (ret == 0) {
+        response = http_proto::content_ok;
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::success_ok);
+    } else {
+        response = http_proto::content_error;
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::server_error_internal_server_error);
+    }
+
+    return 0;
+}
+
+
+// http_cgi_handler
 
 bool CgiGetWrapper::init() {
 

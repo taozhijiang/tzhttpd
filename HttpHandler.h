@@ -10,6 +10,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
+#include "ConfigHelper.h"
 #include "CgiHelper.h"
 #include "SlibLoader.h"
 
@@ -60,6 +61,9 @@ private:
 namespace http_handler {
 
 int default_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line);
+
+// @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
+int manage_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line);
 
 
 // deal with cgi request

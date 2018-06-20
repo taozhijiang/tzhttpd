@@ -80,6 +80,18 @@ public:
         return false;
     }
 
+    V VALUE(const K& k) const {
+        std::lock_guard<std::mutex> lock(lock_);
+
+        V v {}; // default value
+        for (size_t idx = 0; idx < items_.size(); ++idx) {
+            if (items_[idx].first == k) {
+                return items_[idx].second;
+            }
+        }
+        return v;
+    }
+
     size_t SIZE() const {
         std::lock_guard<std::mutex> lock(lock_);
         return items_.size();

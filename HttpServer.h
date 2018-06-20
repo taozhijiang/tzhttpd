@@ -93,7 +93,7 @@ public:
     /// Construct the server to listen on the specified TCP address and port
     HttpServer(const std::string& address, unsigned short port);
     bool init(const libconfig::Config& cfg);
-    bool update_run_cfg(const libconfig::Config& cfg);
+    int update_run_cfg(const libconfig::Config& cfg);
     void service();
 
 private:
