@@ -37,6 +37,9 @@ private:
     bool load_config(const libconfig::Config& cfg);
 
 private:
+
+    int io_thread_number_;
+
     int conn_time_out_;
     int conn_time_out_linger_;
 
@@ -49,6 +52,10 @@ private:
 
     bool get_http_service_token() {
         std::lock_guard<std::mutex> lock(lock_);
+
+        if (!http_service_enabled_)
+            return false;
+
         if (http_service_speed_ == 0) // 没有限流
             return true;
 
@@ -84,8 +91,9 @@ class HttpServer : public boost::noncopyable,
 public:
 
     /// Construct the server to listen on the specified TCP address and port
-    HttpServer(const std::string& address, unsigned short port, size_t t_size);
+    HttpServer(const std::string& address, unsigned short port);
     bool init(const libconfig::Config& cfg);
+    bool update_run_cfg(const libconfig::Config& cfg);
     void service();
 
 private:

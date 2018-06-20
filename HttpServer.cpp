@@ -26,7 +26,8 @@ static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
 }
 
 
-// init http_doc_root/index
+// init http_doc_root/index, once init can guarantee no change it anymore,
+// work with them without protection
 std::once_flag http_docu_once;
 void init_http_docu(const std::string& docu_root, const std::vector<std::string>& docu_index) {
     http_handler::http_docu_root = docu_root;
@@ -35,6 +36,11 @@ void init_http_docu(const std::string& docu_root, const std::vector<std::string>
 
 
 bool HttpConf::load_config(const libconfig::Config& cfg) {
+
+    if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
+        io_thread_number_ = 8;
+        fprintf(stderr, "Using default thread_pool size: 8");
+    }
 
     std::string docu_root;
     if (!cfg.lookupValue("http.docu_root", docu_root)) {
@@ -66,6 +72,8 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
                   static_cast<int>(docu_index.size()));
         std::call_once(http_docu_once, init_http_docu, docu_root, docu_index);
     }
+
+    // other http parameters
 
     if (!cfg.lookupValue("http.conn_time_out", conn_time_out_) ||
         !cfg.lookupValue("http.conn_time_out_linger", conn_time_out_linger_)) {
@@ -110,14 +118,14 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
 /////////////////
 
-HttpServer::HttpServer(const std::string& address, unsigned short port, size_t t_size) :
+HttpServer::HttpServer(const std::string& address, unsigned short port) :
     io_service_(),
     ep_(ip::tcp::endpoint(ip::address::from_string(address), port)),
     acceptor_(),
     timed_checker_(),
     conf_({}),
     conns_alive_("TcpConnAsync"),
-    io_service_threads_(static_cast<uint8_t>(t_size)) {
+    io_service_threads_() {
 
 }
 
@@ -151,22 +159,11 @@ bool HttpServer::init(const libconfig::Config& cfg) {
               conf_.http_service_speed_);
 
     if (!io_service_threads_.init_threads(
-        std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1))) {
+        std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
+        conf_.io_thread_number_)) {
         log_err("HttpServer::io_service_run init task failed!");
         return false;
     }
-
-#if 0
-    // customize route uri handler
-    register_http_get_handler("/", http_handler::index_http_get_handler);
-    register_http_get_handler("/stat", http_handler::event_stat_http_get_handler);
-
-    register_http_get_handler("/ev_query", http_handler::get_ev_query_handler);
-    register_http_post_handler("/ev_submit", http_handler::post_ev_submit_handler);
-
-    register_http_get_handler("/test", http_handler::get_test_handler);
-    register_http_post_handler("/test", http_handler::post_test_handler);
-#endif
 
     timed_checker_.reset(new boost::asio::deadline_timer (io_service_,
                                               boost::posix_time::millisec(5000))); // 5sec
@@ -174,17 +171,72 @@ bool HttpServer::init(const libconfig::Config& cfg) {
         log_err("Create timed_checker_ failed!");
         return false;
     }
-
     timed_checker_->async_wait(
         std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
     return true;
 }
 
+bool HttpServer::update_run_cfg(const libconfig::Config& cfg) {
+
+    HttpConf conf {};
+    if (!conf.load_config(cfg)) {
+        log_err("Load cfg failed!");
+        return false;
+    }
+
+    if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
+        log_alert("update socket/session conn cancel time_out: from %d to %d",
+                  conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
+        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
+    }
+
+    if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
+        log_alert("update http_service_enabled: from %d to %d",
+                  conf_.http_service_enabled_, conf.http_service_enabled_);
+        conf_.http_service_enabled_ = conf.http_service_enabled_;
+    }
+
+    if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
+
+        log_alert("update http_service_speed: from %d to %d",
+                  conf_.http_service_speed_, conf.http_service_speed_);
+
+        if (conf.http_service_speed_) { // 启用
+            if (! conf_.timed_feed_token_) {
+                conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
+                                                      boost::posix_time::millisec(5000))); // 5sec
+                if (!conf_.timed_feed_token_) {
+                    log_err("Create timed_feed_token_ failed!");
+                    return false;
+                }
+
+                conf_.timed_feed_token_->async_wait(
+                    std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
+            }
+        } else { // 禁用
+            // 停用定时器
+            conf_.timed_feed_token_.reset();
+        }
+
+        conf_.http_service_speed_ = conf.http_service_speed_;
+    }
+
+    // 当前不支持缩减线程
+    if (conf.io_thread_number_ > conf_.io_thread_number_) {
+        log_alert("resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
+        conf_.io_thread_number_ = conf.io_thread_number_;
+        if (!io_service_threads_.resize_threads(conf_.io_thread_number_)) {
+            log_err("Resize io_thread_num may failed!");
+            return false;
+        }
+    }
+
+    return true;
+}
 
 void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {
 
-    std::cout << "TIMED CHECK" << std::endl;
     conns_alive_.clean_up();
 
     // 再次启动定时器

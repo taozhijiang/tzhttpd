@@ -60,6 +60,13 @@ public:
         return true;
     }
 
+    bool init(ThreadRunnable func, uint8_t thread_num) {
+        log_alert("update thread_num from %d to %d", thread_num_, thread_num);
+        thread_num_ = thread_num;
+
+        return init(func);
+    }
+
     void start_tasks() {
         std::map<ThreadPtr, ThreadObjPtr>::iterator it;
 
@@ -242,6 +249,15 @@ private:
 
 bool ThreadPool::init_threads(ThreadRunnable func) {
     return impl_ptr_->init(func);
+}
+
+bool ThreadPool::init_threads(ThreadRunnable func, uint8_t thread_num) {
+    if (thread_num == 0 || thread_num > kMaxiumThreadPoolSize ){
+        log_err("Invalid thread_number %d, CRITICAL !!!", thread_num);
+        log_err("Using default 1");
+        thread_num = 1;
+    }
+    return impl_ptr_->init(func, thread_num);
 }
 
 void ThreadPool::start_threads() {

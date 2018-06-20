@@ -26,13 +26,8 @@ int main(int argc, char* argv[]) {
         return false;
     }
 
-    int thread_pool_size = 0;
-    if (!cfg.lookupValue("http.thread_pool_size", thread_pool_size)) {
-        thread_pool_size = 8;
-        fprintf(stderr, "Using default thread_pool size: 8");
-    }
-    fprintf(stderr, "listen at: %s:%d, thread_pool: %d", bind_addr.c_str(), listen_port, thread_pool_size);
-    http_server_ptr.reset(new tzhttpd::HttpServer(bind_addr, static_cast<unsigned short>(listen_port), thread_pool_size));
+    fprintf(stderr, "listen at: %s:%d", bind_addr.c_str(), listen_port);
+    http_server_ptr.reset(new tzhttpd::HttpServer(bind_addr, static_cast<unsigned short>(listen_port)));
     if (!http_server_ptr || !http_server_ptr->init(cfg)) {
         fprintf(stderr, "Init HttpServer failed!");
         return false;

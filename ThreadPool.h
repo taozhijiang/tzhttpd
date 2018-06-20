@@ -36,11 +36,12 @@ class ThreadPool: private boost::noncopyable {
 
 public:
 
-    ThreadPool(uint8_t thread_num);
+    ThreadPool(uint8_t thread_num = 1);
     ~ThreadPool();
 
 
     bool init_threads(ThreadRunnable func);
+    bool init_threads(ThreadRunnable func, uint8_t thread_num);
 
     void start_threads();
     void suspend_threads();
