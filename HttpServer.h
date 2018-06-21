@@ -37,6 +37,8 @@ private:
     bool load_config(const libconfig::Config& cfg);
 
 private:
+    std::string bind_addr_;
+    unsigned short listen_port_;
 
     int io_thread_number_;
 
@@ -53,14 +55,18 @@ private:
     bool get_http_service_token() {
         std::lock_guard<std::mutex> lock(lock_);
 
-        if (!http_service_enabled_)
+        if (!http_service_enabled_) {
+            log_alert("http_service not enabled ...");
             return false;
+        }
 
         if (http_service_speed_ == 0) // 没有限流
             return true;
 
-        if (http_service_token_ <= 0)
+        if (http_service_token_ <= 0) {
+            log_alert("http_service not speed over ...");
             return false;
+        }
 
         -- http_service_token_;
         return true;
@@ -91,12 +97,14 @@ class HttpServer : public boost::noncopyable,
 public:
 
     /// Construct the server to listen on the specified TCP address and port
-    HttpServer(const std::string& address, unsigned short port);
-    bool init(const libconfig::Config& cfg);
+    explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
+    bool init();
+
     int update_run_cfg(const libconfig::Config& cfg);
     void service();
 
 private:
+    const std::string instance_name_;
     io_service io_service_;
 
     // 侦听地址信息

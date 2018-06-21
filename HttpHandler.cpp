@@ -6,6 +6,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 
+#include "HttpCfgHelper.h"
 #include "HttpProto.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
@@ -16,6 +17,7 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
+std::string              http_server_version = "1.0.0";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
@@ -139,7 +141,7 @@ int manage_http_get_handler(const HttpParser& http_parser, std::string& response
     int ret = 0;
     if (cmd == "reload") {
         log_debug("do configure reconfigure ....");
-        ret = ConfigHelper::instance().update_cfg();
+        ret = HttpCfgHelper::instance().update_cfg();
     }
 
     if (ret == 0) {

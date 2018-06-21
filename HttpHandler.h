@@ -10,7 +10,6 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
-#include "ConfigHelper.h"
 #include "CgiHelper.h"
 #include "SlibLoader.h"
 

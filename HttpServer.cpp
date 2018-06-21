@@ -5,7 +5,7 @@
 
 #include <boost/format.hpp>
 
-#include "ConfigHelper.h"
+#include "HttpCfgHelper.h"
 #include "TCPConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
@@ -13,10 +13,9 @@
 
 namespace tzhttpd {
 
-std::string TZ_VERSION = "1.0.0";
-
 namespace http_handler {
 // init only once at startup
+extern std::string              http_server_version;
 extern std::string              http_docu_root;
 extern std::vector<std::string> http_docu_index;
 } // end namespace http_handler
@@ -30,10 +29,11 @@ static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
 // init http_doc_root/index, once init can guarantee no change it anymore,
 // work with them without protection
 std::once_flag http_docu_once;
-void init_http_docu(const std::string& docu_root, const std::vector<std::string>& docu_index) {
+void init_http_docu(const std::string& server_version, const std::string& docu_root, const std::vector<std::string>& docu_index) {
     log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
               static_cast<int>(docu_index.size()));
 
+    http_handler::http_server_version = server_version;
     http_handler::http_docu_root = docu_root;
     http_handler::http_docu_index = docu_index;
 }
@@ -41,9 +41,21 @@ void init_http_docu(const std::string& docu_root, const std::vector<std::string>
 
 bool HttpConf::load_config(const libconfig::Config& cfg) {
 
+    int listen_port = 0;
+    if (!cfg.lookupValue("http.bind_addr", bind_addr_) || !cfg.lookupValue("http.listen_port", listen_port) ){
+        log_err( "get http.bind_addr & http.listen_port error");
+        return false;
+    }
+    listen_port_ = static_cast<unsigned short>(listen_port);
+
     if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
         io_thread_number_ = 8;
         fprintf(stderr, "Using default thread_pool size: 8");
+    }
+
+    std::string server_version;
+    if (!cfg.lookupValue("http.version", server_version)) {
+        log_err("get http.version failed!");
     }
 
     std::string docu_root;
@@ -71,8 +83,8 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     }
 
     // once init
-    if (!docu_root.empty() && !docu_index.empty()) {
-        std::call_once(http_docu_once, init_http_docu, docu_root, docu_index);
+    if (!server_version.empty() && !docu_root.empty() && !docu_index.empty()) {
+        std::call_once(http_docu_once, init_http_docu, server_version, docu_root, docu_index);
     }
 
     // other http parameters
@@ -102,10 +114,18 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         http_service_speed_ = 0;
     }
 
+    log_debug("HttpConf parse cfgfile %s OK!", HttpCfgHelper::instance().get_cfgfile().c_str());
+
     return true;
 }
 
 void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
+
+    if (http_service_speed_ == 0) {
+        log_alert("unlock speed jail, close the timer.");
+        timed_feed_token_.reset();
+        return;
+    }
 
     // 恢复token
     feed_http_service_token();
@@ -120,23 +140,41 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
 /////////////////
 
-HttpServer::HttpServer(const std::string& address, unsigned short port) :
+HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_name) :
+    instance_name_(instance_name),
     io_service_(),
-    ep_(ip::tcp::endpoint(ip::address::from_string(address), port)),
     acceptor_(),
     timed_checker_(),
     conf_({}),
     conns_alive_("TcpConnAsync"),
     io_service_threads_() {
 
+    HttpCfgHelper::instance().init(cfgfile);
+
 }
 
-bool HttpServer::init(const libconfig::Config& cfg) {
+bool HttpServer::init() {
+
+    libconfig::Config cfg;
+
+    std::string cfgfile = HttpCfgHelper::instance().get_cfgfile();
+    try {
+        cfg.readFile(cfgfile.c_str());
+    } catch(libconfig::FileIOException &fioex) {
+        fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
+        return false;
+    } catch(libconfig::ParseException &pex) {
+        fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
+        return false;
+    }
 
     if (!conf_.load_config(cfg)) {
         log_err("Load cfg failed!");
         return false;
     }
+
+    ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.listen_port_);
+    log_alert("create listen endpoint for %s:%d", conf_.bind_addr_.c_str(), conf_.listen_port_);
 
     log_debug("socket/session conn time_out: %ds, linger: %ds",
               conf_.conn_time_out_, conf_.conn_time_out_linger_);
@@ -176,7 +214,7 @@ bool HttpServer::init(const libconfig::Config& cfg) {
     timed_checker_->async_wait(
         std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
-    if (ConfigHelper::instance().register_cfg_callback(
+    if (HttpCfgHelper::instance().register_cfg_callback(
             std::bind(&HttpServer::update_run_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
         log_err("HttpServer register cfg callback failed!");
         return false;
@@ -199,48 +237,48 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
     }
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
-        log_alert("update socket/session conn cancel time_out: from %d to %d",
+        log_alert("===> update socket/session conn cancel time_out: from %d to %d",
                   conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
     }
 
+    // 注意，一旦关闭消费，那么管理页面也登录不上了，只用于服务下线使用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
-        log_alert("update http_service_enabled: from %d to %d",
+        log_alert("===> update http_service_enabled: from %d to %d",
                   conf_.http_service_enabled_, conf.http_service_enabled_);
         conf_.http_service_enabled_ = conf.http_service_enabled_;
     }
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
-        log_alert("update http_service_speed: from %d to %d",
+        log_alert("===> update http_service_speed: from %d to %d",
                   conf_.http_service_speed_, conf.http_service_speed_);
+        conf_.http_service_speed_ = conf.http_service_speed_;
 
-        if (conf.http_service_speed_) { // 启用
+        if (conf.http_service_speed_) { // 首次启用
             if (! conf_.timed_feed_token_) {
                 conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
                                                       boost::posix_time::millisec(5000))); // 5sec
                 if (!conf_.timed_feed_token_) {
-                    log_err("Create timed_feed_token_ failed!");
+                    log_err("create timed_feed_token_ failed!");
                     return -2;
                 }
 
                 conf_.timed_feed_token_->async_wait(
                     std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
             }
-        } else { // 禁用
-            // 停用定时器
-            conf_.timed_feed_token_.reset();
-        }
+        } else { // 禁用功能
 
-        conf_.http_service_speed_ = conf.http_service_speed_;
+            // 禁用在handler中删除定时器就可以了，直接这里删会导致CoreDump
+        }
     }
 
     // 当前不支持缩减线程
     if (conf.io_thread_number_ > conf_.io_thread_number_) {
-        log_alert("resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
+        log_alert("===> resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
         conf_.io_thread_number_ = conf.io_thread_number_;
-        if (!io_service_threads_.resize_threads(conf_.io_thread_number_)) {
-            log_err("Resize io_thread_num may failed!");
+        if (io_service_threads_.resize_threads(conf_.io_thread_number_) != 0) {
+            log_err("resize io_thread_num may failed!");
             return -3;
         }
     }

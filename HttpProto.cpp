@@ -7,8 +7,10 @@ using namespace boost::gregorian;
 
 
 namespace tzhttpd {
-    
-extern std::string TZ_VERSION;
+
+namespace http_handler {
+extern std::string              http_server_version;
+}   // end namespace http_handler
 
 namespace http_proto {
 
@@ -27,7 +29,7 @@ string http_response_generate(const string& content, const string& stat_str) {
 
     // reply fixed header
     headers[0].name = "Server";
-    headers[0].value = "TZhttpd Server/" + TZ_VERSION;
+    headers[0].value = "tzhttpd server/" + http_handler::http_server_version;
     headers[1].name = "Date";
     headers[1].value = to_simple_string(second_clock::universal_time());
     headers[2].name = "Content-Length";
@@ -62,7 +64,7 @@ string http_response_generate(const char* data, size_t len, const string& stat_s
 
     // reply fixed header
     headers[0].name = "Server";
-    headers[0].value = "TZhttpd Server/" + TZ_VERSION;
+    headers[0].value = "tzhttpd server/" + http_handler::http_server_version;
     headers[1].name = "Date";
     headers[1].value = to_simple_string(second_clock::universal_time());
     headers[2].name = "Content-Length";
