@@ -76,7 +76,7 @@ public:
 
     bool init(ExpiredHandler func) {
         if (initialized_) {
-            log_err("AliveTimer %s already initialized so we will skip, please check!", alive_name_.c_str());
+            tzhttpd_log_err("AliveTimer %s already initialized so we will skip, please check!", alive_name_.c_str());
             return true;
         }
 
@@ -88,7 +88,7 @@ public:
 
     bool init(ExpiredHandler func, time_t time_out, time_t time_linger) {
         if (initialized_) {
-            log_err("AliveTimer %s already initialized so we will skip, please check!", alive_name_.c_str());
+            tzhttpd_log_err("AliveTimer %s already initialized so we will skip, please check!", alive_name_.c_str());
             return true;
         }
 
@@ -113,19 +113,19 @@ public:
 
         typename BucketContainer::iterator iter = bucket_items_.find(ptr.get());
         if (iter == bucket_items_.end()) {
-            log_err("bucket item %p not found!", ptr.get());
+            tzhttpd_log_err("bucket item %p not found!", ptr.get());
             SAFE_ASSERT(false);
             return false;
         }
 
         time_t before = iter->second->get_expire_time();
         if (tm - before < time_linger_){
-            log_debug("item %p linger optimize: %ld - %ld = %ld", ptr.get(), tm, before, tm - before);
+            tzhttpd_log_debug("item %p linger optimize: %ld - %ld = %ld", ptr.get(), tm, before, tm - before);
             return true;
         }
 
         if (time_items_.find(before) == time_items_.end()){
-            log_err("time slot: %ld not found, critical error!", before);
+            tzhttpd_log_err("time slot: %ld not found, critical error!", before);
             SAFE_ASSERT(false);
             return false;
         }
@@ -138,7 +138,7 @@ public:
         iter->second->set_expire_time(tm);
         time_items_[tm].insert(iter->second);
         time_items_[before].erase(iter->second);
-        log_debug("touched item %p, from %ld -> %ld", ptr.get(), before, tm);
+        tzhttpd_log_debug("touched item %p, from %ld -> %ld", ptr.get(), before, tm);
         return true;
     }
 
@@ -151,14 +151,14 @@ public:
         std::lock_guard<std::mutex> lock(lock_);
         typename BucketContainer::iterator iter = bucket_items_.find(ptr.get());
         if (iter != bucket_items_.end()) {
-            log_err("insert item %p already exists at time slot %ld",
+            tzhttpd_log_err("insert item %p already exists at time slot %ld",
                     iter->second->get_raw_ptr(), iter->second->get_expire_time());
             return false;
         }
 
         active_item_ptr alive_item = std::make_shared<AliveItem<T> >(tm, ptr);
         if (!alive_item){
-            log_err("create AliveItem object failed!");
+            tzhttpd_log_err("create AliveItem object failed!");
             return false;
         }
 
@@ -169,7 +169,7 @@ public:
         }
         time_items_[tm].insert(alive_item);
 
-        log_debug("inserted item %p, time slot %ld", ptr.get(), tm);
+        tzhttpd_log_debug("inserted item %p, time slot %ld", ptr.get(), tm);
         return true;
     }
 
@@ -191,7 +191,7 @@ public:
     bool clean_up() {
 
         if (!initialized_) {
-            log_err("AliveTimer not initialized, please check ...");
+            tzhttpd_log_err("AliveTimer not initialized, please check ...");
             return false;
         }
 
@@ -205,7 +205,7 @@ public:
         ::gettimeofday(&checked_active_now, NULL);
         int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) + checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
         if (active_elapse_ms > 10) {
-            log_notice("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
+            tzhttpd_log_notice("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
             return true;
         }
 
@@ -224,11 +224,11 @@ public:
                 for (; it != iter->second.end(); ++it) {
                     T* p = (*it)->get_raw_ptr();
                     if (bucket_items_.find(p) == bucket_items_.end()) {
-                        log_err("bucket item %p not found, critical error!", p);
+                        tzhttpd_log_err("bucket item %p not found, critical error!", p);
                         SAFE_ASSERT(false);
                     }
 
-                    log_debug("bucket item remove: %p, time slot %ld", p, (*it)->get_expire_time());
+                    tzhttpd_log_debug("bucket item remove: %p, time slot %ld", p, (*it)->get_expire_time());
                     bucket_items_.erase(p);
                     std::weak_ptr<T> weak_item = (*it)->get_weak_ptr();
                     if (std::shared_ptr<T> ptr = weak_item.lock()) {
@@ -236,14 +236,14 @@ public:
                            func_(ptr);
                         }
                     } else {
-                        log_debug("item %p may already release before ...", p);
+                        tzhttpd_log_debug("item %p may already release before ...", p);
                     }
                 }
 
                 // (Old style) References and iterators to the erased elements are invalidated.
                 // Other references and iterators are not affected.
 
-                log_debug("expire entry remove: %ld, now:%ld count:%ld", iter->first, current_sec, iter->second.size());
+                tzhttpd_log_debug("expire entry remove: %ld, now:%ld count:%ld", iter->first, current_sec, iter->second.size());
                 remove_iter = iter ++;
                 time_items_.erase(remove_iter);
             }
@@ -258,7 +258,7 @@ public:
                 ::gettimeofday(&checked_now, NULL);
                 int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) + checked_now.tv_usec - checked_start.tv_usec ) / 1000;
                 if (elapse_ms > 15) {
-                    log_notice("check works too long elapse time: %ld ms, break now", elapse_ms);
+                    tzhttpd_log_notice("check works too long elapse time: %ld ms, break now", elapse_ms);
                     break;
                 }
             }
@@ -268,10 +268,10 @@ public:
         for (iter = time_items_.begin() ; iter != time_items_.end(); ++ iter) {
             total_count += iter->second.size();
         }
-        log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
+        tzhttpd_log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
                         bucket_items_.size(), total_count, static_cast<int>(time_items_.size()));
         if (bucket_items_.size() != total_count) {
-            log_err("mismatch item count, bug count:%ld, timed_count: %ld", bucket_items_.size(), total_count);
+            tzhttpd_log_err("mismatch item count, bug count:%ld, timed_count: %ld", bucket_items_.size(), total_count);
             SAFE_ASSERT(false);
         }
 
@@ -289,19 +289,19 @@ private:
         do {
             auto bucket_iter = bucket_items_.find(p);
             if (bucket_iter == bucket_items_.end()) {
-                log_notice("bucket item %p not found, may already try released before!", p);
+                tzhttpd_log_notice("bucket item %p not found, may already try released before!", p);
                 return;
             }
 
             active_item = bucket_iter->second;
             if (std::shared_ptr<T> ptr = active_item->get_weak_ptr().lock()) { // bad!!!
-                log_notice("bucket item %p still alive, leave alone with it", p);
+                tzhttpd_log_notice("bucket item %p still alive, leave alone with it", p);
                 return;
             }
 
             auto time_iter = time_items_.find(active_item->get_expire_time());
             if (time_iter == time_items_.end()) {
-                log_err("time slot %ld not found, critical error!", active_item->get_expire_time());
+                tzhttpd_log_err("time slot %ld not found, critical error!", active_item->get_expire_time());
                 SAFE_ASSERT(false);
                 bucket_items_.erase(bucket_iter);  // remove it anyway
                 break;
@@ -310,13 +310,13 @@ private:
             std::set<active_item_ptr>& time_set = time_iter->second;
             auto time_item_iter = time_set.find(active_item);
             if (time_item_iter == time_set.end()) {
-                log_err("time item not found, critical error!");
+                tzhttpd_log_err("time item not found, critical error!");
                 SAFE_ASSERT(false);
                 bucket_items_.erase(bucket_iter);
                 break;
             }
 
-            log_debug("bucket item remove: %p, time slot %ld", p, active_item->get_expire_time());
+            tzhttpd_log_debug("bucket item remove: %p, time slot %ld", p, active_item->get_expire_time());
             bucket_items_.erase(bucket_iter);
             time_set.erase(time_item_iter);
 
@@ -324,7 +324,7 @@ private:
 
         auto weak_real = active_item->get_weak_ptr();
         if (std::shared_ptr<T> ptr = weak_real.lock()) { // bad!!!
-            log_err("active remove item should not shared, bug...");
+            tzhttpd_log_err("active remove item should not shared, bug...");
             SAFE_ASSERT(false);
             func_(ptr);
         }
@@ -348,7 +348,7 @@ private:
         int count = static_cast<int>(drop_items_.size());
         drop_items_.clear();
 
-        log_debug("total active remove %d items!", count);
+        tzhttpd_log_debug("total active remove %d items!", count);
         return count;
     }
 

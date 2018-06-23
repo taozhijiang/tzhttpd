@@ -42,28 +42,28 @@ bool HttpCfgHelper::init(const std::string& cfgfile) {
 int HttpCfgHelper::update_cfg() {
 
     if (cfgfile_.empty()) {
-        log_err("cfg_file is empty, may not init HttpCfgHelper ? ...");
+        tzhttpd_log_err("cfg_file is empty, may not init HttpCfgHelper ? ...");
         return -1;
     }
 
     if (in_process_) {
-        log_err("!!! already in apply configure process, please try it later!");
+        tzhttpd_log_err("!!! already in apply configure process, please try it later!");
         return 0;
     }
 
     std::unique_ptr<libconfig::Config> cfg(new libconfig::Config());
     if (!cfg) {
-        log_err("new libconfig::Config failed!");
+        tzhttpd_log_err("new libconfig::Config failed!");
         return -2;
     }
 
     try {
         cfg->readFile(cfgfile_.c_str());
     } catch(libconfig::FileIOException &fioex) {
-        log_err("I/O error while reading file: %s.", cfgfile_.c_str());
+        tzhttpd_log_err("I/O error while reading file: %s.", cfgfile_.c_str());
         return -3;
     } catch(libconfig::ParseException &pex) {
-        log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
+        tzhttpd_log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
         return -4;
     }
 
@@ -76,7 +76,7 @@ int HttpCfgHelper::update_cfg() {
         ret += (*it)(*cfg_ptr_); // call it!
     }
 
-    log_alert("ConfigHelper::update_cfg total callback return: %d", ret);
+    tzhttpd_log_alert("ConfigHelper::update_cfg total callback return: %d", ret);
     in_process_ = false;
 
     return ret;

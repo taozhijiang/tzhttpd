@@ -19,6 +19,8 @@ Log& Log::instance() {
     return helper;
 }
 
+// We believe outer project some where already initialized this.
+// Because it is just library.
 bool Log::init(int log_level) {
 //    openlog(program_invocation_short_name, LOG_PID , LOG_LOCAL6);
 //    setlogmask (LOG_UPTO (log_level));
@@ -41,7 +43,7 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
 
     n = static_cast<int>(strlen(buf));
     if (likely(std::find(buf, buf + n, '\n') == (buf + n))) {
-        buf[n] = '\n';   // 兼容老的pbi_log_service
+        buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
         ::syslog(priority, "%s", buf);
         return;
     }
@@ -71,7 +73,7 @@ void log_api(const char* priority, const char *file, int line, const char *func,
 
     n = static_cast<int>(strlen(buf));
     if (std::find(buf, buf + n, '\n') == (buf + n)) {
-        buf[n] = '\n';   // 兼容老的pbi_log_service
+        buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
         fprintf(stderr, "%s", buf);
         return;
     }

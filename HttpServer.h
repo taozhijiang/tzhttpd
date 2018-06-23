@@ -63,7 +63,7 @@ private:
         std::lock_guard<std::mutex> lock(lock_);
 
         // if (!http_service_enabled_) {
-        //    log_alert("http_service not enabled ...");
+        //    tzhttpd_log_alert("http_service not enabled ...");
         //    return false;
         // }
 
@@ -71,7 +71,7 @@ private:
             return true;
 
         if (http_service_token_ <= 0) {
-            log_alert("http_service not speed over ...");
+            tzhttpd_log_alert("http_service not speed over ...");
             return false;
         }
 
@@ -170,7 +170,7 @@ public:
                 return 0;
             }
 
-            log_err("http_service_enabled_ == false, reject request GET %s ... ", uri.c_str());
+            tzhttpd_log_err("http_service_enabled_ == false, reject request GET %s ... ", uri.c_str());
             return -1;
         }
         return handler_.find_http_get_handler(uri, handler);
@@ -178,7 +178,7 @@ public:
 
     int find_http_post_handler(std::string uri, HttpPostHandler& handler) {
         if (!conf_.http_service_enabled_) {
-            log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
+            tzhttpd_log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
             return -1;
         }
 

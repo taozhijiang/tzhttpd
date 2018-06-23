@@ -36,7 +36,7 @@ public:
         // RTLD_NOW: All unresolved symbols resolved when dlopen() is called.
         dl_handle_ = dlopen(dl_path_.c_str(), RTLD_LAZY);
         if (!dl_handle_) {
-            log_err("Load library %s failed: %s.", dl_path_.c_str(), dlerror());
+            tzhttpd_log_err("Load library %s failed: %s.", dl_path_.c_str(), dlerror());
             return false;
         }
 
@@ -46,17 +46,17 @@ public:
 
         module_init_ = (module_init_t)dlsym(dl_handle_, "module_init");
         if ((err_info = dlerror()) != NULL ) {
-            log_err("Load func module_init failed: %s", err_info);
+            tzhttpd_log_err("Load func module_init failed: %s", err_info);
             return false;
         }
 
         module_exit_ = (module_exit_t)dlsym(dl_handle_, "module_exit");
         if ((err_info = dlerror()) != NULL ) {
-            log_err("Load func module_exit failed: %s", err_info);
+            tzhttpd_log_err("Load func module_exit failed: %s", err_info);
             return false;
         }
 
-        log_alert("module %s load ok!", dl_path_.c_str());
+        tzhttpd_log_alert("module %s load ok!", dl_path_.c_str());
         return true;
     }
 
@@ -73,12 +73,12 @@ public:
 
         FuncType func_t = (FuncType)dlsym(dl_handle_, func_name.c_str());
         if ((err_info = dlerror()) != NULL ) {
-            log_err("Load func %s failed: %s", func_name.c_str(), err_info);
+            tzhttpd_log_err("Load func %s failed: %s", func_name.c_str(), err_info);
             return false;
         }
 
         *func = func_t;
-        log_alert("load func %s from %s ok!", func_name.c_str(), dl_path_.c_str());
+        tzhttpd_log_alert("load func %s from %s ok!", func_name.c_str(), dl_path_.c_str());
         return true;
     }
 

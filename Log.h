@@ -52,28 +52,28 @@ public:
     void log_api(int priority, const char *file, int line, const char *func, const char *msg, ...);
 };
 
-#define log_emerg(...)  Log::instance().log_api( LOG_EMERG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_alert(...)  Log::instance().log_api( LOG_ALERT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_crit(...)   Log::instance().log_api( LOG_CRIT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_err(...)  Log::instance().log_api( LOG_ERR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_warning(...)  Log::instance().log_api( LOG_WARNING, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_notice(...)  Log::instance().log_api( LOG_NOTICE, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_info(...)  Log::instance().log_api( LOG_INFO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_debug(...)  Log::instance().log_api( LOG_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_emerg(...)   Log::instance().log_api( LOG_EMERG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_alert(...)   Log::instance().log_api( LOG_ALERT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_crit(...)    Log::instance().log_api( LOG_CRIT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_err(...)     Log::instance().log_api( LOG_ERR, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_warning(...) Log::instance().log_api( LOG_WARNING, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_notice(...)  Log::instance().log_api( LOG_NOTICE, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_info(...)    Log::instance().log_api( LOG_INFO, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_debug(...)   Log::instance().log_api( LOG_DEBUG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 #else  // TZHTTPD_USING_SYSLOG
 
 void log_api(const char* priority, const char *file, int line, const char *func, const char *msg, ...);
 
 
-#define log_emerg(...)   log_api( "EMERG", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_alert(...)   log_api( "ALERT", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_crit(...)    log_api( "CRIT", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_err(...)     log_api( "ERR", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_warning(...) log_api( "WARNING", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_notice(...)  log_api( "NOTICE", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_info(...)    log_api( "INFO", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define log_debug(...)   log_api( "DEBUG", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_emerg(...)   log_api( "EMERG", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_alert(...)   log_api( "ALERT", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_crit(...)    log_api( "CRIT", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_err(...)     log_api( "ERR", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_warning(...) log_api( "WARNING", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_notice(...)  log_api( "NOTICE", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_info(...)    log_api( "INFO", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define tzhttpd_log_debug(...)   log_api( "DEBUG", __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 
 #endif // TZHTTPD_USING_SYSLOG
