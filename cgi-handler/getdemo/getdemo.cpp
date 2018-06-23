@@ -16,9 +16,9 @@ int module_exit() {
 }
 
 
-int cgi_handler(const msg_t* req, msg_t* resp) {
-    std::string msg = "return from demo so, with orign:" + std::string(req->data);
-    fill_msg(resp, msg.c_str(), msg.size());
+int cgi_get_handler(const msg_t* param, msg_t* rsp) {
+    std::string msg = "return from getdemo with param:" + std::string(param->data);
+    fill_msg(rsp, msg.c_str(), msg.size());
     return 0;
 }
 

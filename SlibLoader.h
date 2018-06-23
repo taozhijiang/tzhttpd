@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_SLIB_LOADER_H__
 #define __TZHTTPD_SLIB_LOADER_H__
 
@@ -54,8 +61,8 @@ public:
     }
 
     // 函数指针类型
-    template<typename funcT>
-    bool load_func(const std::string& func_name, funcT* func) {
+    template<typename FuncType>
+    bool load_func(const std::string& func_name, FuncType* func) {
 
         if (!dl_handle_) {
             return false;
@@ -64,7 +71,7 @@ public:
         dlerror();
         char *err_info = NULL;
 
-        funcT func_t = (funcT)dlsym(dl_handle_, func_name.c_str());
+        FuncType func_t = (FuncType)dlsym(dl_handle_, func_name.c_str());
         if ((err_info = dlerror()) != NULL ) {
             log_err("Load func %s failed: %s", func_name.c_str(), err_info);
             return false;

@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include <boost/date_time/posix_time/posix_time.hpp>
 using namespace boost::posix_time;
 using namespace boost::gregorian;
@@ -45,6 +52,7 @@ string http_response_generate(const string& content, const string& stat_str) {
     headers[6].value = "*";
 
     string str = stat_str;
+    str += header_crlf_str;
     for (size_t i=0; i< headers.size(); ++i) {
         str += headers[i].name;
         str += header_name_value_separator_str;
@@ -77,6 +85,7 @@ string http_response_generate(const char* data, size_t len, const string& stat_s
     headers[5].value = "*";
 
     string str = stat_str;
+    str += header_crlf_str;
     for (size_t i=0; i< headers.size(); ++i) {
         str += headers[i].name;
         str += header_name_value_separator_str;

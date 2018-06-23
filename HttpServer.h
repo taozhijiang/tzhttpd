@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_HTTP_SERVER_H__
 #define __TZHTTPD_HTTP_SERVER_H__
 
@@ -55,10 +62,10 @@ private:
     bool get_http_service_token() {
         std::lock_guard<std::mutex> lock(lock_);
 
-        if (!http_service_enabled_) {
-            log_alert("http_service not enabled ...");
-            return false;
-        }
+        // if (!http_service_enabled_) {
+        //    log_alert("http_service not enabled ...");
+        //    return false;
+        // }
 
         if (http_service_speed_ == 0) // 没有限流
             return true;
@@ -148,17 +155,33 @@ public:
     int conn_destroy(ConnTypePtr p_conn);
 
 
-    int register_http_get_handler(std::string uri_regex, HttpGetHandler handler) {
+    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler) {
         return handler_.register_http_get_handler(uri_regex, handler);
     }
-    int register_http_post_handler(std::string uri_regex, HttpPostHandler handler) {
+    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler) {
         return handler_.register_http_post_handler(uri_regex, handler);
     }
 
     int find_http_get_handler(std::string uri, HttpGetHandler& handler) {
+        if (!conf_.http_service_enabled_) {
+            uri = handler_.pure_uri_path(uri);
+            if (boost::iequals(uri, "/manage")) {
+                handler = http_handler::manage_http_get_handler;
+                return 0;
+            }
+
+            log_err("http_service_enabled_ == false, reject request GET %s ... ", uri.c_str());
+            return -1;
+        }
         return handler_.find_http_get_handler(uri, handler);
     }
+
     int find_http_post_handler(std::string uri, HttpPostHandler& handler) {
+        if (!conf_.http_service_enabled_) {
+            log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
+            return -1;
+        }
+
         return handler_.find_http_post_handler(uri, handler);
     }
 

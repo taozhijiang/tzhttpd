@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_KVVEC_H__
 #define __TZHTTPD_KVVEC_H__
 
@@ -109,6 +116,24 @@ public:
 
     std::mutex& LOCK() {
         return lock_;
+    }
+
+    // 简单的json序列化，暂时不引入json库
+    std::string SERIALIZE() const {
+        std::lock_guard<std::mutex> lock(lock_);
+
+        std::stringstream ss;
+        ss << "{";
+        for (size_t idx = 0; idx < items_.size(); ++idx) {
+            if (idx != 0) {
+                ss << ",";
+            }
+            ss << "\"" << items_[idx].first << "\"" << ":";
+            ss << "\"" << items_[idx].second << "\"";
+        }
+        ss << "}";
+
+        return ss.str();
     }
 
 private:

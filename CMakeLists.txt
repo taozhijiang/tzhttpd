@@ -8,7 +8,8 @@ set(CMAKE_CXX_FLAGS_DEBUG   "$ENV{CXXFLAGS} -O0 -g")
 set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O2 ")
 
 # 所有的cgi-handler都在这个目录下添加
-add_subdirectory( cgi-handler/demo )
+add_subdirectory( cgi-handler/getdemo )
+add_subdirectory( cgi-handler/postdemo )
 
 include_directories(
            ../xtra_rhel6.x/include )

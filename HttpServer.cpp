@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -9,6 +16,8 @@
 #include "TCPConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
+
+#include "SslSetup.h"
 #include "Log.h"
 
 namespace tzhttpd {
@@ -155,6 +164,11 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 
 bool HttpServer::init() {
 
+    if (!Ssl_thread_setup) {
+        log_err("Ssl_thread_setup failed!");
+        return false;
+    }
+
     libconfig::Config cfg;
 
     std::string cfgfile = HttpCfgHelper::instance().get_cfgfile();
@@ -220,9 +234,16 @@ bool HttpServer::init() {
         return false;
     }
 
+    // 固定的管理页面地址
     if (register_http_get_handler("/manage", http_handler::manage_http_get_handler) != 0) {
         log_err("HttpServer register manage page failed!");
         return false;
+    }
+
+    // load cgi_handlers
+    int ret_code = handler_.update_run_cfg(cfg);
+    if (ret_code != 0) {
+        log_err("register cgi-handler return %d", ret_code);
     }
 
     return true;
@@ -242,7 +263,7 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
     }
 
-    // 注意，一旦关闭消费，那么管理页面也登录不上了，只用于服务下线使用
+    // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了manage管理页面可用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
         log_alert("===> update http_service_enabled: from %d to %d",
                   conf_.http_service_enabled_, conf.http_service_enabled_);
@@ -283,7 +304,13 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
         }
     }
 
-    return 0;
+    // reload cgi-handlers
+    int ret_code = handler_.update_run_cfg(cfg);
+    if (ret_code != 0) {
+        log_err("register cgi-handler return %d", ret_code);
+    }
+
+    return ret_code;
 }
 
 void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {

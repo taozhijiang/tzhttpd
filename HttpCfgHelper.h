@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+ 
 #ifndef __TZHTTPD_HTTP_CFG_HELPER__
 #define __TZHTTPD_HTTP_CFG_HELPER__
 

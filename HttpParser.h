@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_HTTP_PARSER_H__
 #define __TZHTTPD_HTTP_PARSER_H__
 
@@ -156,6 +163,10 @@ public:
 
     const UriParamContainer& get_request_uri_params() const {
         return request_uri_params_;
+    }
+
+    std::string get_request_uri_params_string() const {
+        return request_uri_params_.SERIALIZE();
     }
 
     bool get_request_uri_param(const std::string& key, std::string& value) const {
