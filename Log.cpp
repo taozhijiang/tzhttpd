@@ -8,6 +8,7 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "LocalHead.h"
 #include "Log.h"
 
 namespace tzhttpd {
@@ -44,7 +45,7 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
     n = static_cast<int>(strlen(buf));
     if (likely(std::find(buf, buf + n, '\n') == (buf + n))) {
         buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
-        ::syslog(priority, "%s", buf);
+        syslog(priority, "%s", buf);
         return;
     }
 
@@ -54,7 +55,7 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
     for (std::vector<string>::iterator it = messages.begin(); it != messages.end(); ++it){
         if (!it->empty()) {
             std::string message = (*it) + "\n";
-            ::syslog(priority, "%s", message.c_str());
+            syslog(priority, "%s", message.c_str());
         }
     }
 }
@@ -73,7 +74,7 @@ void log_api(const char* priority, const char *file, int line, const char *func,
 
     n = static_cast<int>(strlen(buf));
     if (std::find(buf, buf + n, '\n') == (buf + n)) {
-        buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
+        buf[n] = '\n';   // 兼容老的log_service
         fprintf(stderr, "%s", buf);
         return;
     }

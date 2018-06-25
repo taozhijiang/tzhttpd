@@ -46,18 +46,26 @@ private:
 private:
     std::string bind_addr_;
     unsigned short listen_port_;
+    std::set<std::string> safe_ip_;
 
     int io_thread_number_;
+
+    // 加载、更新配置的时候保护竞争状态
+    std::mutex        lock_;
 
     int conn_time_out_;
     int conn_time_out_linger_;
 
     int ops_cancel_time_out_;  // sec 会话超时自动取消ops
 
-    std::mutex        lock_;
     bool              http_service_enabled_;  // 服务开关
     int64_t           http_service_speed_;
     volatile int64_t  http_service_token_;
+
+    bool check_safe_ip(const std::string& ip) {
+        std::lock_guard<std::mutex> lock(lock_);
+        return ( safe_ip_.empty() || (safe_ip_.find(ip) != safe_ip_.cend()) );
+    }
 
     bool get_http_service_token() {
         std::lock_guard<std::mutex> lock(lock_);

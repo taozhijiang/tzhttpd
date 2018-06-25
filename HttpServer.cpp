@@ -57,9 +57,29 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     }
     listen_port_ = static_cast<unsigned short>(listen_port);
 
+    std::string ip_list;
+    if (cfg.lookupValue("http.safe_ip", ip_list)) {
+        std::vector<std::string> ip_vec;
+        std::set<std::string> ip_set;
+        boost::split(ip_vec, ip_list, boost::is_any_of(";"));
+        for (std::vector<std::string>::iterator it = ip_vec.begin(); it != ip_vec.cend(); ++it){
+            std::string tmp = boost::trim_copy(*it);
+            if (tmp.empty())
+                continue;
+
+            ip_set.insert(tmp);
+        }
+
+        std::swap(ip_set, safe_ip_);
+    }
+    if (!safe_ip_.empty()) {
+        tzhttpd_log_alert("safe_ip not empty, contain %d items", static_cast<int>(safe_ip_.size()));
+    }
+
+
     if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
         io_thread_number_ = 8;
-        fprintf(stderr, "Using default thread_pool size: 8");
+        tzhttpd_log_err("Using default thread_pool size: 8");
     }
 
     std::string server_version;
@@ -176,11 +196,16 @@ bool HttpServer::init() {
         cfg.readFile(cfgfile.c_str());
     } catch(libconfig::FileIOException &fioex) {
         fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
+        tzhttpd_log_err( "I/O error while reading file: %s.", cfgfile.c_str());
         return false;
     } catch(libconfig::ParseException &pex) {
         fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
+        tzhttpd_log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
         return false;
     }
+
+    // protect cfg race conditon
+    std::lock_guard<std::mutex> lock(conf_.lock_);
 
     if (!conf_.load_config(cfg)) {
         tzhttpd_log_err("Load cfg failed!");
@@ -256,6 +281,12 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
         tzhttpd_log_err("Load cfg failed!");
         return -1;
     }
+
+    // protect cfg race conditon
+    std::lock_guard<std::mutex> lock(conf_.lock_);
+
+    tzhttpd_log_alert("Exchange safe_ip_ .");
+    std::swap(conf.safe_ip_, conf_.safe_ip_);
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
         tzhttpd_log_alert("===> update socket/session conn cancel time_out: from %d to %d",
@@ -387,15 +418,22 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         }
 
         boost::system::error_code ignore_ec;
-        std::stringstream output;
         auto remote = sock_ptr->remote_endpoint(ignore_ec);
         if (ignore_ec) {
             tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec, ignore_ec.message().c_str());
             break;
         }
 
-        output << "Client Info-> " << remote.address() << ":" << remote.port();
-        tzhttpd_log_debug(output.str().c_str());
+        std::string remote_ip = remote.address().to_string(ignore_ec);
+        tzhttpd_log_debug("Remote Client Info: %s:%d", remote_ip.c_str(), remote.port());
+
+        if (!conf_.check_safe_ip(remote_ip)) {
+            tzhttpd_log_err("check safe_ip failed for: %s", remote_ip.c_str());
+
+            sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
+            sock_ptr->close(ignore_ec);
+            break;
+        }
 
         if (!conf_.get_http_service_token()) {
             tzhttpd_log_err("request http service token failed, enabled: %s, speed: %ld",

@@ -4,7 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #include "HttpCfgHelper.h"
 #include "Log.h"
 
@@ -27,10 +27,12 @@ bool HttpCfgHelper::init(const std::string& cfgfile) {
         cfg_ptr_->readFile(cfgfile.c_str());
     } catch(libconfig::FileIOException &fioex) {
         fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
+        tzhttpd_log_err( "I/O error while reading file: %s.", cfgfile.c_str());
         cfg_ptr_.reset();
         return false;
     } catch(libconfig::ParseException &pex) {
         fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
+        tzhttpd_log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
         cfg_ptr_.reset();
         return false;
     }
