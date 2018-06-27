@@ -8,4 +8,5 @@ The key-points of this library includes:
 4. Based on Boost library and C++0x standard, so can used in legacy but widely-deploied RHEL-6.x environment.   
 5. Not buggy, and has stood tests in a way.    
 
-
+Performance:
+![siege](siege.png?raw=true "siege")
