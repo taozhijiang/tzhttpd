@@ -4,7 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -371,8 +371,8 @@ int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandler& handle
 int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key, std::map<std::string, std::string>& path_map) {
 
     if (!cfg.exists(key)) {
-        tzhttpd_log_err("handlers for %s not found!", key.c_str());
-        return -1;
+        tzhttpd_log_notice("handlers for %s not found!", key.c_str());
+        return 0;
     }
 
     path_map.clear();
