@@ -211,6 +211,7 @@ namespace http_proto {
 
     static const char header_name_value_separator[] = { ':', ' ' };
     static const char header_crlf[] = { '\r', '\n'};
+    static const char header_crlfcrlf[] = { '\r', '\n', '\r', '\n'};
 
     static string header_name_value_separator_str = ": ";
     static string header_crlf_str = "\r\n";
@@ -219,9 +220,11 @@ namespace http_proto {
     /**
      * 由于最终的底层都是调用c_str()发送的，所以这里不添加额外的字符
      */
-    string http_response_generate(const string& content, const string& stat_str);
-    string http_response_generate(const char* data, size_t len, const string& stat_str);
-    string http_std_response_generate(const std::string& http_ver, enum StatusCode stat);
+    string http_response_generate(const string& content, const string& stat_str,
+                                  bool keepalive, const std::vector<std::string>& additional_header);
+    string http_response_generate(const char* data, size_t len, const string& stat_str,
+                                  bool keepalive, const std::vector<std::string>& additional_header);
+    string http_std_response_generate(const std::string& http_ver, enum StatusCode stat, bool keepalive);
 
 } // end namespace http_proto
 
