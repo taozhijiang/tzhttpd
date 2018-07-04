@@ -4,7 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #ifndef __TZHTTPD_CRYPTO_UTIL_H__
 #define __TZHTTPD_CRYPTO_UTIL_H__
 
@@ -20,11 +20,13 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include "General.h"
+#include "LocalHead.h"
 
 // 类静态函数可以直接将函数定义丢在头文件中
 
 namespace tzhttpd {
+
+// struct相比于namespace，可以避免产生多个实体
 
 struct CryptoUtil {
 
@@ -92,6 +94,7 @@ static std::string base64_decode(const std::string &base64) noexcept {
 }
 
 /// Return hex string from bytes in input string.
+/// 比如签名的二进制结果进行HEX字符串表达显示
 static std::string to_hex_string(const std::string &input) noexcept {
     std::stringstream hex_stream;
     hex_stream << std::hex << std::internal << std::setfill('0');
@@ -245,19 +248,6 @@ static std::string url_decode(const std::string& src) noexcept {
     return result;
 }
 
-
-static std::string hex_string(const char *data, size_t len) noexcept {
-
-    static const char *hexmap = "0123456789ABCDEF";
-    std::string result(len * 2, ' ');
-
-    for (size_t i = 0; i < len; ++i) {
-        result[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
-        result[2 * i + 1] = hexmap[ data[i] & 0x0F];
-    }
-
-    return result;
-}
 
 };
 

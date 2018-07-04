@@ -4,7 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #ifndef __TZHTTPD_HTTP_PROTO_H__
 #define __TZHTTPD_HTTP_PROTO_H__
 
@@ -214,6 +214,7 @@ namespace http_proto {
 
     static string header_name_value_separator_str = ": ";
     static string header_crlf_str = "\r\n";
+    static string header_crlfcrlf_str = "\r\n\r\n";
 
     /**
      * 由于最终的底层都是调用c_str()发送的，所以这里不添加额外的字符
@@ -221,9 +222,6 @@ namespace http_proto {
     string http_response_generate(const string& content, const string& stat_str);
     string http_response_generate(const char* data, size_t len, const string& stat_str);
     string http_std_response_generate(const std::string& http_ver, enum StatusCode stat);
-
-    int http_url_decode(const std::string& in, std::string& out);
-    int http_url_encode(const std::string& in, std::string& out);
 
 } // end namespace http_proto
 

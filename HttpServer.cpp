@@ -76,6 +76,10 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         tzhttpd_log_alert("safe_ip not empty, contain %d items", static_cast<int>(safe_ip_.size()));
     }
 
+    if (!cfg.lookupValue("http.backlog_size", backlog_size_)) {
+        backlog_size_ = 0;
+    }
+
 
     if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
         io_thread_number_ = 8;
@@ -395,7 +399,7 @@ void HttpServer::service() {
 
     acceptor_->set_option(ip::tcp::acceptor::reuse_address(true));
     acceptor_->bind(ep_);
-    acceptor_->listen();
+    acceptor_->listen(conf_.backlog_size_ > 0 ? conf_.backlog_size_ : socket_base::max_connections);
 
     do_accept();
 }

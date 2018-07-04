@@ -48,6 +48,7 @@ private:
     unsigned short listen_port_;
     std::set<std::string> safe_ip_;
 
+    int backlog_size_;
     int io_thread_number_;
 
     // 加载、更新配置的时候保护竞争状态

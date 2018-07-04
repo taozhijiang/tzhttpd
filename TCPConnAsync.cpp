@@ -4,13 +4,14 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #include <thread>
 #include <functional>
 
 #include <boost/algorithm/string.hpp>
 
 #include "HttpServer.h"
+#include "HttpProto.h"
 #include "TCPConnAsync.h"
 
 namespace tzhttpd {
@@ -78,7 +79,7 @@ void TCPConnAsync::do_read_head() {
 
     set_ops_cancel_timeout();
     async_read_until(*sock_ptr_, request_,
-                             "\r\n\r\n",
+                        http_proto::header_crlfcrlf_str,
                              strand_->wrap(
                                  std::bind(&TCPConnAsync::read_head_handler,
                                      shared_from_this(),

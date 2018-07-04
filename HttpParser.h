@@ -23,6 +23,7 @@
 #include "KVVec.h"
 #include "Log.h"
 
+#include "CryptoUtil.h"
 #include "HttpProto.h"
 
 namespace tzhttpd {
@@ -92,12 +93,12 @@ public:
         std::string::size_type item_idx = 0;
         item_idx = uri.find_first_of("?");
         if (item_idx == std::string::npos) {
-            request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info, url_decode(uri)));
+            request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info, CryptoUtil::url_decode(uri)));
             return true;
         }
 
         request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info,
-                                                        url_decode(uri.substr(0, item_idx))));
+                                                        CryptoUtil::url_decode(uri.substr(0, item_idx))));
         request_headers_.insert(std::make_pair(http_proto::header_options::request_query_str,
                                                         uri.substr(item_idx + 1)));
 
@@ -132,21 +133,21 @@ public:
                 }
 
                 // this becomes an name with an empty value
-                name = url_decode(query_str.substr(oldPos, pos - oldPos));
+                name = CryptoUtil::url_decode(query_str.substr(oldPos, pos - oldPos));
                 request_uri_params_.PUSH_BACK(name, std::string(""));
                 oldPos = ++pos;
                 continue;
             }
 
             // else find the value
-            name = url_decode(query_str.substr(oldPos, pos - oldPos));
+            name = CryptoUtil::url_decode(query_str.substr(oldPos, pos - oldPos));
             oldPos = ++pos;
 
             // Find the '&' or ';' separating subsequent name/value pairs
             pos = query_str.find_first_of(";&", oldPos);
 
             // Even if an '&' wasn't found the rest of the string is a value
-            value = url_decode(query_str.substr(oldPos, pos - oldPos));
+            value = CryptoUtil::url_decode(query_str.substr(oldPos, pos - oldPos));
 
             // Store the pair
             request_uri_params_.PUSH_BACK(name, value);
@@ -196,75 +197,6 @@ public:
         return static_cast<char>(digit);
     }
 
-    std::string url_encode(const std::string& src) {
-
-        std::string result;
-        for(std::string::const_iterator iter = src.begin(); iter != src.end(); ++iter) {
-            switch(*iter) {
-                case ' ':
-                    result.append(1, '+');
-                    break;
-
-                // alnum
-                case 'A': case 'B': case 'C': case 'D': case 'E': case 'F': case 'G':
-                case 'H': case 'I': case 'J': case 'K': case 'L': case 'M': case 'N':
-                case 'O': case 'P': case 'Q': case 'R': case 'S': case 'T': case 'U':
-                case 'V': case 'W': case 'X': case 'Y': case 'Z':
-                case 'a': case 'b': case 'c': case 'd': case 'e': case 'f': case 'g':
-                case 'h': case 'i': case 'j': case 'k': case 'l': case 'm': case 'n':
-                case 'o': case 'p': case 'q': case 'r': case 's': case 't': case 'u':
-                case 'v': case 'w': case 'x': case 'y': case 'z':
-                case '0': case '1': case '2': case '3': case '4': case '5': case '6':
-                case '7': case '8': case '9':
-                // mark
-                case '-': case '_': case '.': case '!': case '~': case '*': case '\'':
-                case '(': case ')':
-                    result.append(1, *iter);
-                    break;
-
-                // escape
-                default:
-                    result.append(1, '%');
-                    result.append(char_to_hex(*iter));
-                    break;
-            }
-        }
-
-        return result;
-    }
-
-
-    std::string url_decode(const std::string& src) const {
-
-        std::string result;
-        char c;
-
-        for(std::string::const_iterator iter = src.begin(); iter != src.end(); ++iter) {
-            switch(*iter) {
-                case '+':
-                    result.append(1, ' ');
-                    break;
-
-                case '%':
-                    // Don't assume well-formed input
-                    if(std::distance(iter, src.end()) >= 2 && std::isxdigit(*(iter + 1)) && std::isxdigit(*(iter + 2))) {
-                        c = *(++iter);
-                        result.append(1, hex_to_char(c, *(++iter)));
-                    }
-                    // Just pass the % through untouched
-                    else {
-                        result.append(1, '%');
-                    }
-                    break;
-
-                default:
-                    result.append(1, *iter);
-                    break;
-            }
-        }
-
-        return result;
-    }
 
 private:
 
