@@ -24,7 +24,7 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.1.0";
+std::string              http_server_version = "1.1.1";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
@@ -236,10 +236,12 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
     std::string header(rsp_header.data, rsp_header.len);
     if (!header.empty()) {
         std::vector<std::string> vec{};
-        boost::split(vec, header, boost::is_any_of(";"));
+        boost::split(vec, header, boost::is_any_of("\n"));
         for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
             std::string str = boost::trim_copy(*iter);
-            add_header.push_back(str);
+            if (!str.empty()) {
+                add_header.push_back(str);
+            }
         }
     }
 
@@ -298,10 +300,12 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
     std::string header(rsp_header.data, rsp_header.len);
     if (!header.empty()) {
         std::vector<std::string> vec{};
-        boost::split(vec, header, boost::is_any_of(";"));
+        boost::split(vec, header, boost::is_any_of("\n"));
         for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
             std::string str = boost::trim_copy(*iter);
-            add_header.push_back(str);
+            if (!str.empty()) {
+                add_header.push_back(str);
+            }
         }
     }
 
