@@ -75,8 +75,23 @@ private:
     // 是否Connection长连接
     bool keep_continue();
 
-    void fill_http_for_send(const char* data, size_t len, const string& status);
-    void fill_http_for_send(const string& str, const string& status);
+    void fill_http_for_send(const char* data, size_t len, const string& status) {
+        SAFE_ASSERT(data && len);
+        std::string msg(data, len);
+        fill_http_for_send(msg, status, {});
+    }
+
+    void fill_http_for_send(const string& str, const string& status) {
+        fill_http_for_send(str, status, {});
+    }
+
+    void fill_http_for_send(const char* data, size_t len, const string& status, const std::vector<std::string>& additional_header) {
+        SAFE_ASSERT(data && len);
+        std::string msg(data, len);
+        return fill_http_for_send(msg, status, additional_header);
+    }
+
+    void fill_http_for_send(const string& str, const string& status, const std::vector<std::string>& additional_header);
 
     // 标准的HTTP响应头和响应体
     void fill_std_http_for_send(enum http_proto::StatusCode code);

@@ -49,13 +49,13 @@ public:
             tzhttpd_log_err("Load func module_init failed: %s", err_info);
             return false;
         }
-		
-		// 调用module_init函数
-		int ret_code = (*module_init_)();
-		if( ret_code != 0) {
-			tzhttpd_log_err("call module_init failed: %d", ret_code);
-			return false;
-		}
+
+        // 调用module_init函数
+        int ret_code = (*module_init_)();
+        if( ret_code != 0) {
+            tzhttpd_log_err("call module_init failed: %d", ret_code);
+            return false;
+        }
 
         module_exit_ = (module_exit_t)dlsym(dl_handle_, "module_exit");
         if ((err_info = dlerror()) != NULL ) {
@@ -91,12 +91,12 @@ public:
 
     void close() {
         if (dl_handle_) {
-			
-			if(module_exit_) {
-				(*module_exit_)();
-				module_exit_ = NULL;
-			}
-			
+
+            if(module_exit_) {
+                (*module_exit_)();
+                module_exit_ = NULL;
+            }
+
             dlclose(dl_handle_);
             dl_handle_ = NULL;
         }

@@ -17,7 +17,8 @@
 namespace tzhttpd {
 
 namespace http_handler {
-extern int default_http_get_handler(const HttpParser& http_parser, std::string& response, string& status);
+extern int default_http_get_handler(const HttpParser& http_parser,
+                                    std::string& response, string& status, std::vector<std::string>& add_header);
 } // end namespace http_handler
 
 TCPConnAsync::TCPConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
@@ -127,6 +128,7 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         HttpGetHandler handler;
         std::string response_body;
         std::string response_status;
+        std::vector<std::string> response_header;
 
         if (http_server_.find_http_get_handler(real_path_info, handler) != 0){
             tzhttpd_log_err("uri %s handler not found, using default handler!", real_path_info.c_str());
@@ -137,12 +139,12 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
-        handler(http_parser_, response_body, response_status); // just call it!
+        handler(http_parser_, response_body, response_status, response_header); // just call it!
         if (response_body.empty() || response_status.empty()) {
             tzhttpd_log_err("caller not generate response body!");  // default status OK
             fill_std_http_for_send(http_proto::StatusCode::success_ok);
         } else {
-            fill_http_for_send(response_body, response_status);
+            fill_http_for_send(response_body, response_status, response_header);
         }
 
         goto write_return;
@@ -265,17 +267,20 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     HttpPostHandler handler;
     std::string response_body;
     std::string response_status;
+    std::vector<std::string> response_header;
+
     if (http_server_.find_http_post_handler(real_path_info, handler) != 0){
         tzhttpd_log_err("uri %s handler not found, and no default!", real_path_info.c_str());
         fill_std_http_for_send(http_proto::StatusCode::client_error_not_found);
     } else {
         if (handler) {
-            handler(http_parser_, std::string(p_buffer_->data(), r_size_), response_body, response_status); // call it!
+            handler(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
+                    response_status, response_header); // call it!
             if (response_body.empty() || response_status.empty()) {
                 tzhttpd_log_err("caller not generate response body!");
                 fill_std_http_for_send(http_proto::StatusCode::success_ok);
             } else {
-                fill_http_for_send(response_body, response_status);
+                fill_http_for_send(response_body, response_status, response_header);
             }
         } else {
             tzhttpd_log_err("real_path_info %s found, but handler empty!", real_path_info.c_str());
@@ -357,32 +362,9 @@ void TCPConnAsync::write_handler(const boost::system::error_code& ec, size_t byt
 }
 
 
-void TCPConnAsync::fill_http_for_send(const char* data, size_t len, const string& status_line) {
+void TCPConnAsync::fill_http_for_send(const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
 
-    SAFE_ASSERT(data && len);
-
-    if (!data || !len) {
-        tzhttpd_log_err("Check send data...");
-        return;
-    }
-
-    string content = http_proto::http_response_generate(data, len, status_line);
-    if (content.size() + 1 > p_write_->size())
-        p_write_->resize(content.size() + 1);
-
-    ::memcpy(p_write_->data(), content.c_str(), content.size() + 1); // copy '\0' but not transform it
-
-    w_size_ = content.size();
-    w_pos_  = 0;
-
-    return;
-
-}
-
-
-void TCPConnAsync::fill_http_for_send(const string& str, const string& status_line) {
-
-    string content = http_proto::http_response_generate(str, status_line);
+    string content = http_proto::http_response_generate(str, status_line, keep_continue(), additional_header);
     if (content.size() + 1 > p_write_->size())
         p_write_->resize(content.size() + 1);
 
@@ -398,7 +380,7 @@ void TCPConnAsync::fill_http_for_send(const string& str, const string& status_li
 void TCPConnAsync::fill_std_http_for_send(enum http_proto::StatusCode code) {
 
     string http_ver = http_parser_.get_version();
-    string content = http_proto::http_std_response_generate(http_ver, code);
+    string content = http_proto::http_std_response_generate(http_ver, code, keep_continue());
     if (content.size() + 1 > p_write_->size())
         p_write_->resize(content.size() + 1);
 
@@ -418,18 +400,21 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
     bool close_socket = false;
 
     if (ec == boost::asio::error::eof) {
-        tzhttpd_log_debug("Peer closed up ...");
+        tzhttpd_log_alert("Peer closed up ...");
         close_socket = true;
     } else if (ec == boost::asio::error::connection_reset) {
-        tzhttpd_log_debug("Connection reset by peer ...");
+        tzhttpd_log_alert("Connection reset by peer ...");
         close_socket = true;
     } else if (ec == boost::asio::error::operation_aborted) {
-        tzhttpd_log_debug("Operation aborted(cancel) ..."); // like timer ...
+        tzhttpd_log_alert("Operation aborted(cancel) ..."); // like timer ...
     } else if (ec == boost::asio::error::bad_descriptor) {
-        tzhttpd_log_debug("Bad file descriptor ...");
+        tzhttpd_log_alert("Bad file descriptor ...");
+        close_socket = true;
+    } else if (ec == boost::asio::error::timed_out) {
+        tzhttpd_log_alert("Connection timed out ...");
         close_socket = true;
     } else {
-        tzhttpd_log_debug("Undetected error %d, %s ...", ec, ec.message().c_str());
+        tzhttpd_log_alert("Undetected error %d, %s ...", ec, ec.message().c_str());
         close_socket = true;
     }
 
