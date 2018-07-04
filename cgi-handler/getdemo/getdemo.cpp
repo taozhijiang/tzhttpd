@@ -21,7 +21,7 @@ int cgi_get_handler(const msg_t* param, msg_t* rsp, msg_t* rsp_header) {
     std::string msg = "return from getdemo with param:" + std::string(param->data);
     fill_msg(rsp, msg.c_str(), msg.size());
 
-    std::string strHead = "GetHead1: value1; GetHead2: value2;";
+    std::string strHead = "GetHead1: value1\n GetHead2: value2\n";
     fill_msg(rsp_header, strHead.c_str(), strHead.size());
 
     return 0;

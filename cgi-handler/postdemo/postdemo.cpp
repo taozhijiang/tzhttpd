@@ -22,7 +22,7 @@ int cgi_post_handler(const msg_t* param, const msg_t* post, msg_t* rsp, msg_t* r
     msg += " , and postdata:" + std::string(post->data);
     fill_msg(rsp, msg.c_str(), msg.size());
 
-    std::string strHead = "PostHead1: value1; PostHead2: value2;";
+    std::string strHead = "PostHead1: value1\n PostHead2: value2  ";
     fill_msg(rsp_header, strHead.c_str(), strHead.size());
 
     return 0;
