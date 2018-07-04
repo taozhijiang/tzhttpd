@@ -32,7 +32,7 @@ std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 using namespace http_proto;
 
 static bool check_and_sendfile(const HttpParser& http_parser, std::string regular_file_path,
-                                   std::string& response, std::string& status_line) {
+                               std::string& response, std::string& status_line) {
 
     // check dest is directory or regular?
     struct stat sb;
@@ -61,7 +61,8 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
 }
 
 
-int default_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line) {
+int default_http_get_handler(const HttpParser& http_parser, std::string& response,
+                             std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (!params.EMPTY()) {
@@ -125,7 +126,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 }
 
 
-int manage_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line) {
+int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+                            std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
@@ -201,7 +203,8 @@ bool CgiGetWrapper::init() {
 }
 
 int CgiGetWrapper::operator()(const HttpParser& http_parser,
-                              std::string& response, std::string& status_line) {
+                              std::string& response, std::string& status_line,
+                              std::vector<std::string>& add_header) {
     if(!func_) {
         tzhttpd_log_err("get func not initialized.");
         return -1;
@@ -213,9 +216,10 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
 
     int ret = -1;
     msg_t rsp {};
+    msg_t rsp_header {};
 
     try {
-        ret = func_(&param, &rsp);
+        ret = func_(&param, &rsp, &rsp_header);
     } catch (...) {
         tzhttpd_log_err("get func call exception detect.");
     }
@@ -227,6 +231,16 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
         tzhttpd_log_err("post func call return: %d", ret);
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
+    }
+
+    std::string header(rsp_header.data, rsp_header.len);
+    if (!header.empty()) {
+        std::vector<std::string> vec{};
+        boost::split(vec, header, boost::is_any_of(";"));
+        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
+            std::string str = boost::trim_copy(*iter);
+            add_header.push_back(str);
+        }
     }
 
     tzhttpd_log_debug("response: %s, status: %s", response.c_str(), status_line.c_str());
@@ -250,7 +264,8 @@ bool CgiPostWrapper::init() {
 }
 
 int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string& post_data,
-                               std::string& response, std::string& status_line) {
+                               std::string& response, std::string& status_line,
+                               std::vector<std::string>& add_header ) {
     if(!func_){
         tzhttpd_log_err("get func not initialized.");
         return -1;
@@ -263,9 +278,10 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
 
     int ret = -1;
     msg_t rsp {};
+    msg_t rsp_header {};
 
     try {
-        ret = func_(&param, &post, &rsp);
+        ret = func_(&param, &post, &rsp, &rsp_header);
     } catch (...) {
         tzhttpd_log_err("post func call exception detect.");
     }
@@ -279,8 +295,19 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
         status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
     }
 
-    tzhttpd_log_debug("response: %s, status: %s", response.c_str(), status_line.c_str());
-    free_msg(&param); free_msg(&rsp);
+    std::string header(rsp_header.data, rsp_header.len);
+    if (!header.empty()) {
+        std::vector<std::string> vec{};
+        boost::split(vec, header, boost::is_any_of(";"));
+        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
+            std::string str = boost::trim_copy(*iter);
+            add_header.push_back(str);
+        }
+    }
+
+    tzhttpd_log_debug("response: %s, status: %s, add_header: %s",
+                      response.c_str(), status_line.c_str(), header.c_str());
+    free_msg(&param); free_msg(&rsp); free_msg(&rsp_header);
     return ret;
 }
 

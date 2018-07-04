@@ -16,10 +16,15 @@ int module_exit() {
 }
 
 
-int cgi_post_handler(const msg_t* param, const msg_t* post, msg_t* rsp) {
+int cgi_post_handler(const msg_t* param, const msg_t* post, msg_t* rsp, msg_t* rsp_header) {
+
     std::string msg = "return from postdemo with param:" + std::string(param->data);
-	msg += " , and postdata:" + std::string(post->data);
+    msg += " , and postdata:" + std::string(post->data);
     fill_msg(rsp, msg.c_str(), msg.size());
+
+    std::string strHead = "PostHead1: value1; PostHead2: value2;";
+    fill_msg(rsp_header, strHead.c_str(), strHead.size());
+
     return 0;
 }
 

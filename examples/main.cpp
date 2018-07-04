@@ -7,8 +7,11 @@ namespace tzhttpd {
 
 using namespace http_proto;
 
-int get_test_handler(const HttpParser& http_parser, std::string& response, std::string& status_line) {
+int get_test_handler(const HttpParser& http_parser,
+                     std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
     response = "test uri called...";
+    add_header.push_back("TestHead1: value1");
+    add_header.push_back("TestHead2: value2");
     status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
     return 0;
 }

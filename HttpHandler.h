@@ -29,9 +29,9 @@ namespace tzhttpd {
 class HttpParser;
 
 typedef std::function<int (const HttpParser& http_parser, \
-                           std::string& response, std::string& status_line)> HttpGetHandler;
+                           std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpGetHandler;
 typedef std::function<int (const HttpParser& http_parser, const std::string& post_data, \
-                           std::string& response, std::string& status_line)> HttpPostHandler;
+                           std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpPostHandler;
 
 class UriRegex: public boost::regex {
 public:
@@ -82,10 +82,12 @@ private:
 
 namespace http_handler {
 
-int default_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line);
+int default_http_get_handler(const HttpParser& http_parser, std::string& response,
+                             std::string& status_line, std::vector<std::string>& add_header);
 
 // @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
-int manage_http_get_handler(const HttpParser& http_parser, std::string& response, std::string& status_line);
+int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+                            std::string& status_line, std::vector<std::string>& add_header);
 
 
 // deal with cgi request
@@ -114,7 +116,8 @@ public:
 
     bool init();
     int operator()(const HttpParser& http_parser,
-                   std::string& response, std::string& status_line);
+                   std::string& response, std::string& status_line,
+                   std::vector<std::string>& add_header);
 
 private:
     cgi_get_handler_t func_;
@@ -132,7 +135,8 @@ public:
 
     bool init();
     int operator()(const HttpParser& http_parser, const std::string& post_data,
-                   std::string& response, std::string& status_line);
+                   std::string& response, std::string& status_line,
+                   std::vector<std::string>& add_header);
 
 private:
     cgi_post_handler_t func_;
