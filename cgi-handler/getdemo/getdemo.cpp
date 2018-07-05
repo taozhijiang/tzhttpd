@@ -18,7 +18,7 @@ int module_exit() {
 
 int cgi_get_handler(const msg_t* param, msg_t* rsp, msg_t* rsp_header) {
 
-    std::string msg = "return from getdemo with param:" + std::string(param->data);
+    std::string msg = "return from getdemo with param:" + std::string(param->data, param->len);
     fill_msg(rsp, msg.c_str(), msg.size());
 
     std::string strHead = "GetHead1: value1\n GetHead2: value2\n";

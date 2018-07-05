@@ -36,7 +36,7 @@ static inline
 int fill_msg(msg_t* msg, const char* data, size_t len) {
 
     free_msg(msg);
-    msg->data = (char *)calloc(len, 1);
+    msg->data = (char *)malloc(len);
     if (!msg->data) {
         return -1;
     }
