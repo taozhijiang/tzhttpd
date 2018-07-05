@@ -245,8 +245,9 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
         }
     }
 
-    tzhttpd_log_debug("response: %s, status: %s", response.c_str(), status_line.c_str());
-    free_msg(&param); free_msg(&rsp);
+    tzhttpd_log_debug("response: %s, status: %s, add_header: %s",
+                      response.c_str(), status_line.c_str(), header.c_str());
+    free_msg(&param); free_msg(&rsp); free_msg(&rsp_header);
     return ret;
 }
 
