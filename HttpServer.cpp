@@ -461,8 +461,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 
 
 int HttpServer::conn_destroy(ConnTypePtr p_conn) {
-    p_conn->sock_shutdown(ShutdownType::kShutdownBoth);
-    p_conn->sock_close();
+    p_conn->sock_shutdown_and_close(ShutdownType::kShutdownBoth);
     return 0;
 }
 

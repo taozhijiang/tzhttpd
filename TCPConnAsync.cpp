@@ -399,22 +399,17 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
     boost::system::error_code ignore_ec;
     bool close_socket = false;
 
-    if (ec == boost::asio::error::eof) {
-        tzhttpd_log_alert("Peer closed up ...");
-        close_socket = true;
-    } else if (ec == boost::asio::error::connection_reset) {
-        tzhttpd_log_alert("Connection reset by peer ...");
+    if (ec == boost::asio::error::eof ||
+        ec == boost::asio::error::connection_reset ||
+        ec == boost::asio::error::timed_out ||
+        ec == boost::asio::error::bad_descriptor ) {
+        tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
         close_socket = true;
     } else if (ec == boost::asio::error::operation_aborted) {
-        tzhttpd_log_alert("Operation aborted(cancel) ..."); // like timer ...
-    } else if (ec == boost::asio::error::bad_descriptor) {
-        tzhttpd_log_alert("Bad file descriptor ...");
-        close_socket = true;
-    } else if (ec == boost::asio::error::timed_out) {
-        tzhttpd_log_alert("Connection timed out ...");
-        close_socket = true;
+        // like itimeout trigger
+        tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
     } else {
-        tzhttpd_log_alert("Undetected error %d, %s ...", ec, ec.message().c_str());
+        tzhttpd_log_err("Undetected error %d, %s ...", ec, ec.message().c_str());
         close_socket = true;
     }
 
@@ -422,8 +417,7 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
     if (close_socket || was_ops_cancelled()) {
         revoke_ops_cancel_timeout();
         ops_cancel();
-        sock_shutdown(ShutdownType::kShutdownBoth);
-        sock_close();
+        sock_shutdown_and_close(ShutdownType::kShutdownBoth);
     }
 
     return close_socket;
@@ -483,12 +477,11 @@ void TCPConnAsync::ops_cancel_timeout_call(const boost::system::error_code& ec) 
     if (ec == 0){
         tzhttpd_log_info("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
         ops_cancel();
-        sock_shutdown(ShutdownType::kShutdownBoth);
-        sock_close();
+        sock_shutdown_and_close(ShutdownType::kShutdownBoth);
     } else if ( ec == boost::asio::error::operation_aborted) {
         // normal cancel
     } else {
-        tzhttpd_log_debug("ops_cancel_timeout_call called with unknow error %d ...", ec);
+        tzhttpd_log_err("unknown and won't handle error_code: {%d} %s", ec.value(), ec.message().c_str());
     }
 }
 
