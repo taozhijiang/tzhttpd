@@ -24,7 +24,7 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.1.1";
+std::string              http_server_version = "1.1.2";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
@@ -211,8 +211,8 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
     }
 
     msg_t param {};
-    std::string str = http_parser.get_request_uri_params_string();
-    fill_msg(&param, str.c_str(), str.size());
+    std::string param_str = http_parser.get_request_uri_params_string();
+    fill_msg(&param, param_str.c_str(), param_str.size());
 
     int ret = -1;
     msg_t rsp {};
@@ -245,8 +245,13 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
         }
     }
 
-    tzhttpd_log_debug("response: %s, status: %s", response.c_str(), status_line.c_str());
-    free_msg(&param); free_msg(&rsp);
+    tzhttpd_log_debug("param: %s,\n"
+                      "response: %s, status: %s, add_header: %s",
+                      param_str.c_str(),
+                      response.c_str(), status_line.c_str(), header.c_str());
+
+    free_msg(&param);
+    free_msg(&rsp); free_msg(&rsp_header);
     return ret;
 }
 
@@ -274,8 +279,8 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
     }
 
     msg_t param {}, post{};
-    std::string str = http_parser.get_request_uri_params_string();
-    fill_msg(&param, str.c_str(), str.size());
+    std::string param_str = http_parser.get_request_uri_params_string();
+    fill_msg(&param, param_str.c_str(), param_str.size());
     fill_msg(&post, post_data.c_str(), post_data.size());
 
     int ret = -1;
@@ -309,9 +314,13 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
         }
     }
 
-    tzhttpd_log_debug("response: %s, status: %s, add_header: %s",
+    tzhttpd_log_debug("param: %s, post: %s,\n"
+                      "response: %s, status: %s, add_header: %s",
+                      param_str.c_str(), post_data.c_str(),
                       response.c_str(), status_line.c_str(), header.c_str());
-    free_msg(&param); free_msg(&rsp); free_msg(&rsp_header);
+
+    free_msg(&param); free_msg(&post);
+    free_msg(&rsp); free_msg(&rsp_header);
     return ret;
 }
 

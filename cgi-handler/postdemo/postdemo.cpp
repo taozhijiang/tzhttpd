@@ -18,8 +18,8 @@ int module_exit() {
 
 int cgi_post_handler(const msg_t* param, const msg_t* post, msg_t* rsp, msg_t* rsp_header) {
 
-    std::string msg = "return from postdemo with param:" + std::string(param->data);
-    msg += " , and postdata:" + std::string(post->data);
+    std::string msg = "return from postdemo with param:" + std::string(param->data, param->len);
+    msg += " , and postdata:" + std::string(post->data, param->len);
     fill_msg(rsp, msg.c_str(), msg.size());
 
     std::string strHead = "PostHead1: value1\n PostHead2: value2  ";

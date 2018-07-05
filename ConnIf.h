@@ -4,7 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #ifndef __TZHTTPD_CONN_IF_H__
 #define __TZHTTPD_CONN_IF_H__
 
@@ -16,6 +16,7 @@ enum ConnStat {
     kConnWorking = 1,
     kConnPending,
     kConnError,
+    kConnClosed,
 };
 
 enum ShutdownType {
@@ -67,7 +68,11 @@ public:
         return (option.value() == set_value);
     }
 
-    void sock_shutdown(enum ShutdownType s) {
+    void sock_shutdown_and_close(enum ShutdownType s) {
+
+        std::lock_guard<std::mutex> lock(conn_mutex_);
+        if ( conn_stat_ == ConnStat::kConnClosed )
+            return;
 
         boost::system::error_code ignore_ec;
         if (s == kShutdownSend) {
@@ -77,22 +82,36 @@ public:
         } else if (s == kShutdownBoth) {
             sock_ptr_->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
         }
+
+        sock_ptr_->close(ignore_ec);
+
+        conn_stat_ = ConnStat::kConnClosed;
     }
 
     void sock_cancel() {
+
+        std::lock_guard<std::mutex> lock(conn_mutex_);
+
         boost::system::error_code ignore_ec;
         sock_ptr_->cancel(ignore_ec);
     }
 
     void sock_close() {
+
+        std::lock_guard<std::mutex> lock(conn_mutex_);
+        if ( conn_stat_ == ConnStat::kConnClosed )
+            return;
+
         boost::system::error_code ignore_ec;
         sock_ptr_->close(ignore_ec);
+        conn_stat_ = ConnStat::kConnClosed;
     }
 
     enum ConnStat get_conn_stat() { return conn_stat_; }
     void set_conn_stat(enum ConnStat stat) { conn_stat_ = stat; }
 
 private:
+    std::mutex conn_mutex_;
     enum ConnStat conn_stat_;
 
 protected:
