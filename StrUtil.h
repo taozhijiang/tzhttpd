@@ -20,7 +20,7 @@ namespace tzhttpd {
 
 struct StrUtil {
 
-    size_t trim_whitespace(std::string& str) {
+    static size_t trim_whitespace(std::string& str) {
 
         size_t index = 0;
         size_t orig = str.size();
@@ -40,7 +40,7 @@ struct StrUtil {
 
 
     template <typename T>
-    std::string convert_to_string(const T& arg) {
+    static std::string convert_to_string(const T& arg) {
         try {
             return boost::lexical_cast<std::string>(arg);
         }
