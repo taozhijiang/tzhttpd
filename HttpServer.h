@@ -19,6 +19,7 @@
 #include <algorithm>
 
 #include <boost/noncopyable.hpp>
+#include <boost/atomic/atomic.hpp>
 
 #include "EQueue.h"
 #include "ThreadPool.h"
@@ -52,16 +53,17 @@ private:
     int io_thread_number_;
 
     // 加载、更新配置的时候保护竞争状态
-    std::mutex        lock_;
+    std::mutex          lock_;
 
-    int conn_time_out_;
-    int conn_time_out_linger_;
+    boost::atomic<int>     conn_time_out_;
+    boost::atomic<int>     conn_time_out_linger_;
 
-    int ops_cancel_time_out_;  // sec 会话超时自动取消ops
+    boost::atomic<int>     ops_cancel_time_out_;    // sec 会话超时自动取消ops
 
-    bool              http_service_enabled_;  // 服务开关
-    int64_t           http_service_speed_;
-    volatile int64_t  http_service_token_;
+    boost::atomic<bool>    http_service_enabled_;   // 服务开关
+    boost::atomic<int64_t> http_service_speed_;
+
+    boost::atomic<int64_t> http_service_token_;
 
     bool check_safe_ip(const std::string& ip) {
         std::lock_guard<std::mutex> lock(lock_);
@@ -69,7 +71,6 @@ private:
     }
 
     bool get_http_service_token() {
-        std::lock_guard<std::mutex> lock(lock_);
 
         // if (!http_service_enabled_) {
         //    tzhttpd_log_alert("http_service not enabled ...");
@@ -89,13 +90,11 @@ private:
     }
 
     void withdraw_http_service_token() {    // 支持将令牌还回去
-        std::lock_guard<std::mutex> lock(lock_);
         ++ http_service_token_;
     }
 
     void feed_http_service_token(){
-        std::lock_guard<std::mutex> lock(lock_);
-        http_service_token_ = http_service_speed_;
+        http_service_token_ = http_service_speed_.load();
     }
 
     std::shared_ptr<boost::asio::deadline_timer> timed_feed_token_;
