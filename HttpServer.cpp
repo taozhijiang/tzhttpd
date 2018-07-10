@@ -274,8 +274,9 @@ bool HttpServer::init() {
         return false;
     }
 
-    // 固定的管理页面地址
-    if (register_http_get_handler("/manage", http_handler::manage_http_get_handler) != 0) {
+    // default handler already static initialized
+
+    if (register_http_get_handler("/manage", http_handler::manage_http_get_handler, true) != 0) {
         tzhttpd_log_err("HttpServer register manage page failed!");
         return false;
     }

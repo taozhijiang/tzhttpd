@@ -33,6 +33,28 @@ typedef std::function<int (const HttpParser& http_parser, \
 typedef std::function<int (const HttpParser& http_parser, const std::string& post_data, \
                            std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpPostHandler;
 
+template<typename T>
+struct HttpHandlerObject {
+
+    bool    built_in_;      // built_in handler，无需引用计数
+    int64_t success_cnt_;
+    int64_t fail_cnt_;
+
+    T handler_;
+
+    explicit HttpHandlerObject(const T& t, bool built_in = false):
+    built_in_(built_in), success_cnt_(0), fail_cnt_(0),
+        handler_(t) {
+    }
+};
+
+typedef HttpHandlerObject<HttpGetHandler>  HttpGetHandlerObject;
+typedef HttpHandlerObject<HttpPostHandler> HttpPostHandlerObject;
+
+typedef std::shared_ptr<HttpGetHandlerObject>  HttpGetHandlerObjectPtr;
+typedef std::shared_ptr<HttpPostHandlerObject> HttpPostHandlerObjectPtr;
+
+
 class UriRegex: public boost::regex {
 public:
     explicit UriRegex(const std::string& regexStr) :
@@ -51,12 +73,14 @@ private:
 class HttpHandler {
 
 public:
-    // 特例化模板
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler);
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler);
+    bool check_exist_http_get_handler(std::string uri_regex);
+    bool check_exist_http_post_handler(std::string uri_regex);
+    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in);
+    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in);
 
-    int find_http_get_handler(std::string uri, HttpGetHandler& handler);
-    int find_http_post_handler(std::string uri, HttpPostHandler& handler);
+    // uri match
+    int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
+    int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj);
 
     int update_run_cfg(const libconfig::Config& cfg);
 
@@ -75,8 +99,8 @@ private:
     boost::shared_mutex rwlock_;
 
     // 使用vector保存handler，保证是先注册handler具有高优先级
-    std::vector<std::pair<UriRegex, HttpPostHandler>> post_handler_;
-    std::vector<std::pair<UriRegex, HttpGetHandler>>  get_handler_;
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>> post_handler_;
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>  get_handler_;
 
 };
 
@@ -84,6 +108,8 @@ namespace http_handler {
 
 int default_http_get_handler(const HttpParser& http_parser, std::string& response,
                              std::string& status_line, std::vector<std::string>& add_header);
+
+extern std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj;
 
 // @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
 int manage_http_get_handler(const HttpParser& http_parser, std::string& response,

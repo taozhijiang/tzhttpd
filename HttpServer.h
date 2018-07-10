@@ -163,34 +163,38 @@ public:
     int conn_destroy(ConnTypePtr p_conn);
 
 
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler) {
-        return handler_.register_http_get_handler(uri_regex, handler);
+    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+        return handler_.register_http_get_handler(uri_regex, handler, built_in);
     }
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler) {
-        return handler_.register_http_post_handler(uri_regex, handler);
+    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+        return handler_.register_http_post_handler(uri_regex, handler, built_in);
     }
 
-    int find_http_get_handler(std::string uri, HttpGetHandler& handler) {
-        if (!conf_.http_service_enabled_) {
-            uri = handler_.pure_uri_path(uri);
-            if (boost::iequals(uri, "/manage")) {
-                handler = http_handler::manage_http_get_handler;
-                return 0;
+    int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj) {
+        do {
+            if (!conf_.http_service_enabled_) {
+
+                // 服务关闭，但是还是允许特定页面的访问
+                uri = handler_.pure_uri_path(uri);
+                if (boost::iequals(uri, "/manage")) {
+                    break; // fall through handler fetch
+                }
+
+                tzhttpd_log_err("http_service_enabled_ == false, reject request GET %s ... ", uri.c_str());
+                return -1;
             }
+        } while (0);
 
-            tzhttpd_log_err("http_service_enabled_ == false, reject request GET %s ... ", uri.c_str());
-            return -1;
-        }
-        return handler_.find_http_get_handler(uri, handler);
+        return handler_.find_http_get_handler(uri, phandler_obj);
     }
 
-    int find_http_post_handler(std::string uri, HttpPostHandler& handler) {
+    int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj) {
         if (!conf_.http_service_enabled_) {
             tzhttpd_log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
             return -1;
         }
 
-        return handler_.find_http_post_handler(uri, handler);
+        return handler_.find_http_post_handler(uri, phandler_obj);
     }
 
 

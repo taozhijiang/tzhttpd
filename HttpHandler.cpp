@@ -28,6 +28,10 @@ std::string              http_server_version = "1.1.3";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
+std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj =
+    std::make_shared<HttpGetHandlerObject>(default_http_get_handler, true);
+
+
 
 using namespace http_proto;
 
@@ -330,59 +334,97 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
 
 // class HttpHandler
 
-int HttpHandler::register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler){
+bool HttpHandler::check_exist_http_get_handler(std::string uri_regex) {
+
+    std::string uri = pure_uri_path(uri_regex);
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::iterator it;
+    for (it = get_handler_.begin(); it != get_handler_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool HttpHandler::check_exist_http_post_handler(std::string uri_regex) {
+
+    std::string uri = pure_uri_path(uri_regex);
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::iterator it;
+    for (it = post_handler_.begin(); it != post_handler_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+int HttpHandler::register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in){
 
     std::string uri = pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpGetHandler>>::iterator it;
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::iterator it;
     for (it = get_handler_.begin(); it != get_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
-            it->second = handler;
-            return 0;
+            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_regex.c_str());
+            return -1;
         }
     }
 
     UriRegex rgx {uri};
-    get_handler_.push_back({rgx, handler});
+    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(handler, built_in);
+    if (!phandler_obj) {
+        tzhttpd_log_err("Create get handler object for %s failed.", uri.c_str());
+        return -2;
+    }
+    get_handler_.push_back({rgx, phandler_obj});
 
     tzhttpd_log_alert("Register GetHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
     return 0;
 }
 
-int HttpHandler::register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler){
+int HttpHandler::register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in){
 
     std::string uri = pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpPostHandler>>::iterator it;
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::iterator it;
     for (it = post_handler_.begin(); it != post_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
-            it->second = handler;
-            return 0;
+            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_regex.c_str());
+            return -1;
         }
     }
 
     UriRegex rgx {uri};
-    post_handler_.push_back({rgx, handler});
+    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(handler, built_in);
+    if (!phandler_obj) {
+        tzhttpd_log_err("Create post handler object for %s failed.", uri.c_str());
+        return -2;
+    }
+    post_handler_.push_back({ rgx, phandler_obj });
 
     tzhttpd_log_alert("Register PostHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
     return 0;
 }
 
 
-int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandler& handler){
+int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj){
 
     uri = pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpGetHandler>>::const_iterator it;
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::const_iterator it;
     boost::smatch what;
     for (it = get_handler_.cbegin(); it != get_handler_.cend(); ++it) {
         if (boost::regex_match(uri, what, it->first)) {
-            handler = it->second;
+            phandler_obj = it->second;
             return 0;
         }
     }
@@ -390,16 +432,16 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandler& handler)
     return -1;
 }
 
-int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandler& handler){
+int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj){
 
     uri = pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpPostHandler>>::const_iterator it;
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::const_iterator it;
     boost::smatch what;
     for (it = post_handler_.cbegin(); it != post_handler_.cend(); ++it) {
         if (boost::regex_match(uri, what, it->first)) {
-            handler = it->second;
+            phandler_obj = it->second;
             return 0;
         }
     }
@@ -453,6 +495,13 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
     path_map.clear();
     ret_code += parse_cfg(cfg, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using /manage
+        if (check_exist_http_get_handler(iter->first)) {
+            tzhttpd_log_alert("HttpGet for %s already exists, skip it.", iter->first.c_str());
+            continue;
+        }
+
         http_handler::CgiGetWrapper getter(iter->second);
         if (!getter.init()) {
             tzhttpd_log_err("init get for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
@@ -460,7 +509,7 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
             continue;
         }
 
-        register_http_get_handler(iter->first, getter);
+        register_http_get_handler(iter->first, getter, false);
         tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 
@@ -469,6 +518,13 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
     path_map.clear();
     ret_code += parse_cfg(cfg, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using /manage
+        if (check_exist_http_post_handler(iter->first)) {
+            tzhttpd_log_alert("HttpPost for %s already exists, skip it.", iter->first.c_str());
+            continue;
+        }
+
         http_handler::CgiPostWrapper poster(iter->second);
         if (!poster.init()) {
             tzhttpd_log_err("init post for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
@@ -476,7 +532,7 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
             continue;
         }
 
-        register_http_post_handler(iter->first, poster);
+        register_http_post_handler(iter->first, poster, false);
         tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 
