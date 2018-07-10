@@ -276,7 +276,10 @@ bool HttpServer::init() {
 
     // default handler already static initialized
 
-    if (register_http_get_handler("/manage", http_handler::manage_http_get_handler, true) != 0) {
+    if (register_http_get_handler("^/manage$",
+            std::bind(&HttpServer::manage_http_get_handler, shared_from_this(), 
+                      std::placeholders::_1, std::placeholders::_2, 
+                      std::placeholders::_3, std::placeholders::_4), true) != 0) {
         tzhttpd_log_err("HttpServer register manage page failed!");
         return false;
     }
@@ -492,5 +495,6 @@ int HttpServer::io_service_join() {
     io_service_threads_.join_threads();
     return 0;
 }
+
 
 } // end namespace tzhttpd

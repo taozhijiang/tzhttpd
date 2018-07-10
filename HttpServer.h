@@ -197,6 +197,11 @@ public:
         return handler_.find_http_post_handler(uri, phandler_obj);
     }
 
+private:
+    // manage页面和服务是强耦合的，所以这里还是弄成成员函数的方式
+    // @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
+    int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+                            std::string& status_line, std::vector<std::string>& add_header);
 
 public:
     ThreadPool io_service_threads_;

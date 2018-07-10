@@ -22,6 +22,7 @@
 #include <boost/thread/shared_mutex.hpp>
 
 #include "CgiHelper.h"
+#include "CgiWrapper.h"
 #include "SlibLoader.h"
 
 namespace tzhttpd {
@@ -36,14 +37,16 @@ typedef std::function<int (const HttpParser& http_parser, const std::string& pos
 template<typename T>
 struct HttpHandlerObject {
 
-    bool    built_in_;      // built_in handler，无需引用计数
-    int64_t success_cnt_;
-    int64_t fail_cnt_;
+    boost::atomic<bool>    built_in_;      // built_in handler，无需引用计数
+    boost::atomic<int64_t> success_cnt_;
+    boost::atomic<int64_t> fail_cnt_;
+
+    boost::atomic<bool>    working_;       // 正在
 
     T handler_;
 
     explicit HttpHandlerObject(const T& t, bool built_in = false):
-    built_in_(built_in), success_cnt_(0), fail_cnt_(0),
+    built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(true),
         handler_(t) {
     }
 };
@@ -61,7 +64,7 @@ public:
         boost::regex(regexStr), str_(regexStr) {
     }
 
-    std::string str() {
+    std::string str() const {
         return str_;
     }
 
@@ -73,8 +76,21 @@ private:
 class HttpHandler {
 
 public:
-    bool check_exist_http_get_handler(std::string uri_regex);
-    bool check_exist_http_post_handler(std::string uri_regex);
+    bool check_exist_http_get_handler(std::string uri_regex) {
+        return do_check_exist_http_handler(uri_regex, get_handler_);
+    }
+
+    bool check_exist_http_post_handler(std::string uri_regex) {
+        return do_check_exist_http_handler(uri_regex, post_handler_);
+    }
+
+    int switch_http_get_handler(std::string uri_regex, bool on) {
+        return do_switch_http_handler(uri_regex, on, get_handler_);
+    }
+    int switch_http_post_handler(std::string uri_regex, bool on) {
+        return do_switch_http_handler(uri_regex, on, post_handler_);
+    }
+
     int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in);
     int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in);
 
@@ -91,6 +107,13 @@ public:
 
         return uri;
     }
+
+private:
+    template<typename T>
+    bool do_check_exist_http_handler(std::string uri_regex, const T& handlers);
+
+    template<typename T>
+    int do_switch_http_handler(std::string uri_regex, bool on, T& handlers);
 
 private:
 
@@ -111,68 +134,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 
 extern std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj;
 
-// @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
-int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                            std::string& status_line, std::vector<std::string>& add_header);
-
-
-// deal with cgi request
-
-
-class CgiWrapper {
-public:
-    explicit CgiWrapper(const std::string& dl_path):
-        dl_path_(dl_path),
-        dl_({}) {
-    }
-    bool load_dl();
-
-protected:
-    std::string dl_path_;
-    std::shared_ptr<SLibLoader> dl_;
-};
-
-
-class CgiGetWrapper: public CgiWrapper {
-
-public:
-    explicit CgiGetWrapper(const std::string& dl_path):
-        CgiWrapper(dl_path) {
-    }
-
-    bool init();
-    int operator()(const HttpParser& http_parser,
-                   std::string& response, std::string& status_line,
-                   std::vector<std::string>& add_header);
-
-private:
-    cgi_get_handler_t func_;
-};
-
-
-
-class CgiPostWrapper: public CgiWrapper {
-
-public:
-
-    explicit CgiPostWrapper(const std::string& dl_path):
-        CgiWrapper(dl_path) {
-    }
-
-    bool init();
-    int operator()(const HttpParser& http_parser, const std::string& post_data,
-                   std::string& response, std::string& status_line,
-                   std::vector<std::string>& add_header);
-
-private:
-    cgi_post_handler_t func_;
-};
-
 
 } // end namespace http_handler
-
-
-
 } // end namespace tzhttpd
 
 
