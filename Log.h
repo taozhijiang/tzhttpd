@@ -41,9 +41,7 @@ public:
     static Log& instance();
     bool init(int log_level);
 
-    ~Log() {
-        closelog();
-    }
+    ~Log();
 
 private:
     int get_time_prefix(char *buf, int size);

@@ -15,6 +15,7 @@
 
 #include "HttpCfgHelper.h"
 #include "HttpProto.h"
+#include "HttpParser.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
 
@@ -24,9 +25,14 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.1.3";
+std::string              http_server_version = "1.2.0";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
+
+std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj =
+    std::make_shared<HttpGetHandlerObject>(default_http_get_handler, true);
+
+
 
 
 using namespace http_proto;
@@ -126,263 +132,75 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 }
 
 
-int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                            std::string& status_line, std::vector<std::string>& add_header) {
-
-    const UriParamContainer& params = http_parser.get_request_uri_params();
-    if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
-        tzhttpd_log_err("manage page param check failed!");
-        response = http_proto::content_bad_request;
-        status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_bad_request);
-        return 0;
-    }
-
-    if (params.VALUE("auth") != "d44bfc666db304b2f72b4918c8b46f78") {
-        tzhttpd_log_err("auth check failed!");
-        response = http_proto::content_forbidden;
-        status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
-        return 0;
-    }
-
-    std::string cmd = params.VALUE("cmd");
-    int ret = 0;
-    if (cmd == "reload") {
-        tzhttpd_log_debug("do configure reconfigure ....");
-        ret = HttpCfgHelper::instance().update_cfg();
-    }
-
-    if (ret == 0) {
-        response = http_proto::content_ok;
-        status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::success_ok);
-    } else {
-        response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
-    }
-
-    return 0;
-}
-
-
-// http_cgi_handler
-
-bool CgiWrapper::load_dl() {
-
-    dl_ = std::make_shared<SLibLoader>(dl_path_);
-    if (!dl_) {
-        return false;
-    }
-
-    if (!dl_->init()) {
-        tzhttpd_log_err("init dl %s failed!", dl_->get_dl_path().c_str());
-        return false;
-    }
-
-
-
-    return true;
-}
-
-
-//
-// GET
-
-bool CgiGetWrapper::init() {
-    if (!load_dl()) {
-        tzhttpd_log_err("load dl failed!");
-        return false;
-    }
-    if (!dl_->load_func<cgi_get_handler_t>("cgi_get_handler", &func_)) {
-        tzhttpd_log_err("Load func cgi_get_handler failed!");
-        return false;
-    }
-    return true;
-}
-
-int CgiGetWrapper::operator()(const HttpParser& http_parser,
-                              std::string& response, std::string& status_line,
-                              std::vector<std::string>& add_header) {
-    if(!func_) {
-        tzhttpd_log_err("get func not initialized.");
-        return -1;
-    }
-
-    msg_t param {};
-    std::string param_str = http_parser.get_request_uri_params_string();
-    fill_msg(&param, param_str.c_str(), param_str.size());
-
-    int ret = -1;
-    msg_t rsp {};
-    msg_t rsp_header {};
-
-    try {
-        ret = func_(&param, &rsp, &rsp_header);
-    } catch (...) {
-        tzhttpd_log_err("get func call exception detect.");
-    }
-
-    if (ret == 0) {
-        response = std::string(rsp.data, rsp.len);
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
-    } else {
-        tzhttpd_log_err("post func call return: %d", ret);
-        response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
-    }
-
-    std::string header(rsp_header.data, rsp_header.len);
-    if (!header.empty()) {
-        std::vector<std::string> vec{};
-        boost::split(vec, header, boost::is_any_of("\n"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
-            std::string str = boost::trim_copy(*iter);
-            if (!str.empty()) {
-                add_header.push_back(str);
-            }
-        }
-    }
-
-    tzhttpd_log_debug("param: %s,\n"
-                      "response: %s, status: %s, add_header: %s",
-                      param_str.c_str(),
-                      response.c_str(), status_line.c_str(), header.c_str());
-
-    free_msg(&param);
-    free_msg(&rsp); free_msg(&rsp_header);
-    return ret;
-}
-
-//
-// POST
-
-bool CgiPostWrapper::init() {
-    if (!load_dl()) {
-        tzhttpd_log_err("load dl failed!");
-        return false;
-    }
-    if (!dl_->load_func<cgi_post_handler_t>("cgi_post_handler", &func_)) {
-        tzhttpd_log_err("Load func cgi_post_handler failed!");
-        return false;
-    }
-    return true;
-}
-
-int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string& post_data,
-                               std::string& response, std::string& status_line,
-                               std::vector<std::string>& add_header ) {
-    if(!func_){
-        tzhttpd_log_err("get func not initialized.");
-        return -1;
-    }
-
-    msg_t param {}, post{};
-    std::string param_str = http_parser.get_request_uri_params_string();
-    fill_msg(&param, param_str.c_str(), param_str.size());
-    fill_msg(&post, post_data.c_str(), post_data.size());
-
-    int ret = -1;
-    msg_t rsp {};
-    msg_t rsp_header {};
-
-    try {
-        ret = func_(&param, &post, &rsp, &rsp_header);
-    } catch (...) {
-        tzhttpd_log_err("post func call exception detect.");
-    }
-
-    if (ret == 0) {
-        response = std::string(rsp.data, rsp.len);
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
-    } else {
-        tzhttpd_log_err("post func call return: %d", ret);
-        response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
-    }
-
-    std::string header(rsp_header.data, rsp_header.len);
-    if (!header.empty()) {
-        std::vector<std::string> vec{};
-        boost::split(vec, header, boost::is_any_of("\n"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
-            std::string str = boost::trim_copy(*iter);
-            if (!str.empty()) {
-                add_header.push_back(str);
-            }
-        }
-    }
-
-    tzhttpd_log_debug("param: %s, post: %s,\n"
-                      "response: %s, status: %s, add_header: %s",
-                      param_str.c_str(), post_data.c_str(),
-                      response.c_str(), status_line.c_str(), header.c_str());
-
-    free_msg(&param); free_msg(&post);
-    free_msg(&rsp); free_msg(&rsp_header);
-    return ret;
-}
-
 } // end namespace http_handler
 
 
 
 // class HttpHandler
 
-int HttpHandler::register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler){
+int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
+                                           bool built_in, bool working){
 
-    std::string uri = pure_uri_path(uri_regex);
+    std::string uri = pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpGetHandler>>::iterator it;
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::iterator it;
     for (it = get_handler_.begin(); it != get_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
-            it->second = handler;
-            return 0;
+            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_r.c_str());
+            return -1;
         }
     }
 
     UriRegex rgx {uri};
-    get_handler_.push_back({rgx, handler});
+    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(handler, built_in, working);
+    if (!phandler_obj) {
+        tzhttpd_log_err("Create get handler object for %s failed.", uri.c_str());
+        return -2;
+    }
+    get_handler_.push_back({rgx, phandler_obj});
 
-    tzhttpd_log_alert("Register GetHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
+    tzhttpd_log_alert("Register GetHandler for %s(%s) OK!", uri.c_str(), uri_r.c_str());
     return 0;
 }
 
-int HttpHandler::register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler){
+int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
+                                            bool built_in, bool working){
 
-    std::string uri = pure_uri_path(uri_regex);
+    std::string uri = pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpPostHandler>>::iterator it;
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::iterator it;
     for (it = post_handler_.begin(); it != post_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, but still override it!", uri.c_str(), uri_regex.c_str());
-            it->second = handler;
-            return 0;
+            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_r.c_str());
+            return -1;
         }
     }
 
     UriRegex rgx {uri};
-    post_handler_.push_back({rgx, handler});
+    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(handler, built_in, working);
+    if (!phandler_obj) {
+        tzhttpd_log_err("Create post handler object for %s failed.", uri.c_str());
+        return -2;
+    }
+    post_handler_.push_back({ rgx, phandler_obj });
 
-    tzhttpd_log_alert("Register PostHandler for %s(%s) OK!", uri.c_str(), uri_regex.c_str());
+    tzhttpd_log_alert("Register PostHandler for %s(%s) OK!", uri.c_str(), uri_r.c_str());
     return 0;
 }
 
 
-int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandler& handler){
+int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj){
 
     uri = pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpGetHandler>>::const_iterator it;
+    std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::const_iterator it;
     boost::smatch what;
     for (it = get_handler_.cbegin(); it != get_handler_.cend(); ++it) {
         if (boost::regex_match(uri, what, it->first)) {
-            handler = it->second;
+            phandler_obj = it->second;
             return 0;
         }
     }
@@ -390,16 +208,16 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandler& handler)
     return -1;
 }
 
-int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandler& handler){
+int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj){
 
     uri = pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
-    std::vector<std::pair<UriRegex, HttpPostHandler>>::const_iterator it;
+    std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::const_iterator it;
     boost::smatch what;
     for (it = post_handler_.cbegin(); it != post_handler_.cend(); ++it) {
         if (boost::regex_match(uri, what, it->first)) {
-            handler = it->second;
+            phandler_obj = it->second;
             return 0;
         }
     }
@@ -408,7 +226,8 @@ int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandler& handle
 }
 
 
-int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key, std::map<std::string, std::string>& path_map) {
+int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key,
+                           std::map<std::string, std::string>& path_map) {
 
     if (!cfg.exists(key)) {
         tzhttpd_log_notice("handlers for %s not found!", key.c_str());
@@ -453,6 +272,13 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
     path_map.clear();
     ret_code += parse_cfg(cfg, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using /manage
+        if (check_exist_http_get_handler(iter->first)) {
+            tzhttpd_log_alert("HttpGet for %s already exists, skip it.", iter->first.c_str());
+            continue;
+        }
+
         http_handler::CgiGetWrapper getter(iter->second);
         if (!getter.init()) {
             tzhttpd_log_err("init get for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
@@ -460,7 +286,7 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
             continue;
         }
 
-        register_http_get_handler(iter->first, getter);
+        register_http_get_handler(iter->first, getter, false);
         tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 
@@ -469,6 +295,13 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
     path_map.clear();
     ret_code += parse_cfg(cfg, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using /manage
+        if (check_exist_http_post_handler(iter->first)) {
+            tzhttpd_log_alert("HttpPost for %s already exists, skip it.", iter->first.c_str());
+            continue;
+        }
+
         http_handler::CgiPostWrapper poster(iter->second);
         if (!poster.init()) {
             tzhttpd_log_err("init post for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
@@ -476,7 +309,7 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
             continue;
         }
 
-        register_http_post_handler(iter->first, poster);
+        register_http_post_handler(iter->first, poster, false);
         tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 

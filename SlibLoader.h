@@ -95,10 +95,12 @@ public:
             if(module_exit_) {
                 (*module_exit_)();
                 module_exit_ = NULL;
+                tzhttpd_log_alert("module_exit from %s called!", dl_path_.c_str());
             }
 
             dlclose(dl_handle_);
             dl_handle_ = NULL;
+            tzhttpd_log_alert("dlclose from %s called!", dl_path_.c_str());
         }
     }
 

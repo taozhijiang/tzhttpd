@@ -125,21 +125,33 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         SAFE_ASSERT(http_parser_.find_request_header(http_proto::header_options::content_length).empty());
 
         std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
-        HttpGetHandler handler;
+        HttpGetHandlerObjectPtr phandler_obj {};
         std::string response_body;
         std::string response_status;
         std::vector<std::string> response_header;
 
-        if (http_server_.find_http_get_handler(real_path_info, handler) != 0){
+        if (http_server_.find_http_get_handler(real_path_info, phandler_obj) != 0){
             tzhttpd_log_err("uri %s handler not found, using default handler!", real_path_info.c_str());
-            handler = http_handler::default_http_get_handler;
-        } else if(!handler) {
+            phandler_obj = http_handler::default_http_get_phandler_obj;
+        } else if(!phandler_obj) {
             tzhttpd_log_err("real_path_info %s found, but handler empty!", real_path_info.c_str());
             fill_std_http_for_send(http_proto::StatusCode::client_error_bad_request);
             goto write_return;
         }
 
-        handler(http_parser_, response_body, response_status, response_header); // just call it!
+        if (!phandler_obj->working_) {
+            tzhttpd_log_err("get handler for %s is disabled ...", real_path_info.c_str());
+            fill_std_http_for_send(http_proto::StatusCode::server_error_service_unavailable);
+            goto write_return;
+        }
+
+        int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header); // just call it!
+        if (call_code == 0) {
+            ++ phandler_obj->success_cnt_;
+        } else {
+            ++ phandler_obj->fail_cnt_;
+        }
+
         if (response_body.empty() || response_status.empty()) {
             tzhttpd_log_err("caller not generate response body!");  // default status OK
             fill_std_http_for_send(http_proto::StatusCode::success_ok);
@@ -264,18 +276,31 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     }
 
     std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
-    HttpPostHandler handler;
+    HttpPostHandlerObjectPtr phandler_obj {};
     std::string response_body;
     std::string response_status;
     std::vector<std::string> response_header;
 
-    if (http_server_.find_http_post_handler(real_path_info, handler) != 0){
+    if (http_server_.find_http_post_handler(real_path_info, phandler_obj) != 0){
         tzhttpd_log_err("uri %s handler not found, and no default!", real_path_info.c_str());
         fill_std_http_for_send(http_proto::StatusCode::client_error_not_found);
     } else {
-        if (handler) {
-            handler(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
-                    response_status, response_header); // call it!
+        if (phandler_obj) {
+
+            if (!phandler_obj->working_) {
+                tzhttpd_log_err("post handler for %s is disabled ...", real_path_info.c_str());
+                fill_std_http_for_send(http_proto::StatusCode::server_error_service_unavailable);
+                goto write_return;
+            }
+
+            int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
+                                                   response_status, response_header); // call it!
+            if (call_code == 0) {
+                ++ phandler_obj->success_cnt_;
+            } else {
+                ++ phandler_obj->fail_cnt_;
+            }
+
             if (response_body.empty() || response_status.empty()) {
                 tzhttpd_log_err("caller not generate response body!");
                 fill_std_http_for_send(http_proto::StatusCode::success_ok);
@@ -291,7 +316,7 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     // default, OK
     // go through write return;
 
- // write_return:
+write_return:
     do_write();
 
     // If HTTP 1.0 or HTTP 1.1 without Keep-Alived, close the connection directly

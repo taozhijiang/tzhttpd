@@ -11,6 +11,7 @@
 #include <functional>
 
 #include <boost/format.hpp>
+#include <boost/atomic/atomic.hpp>
 
 #include "HttpCfgHelper.h"
 #include "TCPConnAsync.h"
@@ -121,30 +122,33 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     }
 
     // other http parameters
-
-    if (!cfg.lookupValue("http.conn_time_out", conn_time_out_) ||
-        !cfg.lookupValue("http.conn_time_out_linger", conn_time_out_linger_)) {
+    int value, value2;
+    if (!cfg.lookupValue("http.conn_time_out", value) ||
+        !cfg.lookupValue("http.conn_time_out_linger", value2)) {
         tzhttpd_log_err("get http conn_time_out & linger configure value error, using default.");
         conn_time_out_ = 5 * 60;
         conn_time_out_linger_ = 10;
+    } else {
+        conn_time_out_ = value;
+        conn_time_out_linger_ = value2;
     }
 
-    if (!cfg.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_)){
+    if (!cfg.lookupValue("http.ops_cancel_time_out", value) || value < 0){
         tzhttpd_log_err("get http ops_cancel_time_out configure value error, using default.");
         ops_cancel_time_out_ = 0;
-    }
-    if (ops_cancel_time_out_ < 0) {
-        ops_cancel_time_out_ = 0;
+    } else {
+        ops_cancel_time_out_ = value;
     }
 
-    if (!cfg.lookupValue("http.service_enable", http_service_enabled_) ||
-        !cfg.lookupValue("http.service_speed", http_service_speed_)){
+    bool value_b;
+    if (!cfg.lookupValue("http.service_enable", value_b) ||
+        !cfg.lookupValue("http.service_speed", value) || value < 0){
         tzhttpd_log_err("get http service enable/speed configure value error, using default.");
         http_service_enabled_ = true;
         http_service_speed_ = 0;
-    }
-    if (http_service_speed_ < 0) {
-        http_service_speed_ = 0;
+    } else {
+        http_service_enabled_ = value_b;
+        http_service_speed_ = value;
     }
 
     tzhttpd_log_debug("HttpConf parse cfgfile %s OK!", HttpCfgHelper::instance().get_cfgfile().c_str());
@@ -188,7 +192,14 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 
 bool HttpServer::init() {
 
-    if (!Ssl_thread_setup) {
+    boost::atomic<int> atomic_int;
+    if (atomic_int.is_lock_free()) {
+        tzhttpd_log_alert("GOOD, your system atomic is lock_free ...");
+    } else {
+        tzhttpd_log_err("BAD, your system atomic is not lock_free, may impact performance ...");
+    }
+
+    if (!Ssl_thread_setup()) {
         tzhttpd_log_err("Ssl_thread_setup failed!");
         return false;
     }
@@ -220,11 +231,11 @@ bool HttpServer::init() {
     tzhttpd_log_alert("create listen endpoint for %s:%d", conf_.bind_addr_.c_str(), conf_.listen_port_);
 
     tzhttpd_log_debug("socket/session conn time_out: %ds, linger: %ds",
-              conf_.conn_time_out_, conf_.conn_time_out_linger_);
+              conf_.conn_time_out_.load(), conf_.conn_time_out_linger_.load());
     conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
                               conf_.conn_time_out_, conf_.conn_time_out_linger_);
 
-    tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_.ops_cancel_time_out_,
+    tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_.ops_cancel_time_out_.load(),
               conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
     if (conf_.http_service_speed_) {
@@ -239,7 +250,7 @@ bool HttpServer::init() {
             std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
     tzhttpd_log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
-              conf_.http_service_speed_);
+              conf_.http_service_speed_.load());
 
     if (!io_service_threads_.init_threads(
         std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
@@ -263,8 +274,12 @@ bool HttpServer::init() {
         return false;
     }
 
-    // 固定的管理页面地址
-    if (register_http_get_handler("/manage", http_handler::manage_http_get_handler) != 0) {
+    // default handler already static initialized
+
+    if (register_http_get_handler("^/manage$",
+            std::bind(&HttpServer::manage_http_get_handler, shared_from_this(), 
+                      std::placeholders::_1, std::placeholders::_2, 
+                      std::placeholders::_3, std::placeholders::_4), true) != 0) {
         tzhttpd_log_err("HttpServer register manage page failed!");
         return false;
     }
@@ -280,6 +295,8 @@ bool HttpServer::init() {
 
 int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
 
+    tzhttpd_log_alert("HttpServer::update_run_cfg called ...");
+
     HttpConf conf {};
     if (!conf.load_config(cfg)) {
         tzhttpd_log_err("Load cfg failed!");
@@ -294,22 +311,22 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
         tzhttpd_log_alert("===> update socket/session conn cancel time_out: from %d to %d",
-                  conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
-        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
+                  conf_.ops_cancel_time_out_.load(), conf.ops_cancel_time_out_.load());
+        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
     }
 
     // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了manage管理页面可用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
         tzhttpd_log_alert("===> update http_service_enabled: from %d to %d",
-                  conf_.http_service_enabled_, conf.http_service_enabled_);
-        conf_.http_service_enabled_ = conf.http_service_enabled_;
+                  conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
+        conf_.http_service_enabled_ = conf.http_service_enabled_.load();
     }
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
         tzhttpd_log_alert("===> update http_service_speed: from %d to %d",
-                  conf_.http_service_speed_, conf.http_service_speed_);
-        conf_.http_service_speed_ = conf.http_service_speed_;
+                  conf_.http_service_speed_.load(), conf.http_service_speed_.load());
+        conf_.http_service_speed_ = conf.http_service_speed_.load();
 
         if (conf.http_service_speed_) { // 首次启用
             if (! conf_.timed_feed_token_) {
@@ -345,6 +362,7 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
         tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
 
+    tzhttpd_log_alert("HttpServer::update_run_cfg called return %d ...", ret_code);
     return ret_code;
 }
 
@@ -441,7 +459,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 
         if (!conf_.get_http_service_token()) {
             tzhttpd_log_err("request http service token failed, enabled: %s, speed: %ld",
-                    conf_.http_service_enabled_ ? "true" : "false", conf_.http_service_speed_);
+                    conf_.http_service_enabled_ ? "true" : "false", conf_.http_service_speed_.load());
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -477,5 +495,6 @@ int HttpServer::io_service_join() {
     io_service_threads_.join_threads();
     return 0;
 }
+
 
 } // end namespace tzhttpd
