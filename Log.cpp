@@ -60,6 +60,10 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
     }
 }
 
+Log::~Log() {
+	closelog();
+}
+
 #else // TZHTTPD_USING_SYSLOG
 
 void log_api(const char* priority, const char *file, int line, const char *func, const char *msg, ...) {

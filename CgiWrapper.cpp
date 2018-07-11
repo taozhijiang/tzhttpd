@@ -65,7 +65,9 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
 
     try {
         ret = func_(&param, &rsp, &rsp_header);
-    } catch (...) {
+    } catch (const std::exception& e) {
+		tzhttpd_log_err("post func call std::exception detect: %s.", e.what());
+	} catch (...) {
         tzhttpd_log_err("get func call exception detect.");
     }
 
@@ -134,7 +136,9 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
 
     try {
         ret = func_(&param, &post, &rsp, &rsp_header);
-    } catch (...) {
+    } catch (const std::exception& e) {
+		tzhttpd_log_err("post func call std::exception detect: %s.", e.what());
+	} catch (...) {
         tzhttpd_log_err("post func call exception detect.");
     }
 
