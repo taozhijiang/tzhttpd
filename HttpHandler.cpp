@@ -25,7 +25,7 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.1.3";
+std::string              http_server_version = "1.2.0";
 std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
