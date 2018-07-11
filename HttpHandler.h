@@ -76,23 +76,36 @@ private:
 class HttpHandler {
 
 public:
-    bool check_exist_http_get_handler(std::string uri_regex) {
-        return do_check_exist_http_handler(uri_regex, get_handler_);
+    // check_exist
+    bool check_exist_http_get_handler(const std::string& uri_r) {
+        return do_check_exist_http_handler(uri_r, get_handler_);
     }
 
-    bool check_exist_http_post_handler(std::string uri_regex) {
-        return do_check_exist_http_handler(uri_regex, post_handler_);
+    bool check_exist_http_post_handler(const std::string& uri_r) {
+        return do_check_exist_http_handler(uri_r, post_handler_);
     }
 
-    int switch_http_get_handler(std::string uri_regex, bool on) {
-        return do_switch_http_handler(uri_regex, on, get_handler_);
-    }
-    int switch_http_post_handler(std::string uri_regex, bool on) {
-        return do_switch_http_handler(uri_regex, on, post_handler_);
+    // switch on/off
+    int switch_http_get_handler(const std::string& uri_r, bool on) {
+        return do_switch_http_handler(uri_r, on, get_handler_);
     }
 
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in);
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in);
+    int switch_http_post_handler(const std::string& uri_r, bool on) {
+        return do_switch_http_handler(uri_r, on, post_handler_);
+    }
+
+    // update_handler
+    int update_http_get_handler(const std::string& uri_r, bool on) {
+        return do_update_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_);
+    }
+
+    int update_http_post_handler(const std::string& uri_r, bool on) {
+        return do_update_http_handler<HttpPostHandlerObjectPtr>(uri_r, on, post_handler_);
+    }
+
+
+    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in);
+    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in);
 
     // uri match
     int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
@@ -110,10 +123,13 @@ public:
 
 private:
     template<typename T>
-    bool do_check_exist_http_handler(std::string uri_regex, const T& handlers);
+    bool do_check_exist_http_handler(const std::string& uri_r, const T& handlers);
 
     template<typename T>
-    int do_switch_http_handler(std::string uri_regex, bool on, T& handlers);
+    int do_switch_http_handler(const std::string& uri_r, bool on, T& handlers);
+
+    template<typename Ptr, typename T>
+    int do_update_http_handler(const std::string& uri_r, bool on, T& handlers);
 
 private:
 
@@ -126,6 +142,103 @@ private:
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>  get_handler_;
 
 };
+
+
+// template code should be .h
+
+template<typename T>
+bool HttpHandler::do_check_exist_http_handler(const std::string& uri_r, const T& handlers) {
+
+    std::string uri = pure_uri_path(uri_r);
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
+
+    for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
+        if (it->first.str() == uri ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+template<typename T>
+int HttpHandler::do_switch_http_handler(const std::string& uri_r, bool on, T& handlers) {
+
+    std::string uri = pure_uri_path(uri_r);
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
+        if (it->first.str() == uri ) {
+            if (it->second->working_ == on) {
+                tzhttpd_log_err("uri handler for %s already in %s status...",
+                                it->first.str().c_str(), on ? "on" : "off");
+                return -1;
+            } else {
+                tzhttpd_log_alert("uri handler for %s update from %s to %s status...",
+                                 it->first.str().c_str(),
+                                 it->second->working_ ? "on" : "off", on ? "on" : "off");
+                it->second->working_ = on;
+                return 0;
+            }
+        }
+    }
+
+    tzhttpd_log_err("uri for %s not found, update status failed...!", uri.c_str());
+    return -2;
+}
+
+
+template<typename Ptr, typename T>
+int HttpHandler::do_update_http_handler(const std::string& uri_r, bool on, T& handlers) {
+
+    Ptr p_handler_object{};
+    std::string uri = pure_uri_path(uri_r);
+
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_); // 持有互斥锁，不会再有新的请求了
+
+    auto it = handlers.begin();
+    for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
+        if (it->first.str() == uri ) {
+            p_handler_object = it->second;
+            break;
+        }
+    }
+
+    if (p_handler_object->built_in_) {
+        tzhttpd_log_err("handler for %s is built_in type, we do not consider support replacement.");
+        return -1;
+    }
+
+    int retry_count = 10;
+    if (p_handler_object) {
+
+        while (p_handler_object.use_count() > 2 && -- retry_count > 0) {
+            ::usleep(1000);
+        }
+
+        if (p_handler_object.use_count() > 2) {
+            tzhttpd_log_err("handler for %s use_count: %ld, may disable it first and update...",
+                            uri_r.c_str(), p_handler_object.use_count());
+            goto ret;
+        }
+
+
+        // safe remove the handler and (may) unload dll
+
+        SAFE_ASSERT(it < handlers.end());
+        handlers.erase(it);
+
+        // install new handler
+
+
+    }
+    // else, good, new handler
+
+ret:
+    return -2;
+}
+
 
 namespace http_handler {
 

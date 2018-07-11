@@ -46,23 +46,53 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
     int ret = 0;
 
     if (cmd == "reload") {
+
         // 配置文件动态更新
         tzhttpd_log_debug("do configure reconfigure ....");
         ret = HttpCfgHelper::instance().update_cfg();
-    } else if (cmd == "disable_handler") {
-        // 禁用 uri
-        std::string uri_regex = params.VALUE("path");
 
-    } else if (cmd == "enable_handler") {
-        // 启用 uri
-        std::string uri_regex = params.VALUE("path");
+    } else if (cmd == "switch_handler") {
+
+        // 开关 uri
+        std::string uri_r = params.VALUE("path");
+        std::string method = params.VALUE("method");
+        std::string enable = params.VALUE("enable");
+
+        bool on = boost::iequals(enable, "off") ? false : true;
+
+        if (boost::iequals(method, "GET")) {
+            ret = handler_.switch_http_get_handler(uri_r, on);
+        } else if (boost::iequals(method, "POST")) {
+            ret = handler_.switch_http_post_handler(uri_r, on);
+        } else {
+            tzhttpd_log_err("Unknown method %s for switch_handler with uri: %s",
+                            method.c_str(), uri_r.c_str());
+            ret = -2;
+        }
 
     } else if (cmd == "update_handler") {
+
         // 更新 non-build_in uri
         // 谨慎，为防止coredump需要检查引用计数
-        std::string uri_regex = params.VALUE("path");
+        std::string uri_r = params.VALUE("path");
+        std::string method = params.VALUE("method");
+        std::string enable = params.VALUE("enable");
+
+        bool on = boost::iequals(enable, "off") ? false : true;
+
+        if (boost::iequals(method, "GET")) {
+            ret = handler_.update_http_get_handler(uri_r, on);
+        } else if (boost::iequals(method, "POST")) {
+            ret = handler_.update_http_post_handler(uri_r, on);
+        } else {
+            tzhttpd_log_err("Unknown method %s for update_handler with uri: %s",
+                            method.c_str(), uri_r.c_str());
+            ret = -2;
+        }
+
 
     } else {
+
         tzhttpd_log_err("Unrecognized cmd: %s", cmd.c_str());
         ret = -1;
     }

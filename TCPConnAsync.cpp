@@ -139,6 +139,12 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
+        if (!phandler_obj->working_) {
+            tzhttpd_log_err("get handler for %s is disabled ...", real_path_info.c_str());
+            fill_std_http_for_send(http_proto::StatusCode::server_error_service_unavailable);
+            goto write_return;
+        }
+
         int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header); // just call it!
         if (call_code == 0) {
             ++ phandler_obj->success_cnt_;
@@ -280,6 +286,13 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
         fill_std_http_for_send(http_proto::StatusCode::client_error_not_found);
     } else {
         if (phandler_obj) {
+
+            if (!phandler_obj->working_) {
+                tzhttpd_log_err("post handler for %s is disabled ...", real_path_info.c_str());
+                fill_std_http_for_send(http_proto::StatusCode::server_error_service_unavailable);
+                goto write_return;
+            }
+
             int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
                                                    response_status, response_header); // call it!
             if (call_code == 0) {
@@ -303,7 +316,7 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     // default, OK
     // go through write return;
 
- // write_return:
+write_return:
     do_write();
 
     // If HTTP 1.0 or HTTP 1.1 without Keep-Alived, close the connection directly
