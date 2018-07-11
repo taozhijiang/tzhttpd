@@ -53,25 +53,16 @@ int HttpCfgHelper::update_cfg() {
         return 0;
     }
 
-    std::unique_ptr<libconfig::Config> cfg(new libconfig::Config());
+    auto cfg = load_cfg_file();
     if (!cfg) {
-        tzhttpd_log_err("new libconfig::Config failed!");
-        return -2;
-    }
-
-    try {
-        cfg->readFile(cfgfile_.c_str());
-    } catch(libconfig::FileIOException &fioex) {
-        tzhttpd_log_err("I/O error while reading file: %s.", cfgfile_.c_str());
-        return -3;
-    } catch(libconfig::ParseException &pex) {
-        tzhttpd_log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
-        return -4;
+        tzhttpd_log_err("load config file %s failed!", cfgfile_.c_str());
+        return false;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
 
     std::swap(cfg, cfg_ptr_);
+    cfg_update_time_ = ::time(NULL);
 
     int ret = 0;
     for (auto it = calls_.begin(); it != calls_.end(); ++it) {

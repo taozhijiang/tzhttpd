@@ -25,6 +25,8 @@
 #include "CgiWrapper.h"
 #include "SlibLoader.h"
 
+#include "HttpCfgHelper.h"
+
 namespace tzhttpd {
 
 class HttpParser;
@@ -45,8 +47,8 @@ struct HttpHandlerObject {
 
     T handler_;
 
-    explicit HttpHandlerObject(const T& t, bool built_in = false):
-    built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(true),
+    explicit HttpHandlerObject(const T& t, bool built_in = false, bool working = true):
+    built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
         handler_(t) {
     }
 };
@@ -96,16 +98,82 @@ public:
 
     // update_handler
     int update_http_get_handler(const std::string& uri_r, bool on) {
-        return do_update_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_);
+
+        auto cfg_ptr = HttpCfgHelper::instance().get_config();
+        if (!cfg_ptr) {
+            tzhttpd_log_err("load config file error: %s", HttpCfgHelper::instance().get_cfgfile().c_str());
+            return -1;
+        }
+
+        std::string uri = pure_uri_path(uri_r);
+        std::string key = "http.cgi_get_handlers";
+        std::map<std::string, std::string> path_map {};
+        parse_cfg(*cfg_ptr, key, path_map);
+        if (path_map.find(uri) == path_map.end()) {
+            tzhttpd_log_err("find get dl path error for: %s", uri.c_str());
+            return -2;
+        }
+        std::string dl_path = path_map.at(uri);
+
+        if(do_unload_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_) != 0) {
+            tzhttpd_log_err("unload get handler for %s failed!", uri.c_str());
+            return -3;
+        }
+
+        http_handler::CgiGetWrapper getter(dl_path);
+        if (!getter.init()) {
+            tzhttpd_log_err("init get for %s @ %s failed, skip it!", uri.c_str(), dl_path.c_str());
+            return -4;
+        }
+
+        register_http_get_handler(uri, getter, false, on);
+        tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
+
+        return 0;
+
     }
 
     int update_http_post_handler(const std::string& uri_r, bool on) {
-        return do_update_http_handler<HttpPostHandlerObjectPtr>(uri_r, on, post_handler_);
+
+        auto cfg_ptr = HttpCfgHelper::instance().get_config();
+        if (!cfg_ptr) {
+            tzhttpd_log_err("load config file error: %s", HttpCfgHelper::instance().get_cfgfile().c_str());
+            return -1;
+        }
+
+        std::string uri = pure_uri_path(uri_r);
+        std::string key = "http.cgi_post_handlers";
+        std::map<std::string, std::string> path_map {};
+        parse_cfg(*cfg_ptr, key, path_map);
+        if (path_map.find(uri) == path_map.end()) {
+            tzhttpd_log_err("find post dl path error for: %s", uri.c_str());
+            return -2;
+        }
+
+        std::string dl_path = path_map.at(uri);
+
+        if(do_unload_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_) != 0) {
+            tzhttpd_log_err("unload get handler for %s failed!", uri.c_str());
+            return -3;
+        }
+
+        http_handler::CgiPostWrapper poster(dl_path);
+        if (!poster.init()) {
+            tzhttpd_log_err("init post for %s @ %s failed, skip it!", uri.c_str(), dl_path.c_str());
+            return -4;
+        }
+
+        register_http_post_handler(uri, poster, false, on);
+        tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
+
+        return 0;
     }
 
 
-    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in);
-    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in);
+    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
+                                  bool built_in, bool working = true);
+    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
+                                   bool built_in, bool working = true);
 
     // uri match
     int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
@@ -129,7 +197,7 @@ private:
     int do_switch_http_handler(const std::string& uri_r, bool on, T& handlers);
 
     template<typename Ptr, typename T>
-    int do_update_http_handler(const std::string& uri_r, bool on, T& handlers);
+    int do_unload_http_handler(const std::string& uri_r, bool on, T& handlers);
 
 private:
 
@@ -190,22 +258,21 @@ int HttpHandler::do_switch_http_handler(const std::string& uri_r, bool on, T& ha
 
 
 template<typename Ptr, typename T>
-int HttpHandler::do_update_http_handler(const std::string& uri_r, bool on, T& handlers) {
+int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& handlers) {
 
     Ptr p_handler_object{};
-    std::string uri = pure_uri_path(uri_r);
 
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_); // 持有互斥锁，不会再有新的请求了
 
     auto it = handlers.begin();
-    for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
-        if (it->first.str() == uri ) {
+    for (it = handlers.begin(); it != handlers.end(); ++ it) {
+        if (it->first.str() == uri_r ) {
             p_handler_object = it->second;
             break;
         }
     }
 
-    if (p_handler_object->built_in_) {
+    if (p_handler_object && p_handler_object->built_in_) {
         tzhttpd_log_err("handler for %s is built_in type, we do not consider support replacement.");
         return -1;
     }
@@ -220,7 +287,7 @@ int HttpHandler::do_update_http_handler(const std::string& uri_r, bool on, T& ha
         if (p_handler_object.use_count() > 2) {
             tzhttpd_log_err("handler for %s use_count: %ld, may disable it first and update...",
                             uri_r.c_str(), p_handler_object.use_count());
-            goto ret;
+            return -2;
         }
 
 
@@ -229,14 +296,13 @@ int HttpHandler::do_update_http_handler(const std::string& uri_r, bool on, T& ha
         SAFE_ASSERT(it < handlers.end());
         handlers.erase(it);
 
-        // install new handler
+        tzhttpd_log_alert("remove handler %s done!", uri_r.c_str());
+    } else {
 
-
+        tzhttpd_log_alert("handler %s not installed, just pass!", uri_r.c_str());
     }
-    // else, good, new handler
 
-ret:
-    return -2;
+    return 0;
 }
 
 

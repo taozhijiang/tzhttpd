@@ -72,6 +72,12 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
 
     } else if (cmd == "update_handler") {
 
+		//
+		// curl 'http://172.16.10.137:18430/manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+		// cp libgetdemo.so ../cgi-bin 
+		// curl 'http://172.16.10.137:18430/manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+		// curl 'http://172.16.10.137:18430/cgi-bin/getdemo.cgi'
+
         // 更新 non-build_in uri
         // 谨慎，为防止coredump需要检查引用计数
         std::string uri_r = params.VALUE("path");

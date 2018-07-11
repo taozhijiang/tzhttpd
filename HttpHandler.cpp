@@ -138,7 +138,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 
 // class HttpHandler
 
-int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in){
+int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
+                                           bool built_in, bool working){
 
     std::string uri = pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -152,7 +153,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     }
 
     UriRegex rgx {uri};
-    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(handler, built_in);
+    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(handler, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("Create get handler object for %s failed.", uri.c_str());
         return -2;
@@ -163,7 +164,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     return 0;
 }
 
-int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in){
+int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
+                                            bool built_in, bool working){
 
     std::string uri = pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -177,7 +179,7 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     }
 
     UriRegex rgx {uri};
-    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(handler, built_in);
+    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(handler, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("Create post handler object for %s failed.", uri.c_str());
         return -2;
