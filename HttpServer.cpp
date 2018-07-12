@@ -5,6 +5,7 @@
  *
  */
 
+#include <signal.h>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -191,6 +192,9 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 }
 
 bool HttpServer::init() {
+
+    // incase not forget
+    ::signal(SIGPIPE, SIG_IGN);
 
     boost::atomic<int> atomic_int;
     if (atomic_int.is_lock_free()) {
