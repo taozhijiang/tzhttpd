@@ -3,7 +3,7 @@
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  */
- 
+
 #ifndef __TZHTTPD_ALIVE_TIMER_H__
 #define __TZHTTPD_ALIVE_TIMER_H__
 
@@ -204,8 +204,8 @@ public:
         struct timeval checked_active_now;
         ::gettimeofday(&checked_active_now, NULL);
         int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) + checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
-        if (active_elapse_ms > 10) {
-            tzhttpd_log_notice("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
+        if (active_elapse_ms > 5) {
+            tzhttpd_log_err("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
             return true;
         }
 
@@ -243,7 +243,8 @@ public:
                 // (Old style) References and iterators to the erased elements are invalidated.
                 // Other references and iterators are not affected.
 
-                tzhttpd_log_debug("expire entry remove: %ld, now:%ld count:%ld", iter->first, current_sec, iter->second.size());
+                tzhttpd_log_debug("expire entry remove: %ld, now:%ld, diff:%ld, count:%ld",
+                                  iter->first, current_sec, current_sec - iter->first, iter->second.size());
                 remove_iter = iter ++;
                 time_items_.erase(remove_iter);
             }
@@ -257,8 +258,8 @@ public:
                 struct timeval checked_now;
                 ::gettimeofday(&checked_now, NULL);
                 int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) + checked_now.tv_usec - checked_start.tv_usec ) / 1000;
-                if (elapse_ms > 15) {
-                    tzhttpd_log_notice("check works too long elapse time: %ld ms, break now", elapse_ms);
+                if (elapse_ms > 5) {
+                    tzhttpd_log_err("check works too long elapse time: %ld ms, break now", elapse_ms);
                     break;
                 }
             }
