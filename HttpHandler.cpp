@@ -30,7 +30,7 @@ std::string              http_docu_root = "./docs/";
 std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
 
 std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj =
-    std::make_shared<HttpGetHandlerObject>(default_http_get_handler, true);
+    std::make_shared<HttpGetHandlerObject>("[default]", default_http_get_handler, true);
 
 
 
@@ -153,7 +153,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     }
 
     UriRegex rgx {uri};
-    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(handler, built_in, working);
+    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(uri, handler, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("Create get handler object for %s failed.", uri.c_str());
         return -2;
@@ -179,7 +179,7 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     }
 
     UriRegex rgx {uri};
-    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(handler, built_in, working);
+    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(uri, handler, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("Create post handler object for %s failed.", uri.c_str());
         return -2;

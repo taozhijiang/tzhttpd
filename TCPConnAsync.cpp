@@ -13,6 +13,7 @@
 #include "HttpServer.h"
 #include "HttpProto.h"
 #include "TCPConnAsync.h"
+#include "CheckPoint.h"
 
 namespace tzhttpd {
 
@@ -145,11 +146,18 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
-        int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header); // just call it!
-        if (call_code == 0) {
-            ++ phandler_obj->success_cnt_;
-        } else {
-            ++ phandler_obj->fail_cnt_;
+        {
+            std::string key = "GET_" + phandler_obj->path_;
+            CountPerfByMs call_perf { key };
+
+            // just call it!
+            int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header);
+            if (call_code == 0) {
+                ++ phandler_obj->success_cnt_;
+            } else {
+                ++ phandler_obj->fail_cnt_;
+                call_perf.set_error();
+            }
         }
 
         if (response_body.empty() || response_status.empty()) {
@@ -293,12 +301,19 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                 goto write_return;
             }
 
-            int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
-                                                   response_status, response_header); // call it!
-            if (call_code == 0) {
-                ++ phandler_obj->success_cnt_;
-            } else {
-                ++ phandler_obj->fail_cnt_;
+            {
+                std::string key = "POST_" + phandler_obj->path_;
+                CountPerfByMs call_perf { key };
+
+                // just call it!
+                int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
+                                                       response_status, response_header); // call it!
+                if (call_code == 0) {
+                    ++ phandler_obj->success_cnt_;
+                } else {
+                    ++ phandler_obj->fail_cnt_;
+                    call_perf.set_error();
+                }
             }
 
             if (response_body.empty() || response_status.empty()) {

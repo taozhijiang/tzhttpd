@@ -4,31 +4,32 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
- 
+
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
 #include "LocalHead.h"
+#include "CheckPoint.h"
 #include "Log.h"
 
 namespace tzhttpd {
 
-#ifdef TZHTTPD_USING_SYSLOG
 
-Log& Log::instance() {
-    static Log helper;
-    return helper;
-}
+// The use of openlog() is optional; it will automatically be called by syslog() if necessary.
+bool tzhttpd_log_init(int log_level) {
 
-// We believe outer project some where already initialized this.
-// Because it is just library.
-bool Log::init(int log_level) {
-//    openlog(program_invocation_short_name, LOG_PID , LOG_LOCAL6);
-//    setlogmask (LOG_UPTO (log_level));
+    openlog(program_invocation_short_name, LOG_PID , LOG_LOCAL6);
+    setlogmask (LOG_UPTO (log_level));
     return true;
 }
 
-void Log::log_api(int priority, const char *file, int line, const char *func, const char *msg, ...) {
+void tzhttpd_log_close() {
+
+    closelog();
+}
+
+static const std::size_t MAX_LOG_BUF_SIZE = (16*1024 -2);
+void log_api(int priority, const char *file, int line, const char *func, const char *msg, ...) {
 
     char buf[MAX_LOG_BUF_SIZE + 2] = {0, };
     int n = snprintf(buf, MAX_LOG_BUF_SIZE, "[%s:%d][%s][%#lx] -- ", file, line, func, (long)pthread_self());
@@ -45,7 +46,11 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
     n = static_cast<int>(strlen(buf));
     if (likely(std::find(buf, buf + n, '\n') == (buf + n))) {
         buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
-        syslog(priority, "%s", buf);
+        if (checkpoint_log_store_func_impl_) {
+            checkpoint_log_store_func_impl_(priority, "%s", buf);
+        } else {
+            fprintf(stdout, "%s", buf);
+        }
         return;
     }
 
@@ -55,36 +60,15 @@ void Log::log_api(int priority, const char *file, int line, const char *func, co
     for (std::vector<string>::iterator it = messages.begin(); it != messages.end(); ++it){
         if (!it->empty()) {
             std::string message = (*it) + "\n";
+            if (checkpoint_log_store_func_impl_) {
+                checkpoint_log_store_func_impl_(priority, "%s", message.c_str());
+            } else {
+                fprintf(stdout, "%s", message.c_str());
+            }
             syslog(priority, "%s", message.c_str());
         }
     }
 }
-
-Log::~Log() {
-	closelog();
-}
-
-#else // TZHTTPD_USING_SYSLOG
-
-void log_api(const char* priority, const char *file, int line, const char *func, const char *msg, ...) {
-
-    char buf[MAX_LOG_BUF_SIZE + 2] = {0, };
-    int n = snprintf(buf, MAX_LOG_BUF_SIZE, "[%s:%d][%s][%#lx]<%s> -- ", file, line, func, (long)pthread_self(), priority);
-
-    va_list arg_ptr;
-    va_start(arg_ptr, msg);
-    vsnprintf(buf + n, MAX_LOG_BUF_SIZE - n, msg, arg_ptr);
-    va_end(arg_ptr);
-
-    n = static_cast<int>(strlen(buf));
-    if (std::find(buf, buf + n, '\n') == (buf + n)) {
-        buf[n] = '\n';   // 兼容老的log_service
-        fprintf(stderr, "%s", buf);
-        return;
-    }
-}
-
-#endif // TZHTTPD_USING_SYSLOG
 
 
 } // end namespace tzhttpd

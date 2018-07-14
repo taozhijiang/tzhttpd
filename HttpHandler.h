@@ -39,6 +39,7 @@ typedef std::function<int (const HttpParser& http_parser, const std::string& pos
 template<typename T>
 struct HttpHandlerObject {
 
+    std::string            path_;
     boost::atomic<bool>    built_in_;      // built_in handler，无需引用计数
     boost::atomic<int64_t> success_cnt_;
     boost::atomic<int64_t> fail_cnt_;
@@ -47,8 +48,10 @@ struct HttpHandlerObject {
 
     T handler_;
 
-    explicit HttpHandlerObject(const T& t, bool built_in = false, bool working = true):
-    built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
+    explicit HttpHandlerObject(const std::string& path, const T& t,
+                               bool built_in = false, bool working = true):
+        path_(path),
+        built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
         handler_(t) {
     }
 };

@@ -269,8 +269,12 @@ public:
         for (iter = time_items_.begin() ; iter != time_items_.end(); ++ iter) {
             total_count += iter->second.size();
         }
-        tzhttpd_log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
-                        bucket_items_.size(), total_count, static_cast<int>(time_items_.size()));
+
+        if (total_count != 0 || bucket_items_.size() != 0) {
+            tzhttpd_log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
+                            bucket_items_.size(), total_count, static_cast<int>(time_items_.size()));
+        }
+
         if (bucket_items_.size() != total_count) {
             tzhttpd_log_err("mismatch item count, bug count:%ld, timed_count: %ld", bucket_items_.size(), total_count);
             SAFE_ASSERT(false);

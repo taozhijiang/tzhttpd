@@ -1,6 +1,9 @@
+#include <syslog.h>
 #include <cstdio>
 #include <libconfig.h++>
 
+#include "CheckPoint.h"
+#include "Log.h"
 #include "HttpServer.h"
 
 namespace tzhttpd {
@@ -20,9 +23,13 @@ int get_test_handler(const HttpParser& http_parser,
 
 int main(int argc, char* argv[]) {
 
-    std::string cfgfile = "../tzhttpd.conf";
+    std::string cfgfile = "httpsrv.conf";
     libconfig::Config cfg;
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
+
+    // default syslog
+    tzhttpd::set_checkpoint_log_store_func(syslog);
+    tzhttpd::tzhttpd_log_init(7);
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgfile, "example_main"));
     if (!http_server_ptr || !http_server_ptr->init()) {
