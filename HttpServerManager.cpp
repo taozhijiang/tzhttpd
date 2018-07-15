@@ -12,7 +12,8 @@
 
 #include <boost/format.hpp>
 
-#include "HttpServer.h"
+#include "HttpVhost.h"
+#include "HttpParser.h"
 #include "HttpProto.h"
 #include "HttpCfgHelper.h"
 
@@ -22,8 +23,8 @@ namespace tzhttpd {
 
 using namespace tzhttpd::http_proto;
 
-int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                        std::string& status_line, std::vector<std::string>& add_header) {
+int HttpVhost::internel_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+                                     std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
@@ -54,6 +55,7 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
     } else if (cmd == "switch_handler") {
 
         // 开关 uri
+        std::string vhost = params.VALUE("vhost");
         std::string uri_r = params.VALUE("path");
         std::string method = params.VALUE("method");
         std::string enable = params.VALUE("enable");
@@ -61,9 +63,9 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
         bool on = boost::iequals(enable, "off") ? false : true;
 
         if (boost::iequals(method, "GET")) {
-            ret = handler_.switch_http_get_handler(uri_r, on);
+            ret = switch_http_get_handler(vhost, uri_r, on);
         } else if (boost::iequals(method, "POST")) {
-            ret = handler_.switch_http_post_handler(uri_r, on);
+            ret = switch_http_post_handler(vhost, uri_r, on);
         } else {
             tzhttpd_log_err("Unknown method %s for switch_handler with uri: %s",
                             method.c_str(), uri_r.c_str());
@@ -72,14 +74,15 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
 
     } else if (cmd == "update_handler") {
 
-		//
-		// curl 'http://172.16.10.137:18430/manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
-		// cp libgetdemo.so ../cgi-bin 
-		// curl 'http://172.16.10.137:18430/manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
-		// curl 'http://172.16.10.137:18430/cgi-bin/getdemo.cgi'
+        //
+        // curl 'http://172.16.10.137:18430/internel_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // cp libgetdemo.so ../cgi-bin
+        // curl 'http://172.16.10.137:18430/internel_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // curl 'http://172.16.10.137:18430/cgi-bin/getdemo.cgi'
 
         // 更新 non-build_in uri
         // 谨慎，为防止coredump需要检查引用计数
+        std::string vhost = params.VALUE("vhost");
         std::string uri_r = params.VALUE("path");
         std::string method = params.VALUE("method");
         std::string enable = params.VALUE("enable");
@@ -87,9 +90,9 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
         bool on = boost::iequals(enable, "off") ? false : true;
 
         if (boost::iequals(method, "GET")) {
-            ret = handler_.update_http_get_handler(uri_r, on);
+            ret = update_http_get_handler(vhost, uri_r, on);
         } else if (boost::iequals(method, "POST")) {
-            ret = handler_.update_http_post_handler(uri_r, on);
+            ret = update_http_post_handler(vhost, uri_r, on);
         } else {
             tzhttpd_log_err("Unknown method %s for update_handler with uri: %s",
                             method.c_str(), uri_r.c_str());
@@ -111,8 +114,8 @@ int HttpServer::manage_http_get_handler(const HttpParser& http_parser, std::stri
 
         // 如果没有配置错误返回信息，使用下面的默认错误响应
         if (response.empty() || status_line.empty()) {
-        response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(),
+            response = http_proto::content_error;
+            status_line = generate_response_status_line(http_parser.get_version(),
                                                     StatusCode::server_error_internal_server_error);
         }
     }

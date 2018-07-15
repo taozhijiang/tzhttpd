@@ -141,7 +141,7 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
                                            bool built_in, bool working){
 
-    std::string uri = pure_uri_path(uri_r);
+    std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::iterator it;
@@ -167,7 +167,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
 int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
                                             bool built_in, bool working){
 
-    std::string uri = pure_uri_path(uri_r);
+    std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::iterator it;
@@ -193,7 +193,7 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
 
 int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj){
 
-    uri = pure_uri_path(uri);
+    uri = StrUtil::pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::const_iterator it;
@@ -210,7 +210,7 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr&
 
 int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj){
 
-    uri = pure_uri_path(uri);
+    uri = StrUtil::pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::const_iterator it;

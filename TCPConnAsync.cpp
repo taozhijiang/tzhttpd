@@ -126,12 +126,13 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         SAFE_ASSERT(http_parser_.find_request_header(http_proto::header_options::content_length).empty());
 
         std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
+        std::string vhost_name = http_parser_.find_request_header(http_proto::header_options::host);
         HttpGetHandlerObjectPtr phandler_obj {};
         std::string response_body;
         std::string response_status;
         std::vector<std::string> response_header;
 
-        if (http_server_.find_http_get_handler(real_path_info, phandler_obj) != 0){
+        if (http_server_.find_http_get_handler(vhost_name, real_path_info, phandler_obj) != 0){
             tzhttpd_log_err("uri %s handler not found, using default handler!", real_path_info.c_str());
             phandler_obj = http_handler::default_http_get_phandler_obj;
         } else if(!phandler_obj) {
@@ -284,12 +285,13 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     }
 
     std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
+    std::string vhost_name = http_parser_.find_request_header(http_proto::header_options::host);
     HttpPostHandlerObjectPtr phandler_obj {};
     std::string response_body;
     std::string response_status;
     std::vector<std::string> response_header;
 
-    if (http_server_.find_http_post_handler(real_path_info, phandler_obj) != 0){
+    if (http_server_.find_http_post_handler(vhost_name, real_path_info, phandler_obj) != 0){
         tzhttpd_log_err("uri %s handler not found, and no default!", real_path_info.c_str());
         fill_std_http_for_send(http_proto::StatusCode::client_error_not_found);
     } else {

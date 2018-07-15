@@ -21,6 +21,8 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
+#include "StrUtil.h"
+
 #include "CgiHelper.h"
 #include "CgiWrapper.h"
 #include "SlibLoader.h"
@@ -108,7 +110,7 @@ public:
             return -1;
         }
 
-        std::string uri = pure_uri_path(uri_r);
+        std::string uri = StrUtil::pure_uri_path(uri_r);
         std::string key = "http.cgi_get_handlers";
         std::map<std::string, std::string> path_map {};
         parse_cfg(*cfg_ptr, key, path_map);
@@ -144,7 +146,7 @@ public:
             return -1;
         }
 
-        std::string uri = pure_uri_path(uri_r);
+        std::string uri = StrUtil::pure_uri_path(uri_r);
         std::string key = "http.cgi_post_handlers";
         std::map<std::string, std::string> path_map {};
         parse_cfg(*cfg_ptr, key, path_map);
@@ -184,14 +186,6 @@ public:
 
     int update_run_cfg(const libconfig::Config& cfg);
 
-    std::string pure_uri_path(std::string uri) {  // copy
-        uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri));
-        while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部
-            uri = uri.substr(0, uri.size()-1);
-
-        return uri;
-    }
-
 private:
     template<typename T>
     bool do_check_exist_http_handler(const std::string& uri_r, const T& handlers);
@@ -220,7 +214,7 @@ private:
 template<typename T>
 bool HttpHandler::do_check_exist_http_handler(const std::string& uri_r, const T& handlers) {
 
-    std::string uri = pure_uri_path(uri_r);
+    std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
     for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
@@ -236,7 +230,7 @@ bool HttpHandler::do_check_exist_http_handler(const std::string& uri_r, const T&
 template<typename T>
 int HttpHandler::do_switch_http_handler(const std::string& uri_r, bool on, T& handlers) {
 
-    std::string uri = pure_uri_path(uri_r);
+    std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
 
     for (auto it = handlers.begin(); it != handlers.end(); ++ it) {

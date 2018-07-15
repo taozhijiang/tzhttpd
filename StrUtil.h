@@ -10,6 +10,7 @@
 
 #include <string>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include "LocalHead.h"
@@ -49,6 +50,14 @@ struct StrUtil {
         }
     }
 
+
+    static std::string pure_uri_path(std::string uri) {  // copy
+        uri = boost::algorithm::trim_copy(boost::to_lower_copy(uri));
+        while (uri[uri.size()-1] == '/' && uri.size() > 1)  // 全部的小写字母，去除尾部
+            uri = uri.substr(0, uri.size()-1);
+
+        return uri;
+    }
 
 };
 

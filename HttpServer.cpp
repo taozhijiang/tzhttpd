@@ -278,18 +278,14 @@ bool HttpServer::init() {
         return false;
     }
 
-    // default handler already static initialized
-
-    if (register_http_get_handler("^/manage$",
-            std::bind(&HttpServer::manage_http_get_handler, shared_from_this(), 
-                      std::placeholders::_1, std::placeholders::_2, 
-                      std::placeholders::_3, std::placeholders::_4), true) != 0) {
-        tzhttpd_log_err("HttpServer register manage page failed!");
+    // vhost_manager_ initialize
+    if (!vhost_manager_.init()) {
+        tzhttpd_log_err("HttpVhost initialize failed!");
         return false;
     }
 
-    // load cgi_handlers
-    int ret_code = handler_.update_run_cfg(cfg);
+    // reload cgi-handlers
+    int ret_code = vhost_manager_.update_run_cfg(cfg);
     if (ret_code != 0) {
         tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
@@ -361,7 +357,7 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
     }
 
     // reload cgi-handlers
-    int ret_code = handler_.update_run_cfg(cfg);
+    int ret_code = vhost_manager_.update_run_cfg(cfg);
     if (ret_code != 0) {
         tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
