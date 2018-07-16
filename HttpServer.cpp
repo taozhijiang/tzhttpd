@@ -27,8 +27,6 @@ namespace tzhttpd {
 namespace http_handler {
 // init only once at startup
 extern std::string              http_server_version;
-extern std::string              http_docu_root;
-extern std::vector<std::string> http_docu_index;
 } // end namespace http_handler
 
 static const size_t bucket_size_ = 0xFF;
@@ -37,16 +35,9 @@ static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
 }
 
 
-// init http_doc_root/index, once init can guarantee no change it anymore,
-// work with them without protection
-std::once_flag http_docu_once;
-void init_http_docu(const std::string& server_version, const std::string& docu_root, const std::vector<std::string>& docu_index) {
-    tzhttpd_log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
-              static_cast<int>(docu_index.size()));
-
+std::once_flag http_version_once;
+void init_http_version(const std::string& server_version) {
     http_handler::http_server_version = server_version;
-    http_handler::http_docu_root = docu_root;
-    http_handler::http_docu_index = docu_index;
 }
 
 
@@ -93,33 +84,9 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         tzhttpd_log_err("get http.version failed!");
     }
 
-    std::string docu_root;
-    if (!cfg.lookupValue("http.docu_root", docu_root)) {
-        tzhttpd_log_err("get http.docu_root failed!");
-    }
-
-    std::string str_docu_index;
-    std::vector<std::string> docu_index {};
-    if (!cfg.lookupValue("http.docu_index", str_docu_index)) {
-        tzhttpd_log_err("get http.docu_index failed!");
-    } else  {
-        std::vector<std::string> vec {};
-        boost::split(vec, str_docu_index, boost::is_any_of(";"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
-            std::string tmp = boost::trim_copy(*iter);
-            if (tmp.empty())
-                continue;
-
-            docu_index.push_back(tmp);
-        }
-        if (docu_index.empty()) {
-            tzhttpd_log_err("empty valid docu_index found, previous: %s", str_docu_index.c_str());
-        }
-    }
-
     // once init
-    if (!server_version.empty() && !docu_root.empty() && !docu_index.empty()) {
-        std::call_once(http_docu_once, init_http_docu, server_version, docu_root, docu_index);
+    if (!server_version.empty()) {
+        std::call_once(http_version_once, init_http_version, server_version);
     }
 
     // other http parameters
@@ -279,7 +246,7 @@ bool HttpServer::init() {
     }
 
     // vhost_manager_ initialize
-    if (!vhost_manager_.init()) {
+    if (!vhost_manager_.init(cfg)) {
         tzhttpd_log_err("HttpVhost initialize failed!");
         return false;
     }
@@ -287,7 +254,7 @@ bool HttpServer::init() {
     // reload cgi-handlers
     int ret_code = vhost_manager_.update_run_cfg(cfg);
     if (ret_code != 0) {
-        tzhttpd_log_err("register cgi-handler return %d", ret_code);
+        tzhttpd_log_err("register all vhosts cgi-handler return %d", ret_code);
     }
 
     return true;

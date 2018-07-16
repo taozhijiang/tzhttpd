@@ -59,6 +59,16 @@ struct StrUtil {
         return uri;
     }
 
+    static std::string trim_lowcase(std::string str) {  // copy
+        return boost::algorithm::trim_copy(boost::to_lower_copy(str));
+    }
+
+    // 删除host尾部的端口号
+    static std::string drop_host_port(std::string host) {  // copy
+        host = boost::algorithm::trim_copy(boost::to_lower_copy(host));
+        host.erase(host.find(':'));
+        return host;
+    }
 };
 
 

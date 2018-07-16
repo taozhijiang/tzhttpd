@@ -83,6 +83,36 @@ private:
 class HttpHandler {
 
 public:
+
+    HttpHandler():
+        vhost_name_({}) {
+    }
+
+    explicit HttpHandler(std::string vhost,
+                         const std::string& docu_root, const std::vector<std::string>& docu_index):
+        vhost_name_({}), http_docu_root_(docu_root), http_docu_index_(docu_index) {
+        vhost_name_ = StrUtil::drop_host_port(vhost);
+    }
+
+    bool init() {
+
+        default_http_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[default]",
+                                               std::bind(&HttpHandler::default_http_get_handler, this,
+                                                         std::placeholders::_1, std::placeholders::_2,
+                                                         std::placeholders::_3, std::placeholders::_4 ), true);
+        if (!default_http_get_phandler_obj_) {
+            tzhttpd_log_err("Create default get handler for %s failed!", vhost_name_.c_str());
+            return false;
+        }
+
+        return true;
+    }
+
+    std::string get_vhost_name() {
+        return vhost_name_;
+    }
+
+public:
     // check_exist
     bool check_exist_http_get_handler(const std::string& uri_r) {
         return do_check_exist_http_handler(uri_r, get_handler_);
@@ -113,7 +143,8 @@ public:
         std::string uri = StrUtil::pure_uri_path(uri_r);
         std::string key = "http.cgi_get_handlers";
         std::map<std::string, std::string> path_map {};
-        parse_cfg(*cfg_ptr, key, path_map);
+        // TODO
+//        parse_cfg(*cfg_ptr, key, path_map);
         if (path_map.find(uri) == path_map.end()) {
             tzhttpd_log_err("find get dl path error for: %s", uri.c_str());
             return -2;
@@ -149,7 +180,8 @@ public:
         std::string uri = StrUtil::pure_uri_path(uri_r);
         std::string key = "http.cgi_post_handlers";
         std::map<std::string, std::string> path_map {};
-        parse_cfg(*cfg_ptr, key, path_map);
+        // TODO
+ //       parse_cfg(*cfg_ptr, key, path_map);
         if (path_map.find(uri) == path_map.end()) {
             tzhttpd_log_err("find post dl path error for: %s", uri.c_str());
             return -2;
@@ -184,7 +216,7 @@ public:
     int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
     int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj);
 
-    int update_run_cfg(const libconfig::Config& cfg);
+    int update_run_cfg(const libconfig::Setting& setting);
 
 private:
     template<typename T>
@@ -198,13 +230,23 @@ private:
 
 private:
 
-    int parse_cfg(const libconfig::Config& cfg, const std::string& key, std::map<std::string, std::string>& path_map);
+    std::string vhost_name_;
+    std::string http_docu_root_;
+    std::vector<std::string> http_docu_index_;
+
+    // default http get handler, important for web_server
+    int default_http_get_handler(const HttpParser& http_parser, std::string& response,
+                                 std::string& status_line, std::vector<std::string>& add_header);
+    std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj_;
+
+    int parse_cfg(const libconfig::Setting& setting, const std::string& key, std::map<std::string, std::string>& path_map);
 
     boost::shared_mutex rwlock_;
 
     // 使用vector保存handler，保证是先注册handler具有高优先级
     std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>> post_handler_;
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>  get_handler_;
+
 
 };
 
@@ -302,16 +344,6 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
     return 0;
 }
 
-
-namespace http_handler {
-
-int default_http_get_handler(const HttpParser& http_parser, std::string& response,
-                             std::string& status_line, std::vector<std::string>& add_header);
-
-extern std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj;
-
-
-} // end namespace http_handler
 } // end namespace tzhttpd
 
 

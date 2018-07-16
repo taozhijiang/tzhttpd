@@ -26,13 +26,7 @@ namespace http_handler {
 
 // init only once at startup, these are the default value
 std::string              http_server_version = "1.2.0";
-std::string              http_docu_root = "./docs/";
-std::vector<std::string> http_docu_index = { "index.html", "index.htm" };
-
-std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj =
-    std::make_shared<HttpGetHandlerObject>("[default]", default_http_get_handler, true);
-
-
+} // end namespace http_handler
 
 
 using namespace http_proto;
@@ -67,15 +61,15 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
 }
 
 
-int default_http_get_handler(const HttpParser& http_parser, std::string& response,
-                             std::string& status_line, std::vector<std::string>& add_header) {
+int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::string& response,
+                                          std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (!params.EMPTY()) {
         tzhttpd_log_err("Default handler just for static file transmit, we can not handler uri parameters...");
     }
 
-    std::string real_file_path = http_docu_root +
+    std::string real_file_path = http_docu_root_ +
         "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
 
     // check dest exist?
@@ -91,7 +85,8 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
     if (stat(real_file_path.c_str(), &sb) == -1) {
         tzhttpd_log_err("Stat file error: %s", real_file_path.c_str());
         response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::server_error_internal_server_error);
         return -1;
     }
 
@@ -103,7 +98,7 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
         case S_IFDIR:
             {
                 bool OK = false;
-                const std::vector<std::string>& indexes = http_docu_index;
+                const std::vector<std::string>& indexes = http_docu_index_;
                 for (std::vector<std::string>::const_iterator iter = indexes.cbegin();
                       iter != indexes.cend();
                       ++iter) {
@@ -131,13 +126,6 @@ int default_http_get_handler(const HttpParser& http_parser, std::string& respons
     return 0;
 }
 
-
-} // end namespace http_handler
-
-
-
-// class HttpHandler
-
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
                                            bool built_in, bool working){
 
@@ -160,7 +148,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     }
     get_handler_.push_back({rgx, phandler_obj});
 
-    tzhttpd_log_alert("Register GetHandler for %s(%s) OK!", uri.c_str(), uri_r.c_str());
+    tzhttpd_log_alert("Register GetHandler for %s %s(%s) OK!",
+                      vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
     return 0;
 }
 
@@ -186,7 +175,8 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     }
     post_handler_.push_back({ rgx, phandler_obj });
 
-    tzhttpd_log_alert("Register PostHandler for %s(%s) OK!", uri.c_str(), uri_r.c_str());
+    tzhttpd_log_alert("Register PostHandler for %s %s(%s) OK!",
+                      vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
     return 0;
 }
 
@@ -205,7 +195,9 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr&
         }
     }
 
-    return -1;
+    tzhttpd_log_debug("http get handler for %s not found, using default...", uri.c_str());
+    phandler_obj = default_http_get_phandler_obj_;
+    return 0;
 }
 
 int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj){
@@ -226,10 +218,10 @@ int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPt
 }
 
 
-int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key,
+int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string& key,
                            std::map<std::string, std::string>& path_map) {
 
-    if (!cfg.exists(key)) {
+    if (!setting.exists(key)) {
         tzhttpd_log_notice("handlers for %s not found!", key.c_str());
         return 0;
     }
@@ -238,7 +230,7 @@ int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key,
     int ret_code = 0;
     try {
 
-        const libconfig::Setting &http_cgi_handlers = cfg.lookup(key);
+        const libconfig::Setting &http_cgi_handlers = setting[key];
         for(int i = 0; i < http_cgi_handlers.getLength(); ++i) {
 
             const libconfig::Setting& handler = http_cgi_handlers[i];
@@ -262,15 +254,15 @@ int HttpHandler::parse_cfg(const libconfig::Config& cfg, const std::string& key,
     return ret_code;
 }
 
-int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
+int HttpHandler::update_run_cfg(const libconfig::Setting& setting) {
 
     int ret_code = 0;
     std::string key;
     std::map<std::string, std::string> path_map {};
 
-    key = "http.cgi_get_handlers";
+    key = "cgi_get_handlers";
     path_map.clear();
-    ret_code += parse_cfg(cfg, key, path_map);
+    ret_code += parse_cfg(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
         // we will not override handler directly, consider using /manage
@@ -291,9 +283,9 @@ int HttpHandler::update_run_cfg(const libconfig::Config& cfg) {
     }
 
 
-    key = "http.cgi_post_handlers";
+    key = "cgi_post_handlers";
     path_map.clear();
-    ret_code += parse_cfg(cfg, key, path_map);
+    ret_code += parse_cfg(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
         // we will not override handler directly, consider using /manage
