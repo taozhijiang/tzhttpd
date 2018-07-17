@@ -33,7 +33,7 @@ struct header {
 string http_response_generate(const string& content, const string& stat_str,
                               bool keepalive, const std::vector<std::string>& additional_header) {
 
-    std::vector<header> headers(6);
+    std::vector<header> headers(5);
 
     // reply fixed header
     headers[0].name = "Server";
@@ -50,10 +50,8 @@ string http_response_generate(const string& content, const string& stat_str,
         headers[3].value = "close";        // 短连接
     }
 
-    headers[4].name = "Cache-Control";
-    headers[4].value = "no-cache";
-    headers[5].name = "Access-Control-Allow-Origin";
-    headers[5].value = "*";
+    headers[4].name = "Access-Control-Allow-Origin";
+    headers[4].value = "*";
 
     string str = stat_str;
     str += header_crlf_str;

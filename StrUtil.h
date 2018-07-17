@@ -66,7 +66,10 @@ struct StrUtil {
     // 删除host尾部的端口号
     static std::string drop_host_port(std::string host) {  // copy
         host = boost::algorithm::trim_copy(boost::to_lower_copy(host));
-        host.erase(host.find(':'));
+        auto pos = host.find(':');
+        if (pos != std::string::npos) {
+            host.erase(pos);
+        }
         return host;
     }
 };

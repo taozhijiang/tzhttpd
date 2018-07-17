@@ -107,7 +107,7 @@ bool HttpVhost::handle_vhost_cfg(const libconfig::Setting& setting, std::shared_
     }
 
     std::shared_ptr<HttpHandler> phandler = std::make_shared<HttpHandler>(server_name, docu_root, docu_index);
-    if (!phandler || !phandler->init()) {
+    if (!phandler || !phandler->init(setting)) {
         tzhttpd_log_err("create handler object for %s failed...", server_name.c_str());
         return false;
     }

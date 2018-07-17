@@ -90,14 +90,19 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
         return -1;
     }
 
+    bool OK = false;
+    std::string did_file_full_path {};
+
     switch (sb.st_mode & S_IFMT) {
         case S_IFREG:
-            check_and_sendfile(http_parser, real_file_path, response, status_line);
+            if(check_and_sendfile(http_parser, real_file_path, response, status_line)) {
+                did_file_full_path = real_file_path;
+                OK = true;
+            }
             break;
 
         case S_IFDIR:
             {
-                bool OK = false;
                 const std::vector<std::string>& indexes = http_docu_index_;
                 for (std::vector<std::string>::const_iterator iter = indexes.cbegin();
                       iter != indexes.cend();
@@ -105,6 +110,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
                     std::string file_path = real_file_path + "/" + *iter;
                     tzhttpd_log_info("Trying: %s", file_path.c_str());
                     if (check_and_sendfile(http_parser, file_path, response, status_line)) {
+                        did_file_full_path = file_path;
                         OK = true;
                         break;
                     }
@@ -121,6 +127,19 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
 
         default:
             break;
+    }
+
+    // do handler helper
+    if (OK && !did_file_full_path.empty()) {
+        boost::to_lower(did_file_full_path);
+        for (auto iter = cache_controls_.begin(); iter != cache_controls_.end(); ++iter) {
+            if (boost::algorithm::ends_with(did_file_full_path, iter->first)) {
+                add_header.push_back(iter->second);
+                tzhttpd_log_debug("Adding cache header for %s(%s) -> %s",
+                                  did_file_full_path.c_str(), iter->first.c_str(), iter->second.c_str());
+                break;
+            }
+        }
     }
 
     return 0;
