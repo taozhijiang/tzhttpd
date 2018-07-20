@@ -75,38 +75,54 @@ bool HttpVhost::init(const libconfig::Config& cfg) {
 
 bool HttpVhost::handle_vhost_cfg(const libconfig::Setting& setting, std::shared_ptr<HttpHandler>& handler) {
 
-    if (!setting.exists("server_name") || !setting.exists("docu_root") ||
-        !setting.exists("docu_index")) {
-        tzhttpd_log_err("required param not found for vhost.");
+    if (!setting.exists("server_name") ) {
+        tzhttpd_log_err("required vhost_name not found for vhost.");
         return false;
     }
 
-    std::string server_name = setting["server_name"];
-    std::string docu_root = setting["docu_root"];
-    std::string str_docu_index = setting["docu_index"];
+    std::string server_name;
+    std::string redirect_str;
+    std::string docu_root_str;
+    std::string docu_index_str;
+    ConfUtil::conf_value(setting,"server_name", server_name);
+    ConfUtil::conf_value(setting,"redirect", redirect_str);
+    ConfUtil::conf_value(setting,"docu_root", docu_root_str);
+    ConfUtil::conf_value(setting,"docu_index", docu_index_str);
 
-    std::vector<std::string> docu_index {};
-    {
-        std::vector<std::string> vec {};
-        boost::split(vec, str_docu_index, boost::is_any_of(";"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
-            std::string tmp = boost::trim_copy(*iter);
-            if (tmp.empty())
-                continue;
+    std::shared_ptr<HttpHandler> phandler {};
 
-            docu_index.push_back(tmp);
+    if (!redirect_str.empty()) {
+
+        phandler = std::make_shared<HttpHandler>(server_name, redirect_str);
+
+    } else if (!docu_root_str.empty() && !docu_index_str.empty()) {
+
+        std::vector<std::string> docu_index{};
+        {
+            std::vector<std::string> vec {};
+            boost::split(vec, docu_index_str, boost::is_any_of(";"));
+            for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
+                std::string tmp = boost::trim_copy(*iter);
+                if (tmp.empty())
+                    continue;
+
+                docu_index.push_back(tmp);
+            }
+            if (docu_index.empty()) { // not fatal
+                tzhttpd_log_err("empty valid docu_index found, previous: %s", docu_index_str.c_str());
+            }
         }
-        if (docu_index.empty()) {
-            tzhttpd_log_err("empty valid docu_index found, previous: %s", str_docu_index.c_str());
-        }
-    }
 
-    if (server_name.empty() || docu_root.empty() || docu_index.empty()) {
+        phandler = std::make_shared<HttpHandler>(server_name, docu_root_str, docu_index);
+
+    } else {
+
         tzhttpd_log_err("required param not found for vhost.");
         return false;
+
     }
 
-    std::shared_ptr<HttpHandler> phandler = std::make_shared<HttpHandler>(server_name, docu_root, docu_index);
+
     if (!phandler || !phandler->init(setting)) {
         tzhttpd_log_err("create handler object for %s failed...", server_name.c_str());
         return false;

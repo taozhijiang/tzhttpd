@@ -46,7 +46,7 @@ struct HttpHandlerObject {
     boost::atomic<int64_t> success_cnt_;
     boost::atomic<int64_t> fail_cnt_;
 
-    boost::atomic<bool>    working_;       // 正在
+    boost::atomic<bool>    working_;       //  启用，禁用等标记
 
     T handler_;
 
@@ -88,13 +88,60 @@ public:
         vhost_name_({}) {
     }
 
+    explicit HttpHandler(std::string vhost, const std::string& redirect):
+        vhost_name_({}), http_docu_root_({}),
+        http_docu_index_({}), redirect_str_(redirect) {
+        vhost_name_ = StrUtil::drop_host_port(vhost);
+    }
+
     explicit HttpHandler(std::string vhost,
                          const std::string& docu_root, const std::vector<std::string>& docu_index):
-        vhost_name_({}), http_docu_root_(docu_root), http_docu_index_(docu_index) {
+        vhost_name_({}), http_docu_root_(docu_root),
+        http_docu_index_(docu_index), redirect_str_({}) {
         vhost_name_ = StrUtil::drop_host_port(vhost);
     }
 
     bool init(const libconfig::Setting& setting) {
+
+        if (!redirect_str_.empty()) {
+
+            auto pos = redirect_str_.find('~');
+            if (pos == std::string::npos) {
+                tzhttpd_log_err("error redirect config: %s", redirect_str_.c_str());
+                return false;
+            }
+
+            std::string code = boost::trim_copy(redirect_str_.substr(0, pos));
+            std::string uri  = boost::trim_copy(redirect_str_.substr(pos+1));
+
+            if (code != "301" && code != "302") {
+                tzhttpd_log_err("error redirect config: %s", redirect_str_.c_str());
+                return false;
+            }
+
+            http_redirect_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[redirect]",
+                                                   std::bind(&HttpHandler::http_redirect_handler, this,
+                                                             code, uri,
+                                                             std::placeholders::_1, dummy_post,
+                                                             std::placeholders::_2,
+                                                             std::placeholders::_3, std::placeholders::_4 ), true);
+            http_redirect_post_phandler_obj_ = std::make_shared<HttpPostHandlerObject>("[redirect]",
+                                                   std::bind(&HttpHandler::http_redirect_handler, this,
+                                                             code, uri,
+                                                             std::placeholders::_1, std::placeholders::_2,
+                                                             std::placeholders::_3, std::placeholders::_4,
+                                                             std::placeholders::_5 ), true);
+            if (!http_redirect_get_phandler_obj_ || !http_redirect_post_phandler_obj_) {
+                tzhttpd_log_err("Create redirect handler for %s failed!", vhost_name_.c_str());
+                return false;
+            }
+
+            // configured redirect, pass following configure
+            tzhttpd_log_alert("redirect %s configure ok for host %s",
+                              redirect_str_.c_str(), vhost_name_.c_str());
+            return true;
+        }
+
 
         default_http_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[default]",
                                                std::bind(&HttpHandler::default_http_get_handler, this,
@@ -267,11 +314,21 @@ private:
     std::string vhost_name_;
     std::string http_docu_root_;
     std::vector<std::string> http_docu_index_;
+    std::string redirect_str_;
 
     // default http get handler, important for web_server
     int default_http_get_handler(const HttpParser& http_parser, std::string& response,
                                  std::string& status_line, std::vector<std::string>& add_header);
     std::shared_ptr<HttpGetHandlerObject> default_http_get_phandler_obj_;
+
+    // http redirect part
+    std::string dummy_post;
+    int http_redirect_handler(std::string red_code, std::string red_uri,
+                              const HttpParser& http_parser, const std::string& post_data,
+                              std::string& response,
+                              std::string& status_line, std::vector<std::string>& add_header);
+    std::shared_ptr<HttpGetHandlerObject> http_redirect_get_phandler_obj_;
+    std::shared_ptr<HttpPostHandlerObject> http_redirect_post_phandler_obj_;
 
     int parse_cfg(const libconfig::Setting& setting, const std::string& key, std::map<std::string, std::string>& path_map);
 
@@ -347,7 +404,8 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
     }
 
     if (p_handler_object && p_handler_object->built_in_) {
-        tzhttpd_log_err("handler for %s is built_in type, we do not consider support replacement.");
+        tzhttpd_log_err("handler for %s is built_in type, we do not consider support replacement.",
+                        p_handler_object->path_.c_str());
         return -1;
     }
 

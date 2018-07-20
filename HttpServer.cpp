@@ -409,7 +409,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         boost::system::error_code ignore_ec;
         auto remote = sock_ptr->remote_endpoint(ignore_ec);
         if (ignore_ec) {
-            tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec, ignore_ec.message().c_str());
+            tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec.value(), ignore_ec.message().c_str());
             break;
         }
 

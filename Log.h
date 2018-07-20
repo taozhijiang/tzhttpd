@@ -36,7 +36,8 @@ namespace tzhttpd {
 
 bool tzhttpd_log_init(int log_level);
 void tzhttpd_log_close();
-void log_api(int priority, const char *file, int line, const char *func, const char *msg, ...);
+void log_api(int priority, const char *file, int line, const char *func, const char *msg, ...)
+    __attribute__((format(printf, 5, 6)));
 
 #define tzhttpd_log_emerg(...)   log_api( LOG_EMERG, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #define tzhttpd_log_alert(...)   log_api( LOG_ALERT, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)

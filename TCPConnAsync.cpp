@@ -456,7 +456,7 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
         // like itimeout trigger
         tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
     } else {
-        tzhttpd_log_err("Undetected error %d, %s ...", ec, ec.message().c_str());
+        tzhttpd_log_err("Undetected error %d, %s ...", ec.value(), ec.message().c_str());
         close_socket = true;
     }
 

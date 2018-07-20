@@ -145,6 +145,32 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
     return 0;
 }
 
+int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri,
+                          const HttpParser& http_parser, const std::string& post_data,
+                          std::string& response,
+                          std::string& status_line, std::vector<std::string>& add_header) {
+
+    if (red_code == "301") {
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::redirection_moved_permanently);
+        response = http_proto::content_301;
+        add_header.push_back("Location: " + red_uri);
+    } else if(red_code == "302"){
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::redirection_found);
+        response = http_proto::content_302;
+        add_header.push_back("Location: " + red_uri);
+    } else {
+        tzhttpd_log_err("unknown red_code: %s", red_code.c_str());
+        status_line = generate_response_status_line(http_parser.get_version(),
+                                                    StatusCode::server_error_internal_server_error);
+        response = http_proto::content_error;
+    }
+
+    return 0;
+}
+
+
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
                                            bool built_in, bool working){
 
@@ -202,6 +228,11 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
 
 int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj){
 
+    if (http_redirect_get_phandler_obj_) {
+        phandler_obj = http_redirect_get_phandler_obj_;
+        return 0;
+    }
+
     uri = StrUtil::pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
@@ -220,6 +251,11 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr&
 }
 
 int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj){
+
+    if (http_redirect_get_phandler_obj_) {
+        phandler_obj = http_redirect_post_phandler_obj_;
+        return 0;
+    }
 
     uri = StrUtil::pure_uri_path(uri);
     boost::shared_lock<boost::shared_mutex> rlock(rwlock_);

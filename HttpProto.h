@@ -19,22 +19,59 @@ namespace http_proto {
 
     static const string content_ok = "{}";
 
-    static const string content_error =  "<html>"
-                  "<head><title>Internal Server Error</title></head>"
-                  "<body><h1>500 Internal Server Error</h1></body>"
-                  "</html>";
-    static const string content_bad_request = "<html>"
-                  "<head><title>Bad Request</title></head>"
-                  "<body><h1>400 Bad Request</h1></body>"
-                  "</html>";
-    static const string content_forbidden = "<html>"
-                  "<head><title>Forbidden</title></head>"
-                  "<body><h1>403 Forbidden</h1></body>"
-                  "</html>";
-    static const string content_not_found = "<html>"
-                  "<head><title>Not Found</title></head>"
-                  "<body><h1>404 Not Found</h1></body>"
-                  "</html>";
+    static const string content_error =
+                        "<html>"
+                        "<head><title>500 Internel Server Error</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>500 Internel Server Error</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_bad_request =
+                        "<html>"
+                        "<head><title>400 Bad Request</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>400 Bad Request</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_forbidden =
+                        "<html>"
+                        "<head><title>403 Forbidden</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>403 Forbidden</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_not_found =
+                        "<html>"
+                        "<head><title>404 Not Found</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>404 Not Found</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_301 =
+                        "<html>"
+                        "<head><title>301 Moved Permanently</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>301 Moved Permanently</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_302 =
+                        "<html>"
+                        "<head><title>302 Found</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>302 Found</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
 
     namespace header_options {  // header key words
 

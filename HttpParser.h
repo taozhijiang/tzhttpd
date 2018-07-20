@@ -93,7 +93,8 @@ public:
         std::string::size_type item_idx = 0;
         item_idx = uri.find_first_of("?");
         if (item_idx == std::string::npos) {
-            request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info, CryptoUtil::url_decode(uri)));
+            request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info,
+                                                   CryptoUtil::url_decode(uri)));
             return true;
         }
 
@@ -222,7 +223,8 @@ private:
     bool do_parse_request(const std::string& header) {
 
         request_headers_.clear();
-        request_headers_.insert(std::make_pair(http_proto::header_options::request_body, header.substr(header.find("\r\n\r\n") + 4)));
+        request_headers_.insert(std::make_pair(http_proto::header_options::request_body,
+                                               header.substr(header.find("\r\n\r\n") + 4)));
         std::string header_part = header.substr(0, header.find("\r\n\r\n") + 4);
 
         std::istringstream resp(header_part);
