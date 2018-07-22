@@ -203,7 +203,8 @@ public:
 
         struct timeval checked_active_now;
         ::gettimeofday(&checked_active_now, NULL);
-        int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) + checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
+        int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) +
+                                                 checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
         if (active_elapse_ms > 5) {
             tzhttpd_log_err("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
             return true;
@@ -257,7 +258,8 @@ public:
             if ((checked_count % 10) == 0) {  // 不能卡顿太长时间，否则正常的请求会被卡死
                 struct timeval checked_now;
                 ::gettimeofday(&checked_now, NULL);
-                int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) + checked_now.tv_usec - checked_start.tv_usec ) / 1000;
+                int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) +
+                                                  checked_now.tv_usec - checked_start.tv_usec ) / 1000;
                 if (elapse_ms > 5) {
                     tzhttpd_log_err("check works too long elapse time: %ld ms, break now", elapse_ms);
                     break;
@@ -348,7 +350,8 @@ private:
 
         // 在高并发的情况下会占用大量的时间，导致实时交易延迟而不能退出
         // 后续优化之
-        std::for_each(drop_items_.begin(), drop_items_.end(), std::bind(&AliveTimer::active_remove_item, this, std::placeholders::_1));
+        std::for_each(drop_items_.begin(), drop_items_.end(),
+                      std::bind(&AliveTimer::active_remove_item, this, std::placeholders::_1));
 
         int count = static_cast<int>(drop_items_.size());
         drop_items_.clear();

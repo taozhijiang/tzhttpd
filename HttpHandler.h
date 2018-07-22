@@ -159,7 +159,9 @@ public:
                 std::string suffix {};
                 std::string ctrl_head {};
 
-                if(!ctrl_item.lookupValue("suffix", suffix) || !ctrl_item.lookupValue("header", ctrl_head)) {
+                ConfUtil::conf_value(ctrl_item, "suffix", suffix);
+                ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+                if(suffix.empty() || ctrl_head.empty()) {
                     tzhttpd_log_err("skip err cache ctrl configure item ...");
                     continue;
                 }

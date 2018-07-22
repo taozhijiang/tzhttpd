@@ -64,6 +64,8 @@ namespace http_proto {
                         "</body>"
                         "</html>";
 
+    // 实际在HTTP协议上，302不应该改变请求的方式，303明确表示应该用
+    // GET方式访问重定向的Location。现在的实际上很多302被当做303处理了
     static const string content_302 =
                         "<html>"
                         "<head><title>302 Found</title></head>"

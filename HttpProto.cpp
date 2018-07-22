@@ -39,7 +39,7 @@ string http_response_generate(const string& content, const string& stat_str,
     headers[0].name = "Server";
     headers[0].value = "tzhttpd server/" + http_handler::http_server_version;
     headers[1].name = "Date";
-    headers[1].value = to_simple_string(second_clock::universal_time());
+    headers[1].value = to_simple_string(second_clock::universal_time()) + " GMT";
     headers[2].name = "Content-Length";
     headers[2].value = std::to_string(static_cast<long long unsigned>(content.size()));
 

@@ -19,6 +19,7 @@
 #include "HttpHandler.h"
 #include "HttpServer.h"
 
+#include "StrUtil.h"
 #include "SslSetup.h"
 #include "Log.h"
 
@@ -44,14 +45,17 @@ void init_http_version(const std::string& server_version) {
 bool HttpConf::load_config(const libconfig::Config& cfg) {
 
     int listen_port = 0;
-    if (!cfg.lookupValue("http.bind_addr", bind_addr_) || !cfg.lookupValue("http.listen_port", listen_port) ){
-        tzhttpd_log_err( "get http.bind_addr & http.listen_port error");
+    ConfUtil::conf_value(cfg, "http.bind_addr", bind_addr_);
+    ConfUtil::conf_value(cfg, "http.listen_port", listen_port);
+    if (bind_addr_.empty() || listen_port <=0 ){
+        tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d", bind_addr_.c_str(), listen_port);
         return false;
     }
     listen_port_ = static_cast<unsigned short>(listen_port);
 
     std::string ip_list;
-    if (cfg.lookupValue("http.safe_ip", ip_list)) {
+    ConfUtil::conf_value(cfg, "http.safe_ip", ip_list);
+    if (!ip_list.empty()) {
         std::vector<std::string> ip_vec;
         std::set<std::string> ip_set;
         boost::split(ip_vec, ip_list, boost::is_any_of(";"));
@@ -66,58 +70,55 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         std::swap(ip_set, safe_ip_);
     }
     if (!safe_ip_.empty()) {
-        tzhttpd_log_alert("safe_ip not empty, contain %d items", static_cast<int>(safe_ip_.size()));
+        tzhttpd_log_alert("safe_ip not empty, totally contain %d items", static_cast<int>(safe_ip_.size()));
     }
 
-    if (!cfg.lookupValue("http.backlog_size", backlog_size_)) {
-        backlog_size_ = 0;
+    ConfUtil::conf_value(cfg, "http.backlog_size", backlog_size_);
+    if (backlog_size_ < 0) {
+        tzhttpd_log_err( "invalid http.backlog_size %d.", backlog_size_);
+        return false;
     }
 
-
-    if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
-        io_thread_number_ = 8;
-        tzhttpd_log_err("Using default thread_pool size: 8");
-    }
-
-    std::string server_version;
-    if (!cfg.lookupValue("http.version", server_version)) {
-        tzhttpd_log_err("get http.version failed!");
+    ConfUtil::conf_value(cfg, "http.thread_pool_size", io_thread_number_);
+    if (io_thread_number_ < 0) {
+        tzhttpd_log_err( "invalid http.io_thread_number %d", io_thread_number_);
+        return false;
     }
 
     // once init
+    std::string server_version;
+    ConfUtil::conf_value(cfg, "http.version", server_version);
     if (!server_version.empty()) {
         std::call_once(http_version_once, init_http_version, server_version);
     }
 
     // other http parameters
-    int value, value2;
-    if (!cfg.lookupValue("http.conn_time_out", value) ||
-        !cfg.lookupValue("http.conn_time_out_linger", value2)) {
-        tzhttpd_log_err("get http conn_time_out & linger configure value error, using default.");
-        conn_time_out_ = 5 * 60;
-        conn_time_out_linger_ = 10;
-    } else {
-        conn_time_out_ = value;
-        conn_time_out_linger_ = value2;
+    int value1, value2;
+    ConfUtil::conf_value(cfg, "http.conn_time_out", value1, 300);
+    ConfUtil::conf_value(cfg, "http.conn_time_out_linger", value2, 10);
+    if (value1 < 0 || value2 < 0 || value1 < value2) {
+        tzhttpd_log_err("invalid http conn_time_out %d & linger configure value %d, using default.");
+        return false;
     }
+    conn_time_out_ = value1;
+    conn_time_out_linger_ = value2;
 
-    if (!cfg.lookupValue("http.ops_cancel_time_out", value) || value < 0){
-        tzhttpd_log_err("get http ops_cancel_time_out configure value error, using default.");
-        ops_cancel_time_out_ = 0;
-    } else {
-        ops_cancel_time_out_ = value;
+    ConfUtil::conf_value(cfg, "http.ops_cancel_time_out", value1);
+    if (value1 < 0){
+        tzhttpd_log_err("invalid http ops_cancel_time_out value.");
+        return false;
     }
+    ops_cancel_time_out_ = value1;
 
     bool value_b;
-    if (!cfg.lookupValue("http.service_enable", value_b) ||
-        !cfg.lookupValue("http.service_speed", value) || value < 0){
-        tzhttpd_log_err("get http service enable/speed configure value error, using default.");
-        http_service_enabled_ = true;
-        http_service_speed_ = 0;
-    } else {
-        http_service_enabled_ = value_b;
-        http_service_speed_ = value;
+    ConfUtil::conf_value(cfg, "http.service_enable", value_b, true);
+    ConfUtil::conf_value(cfg, "http.service_speed", value1);
+    if (value1 < 0){
+        tzhttpd_log_err("invalid http.service_speed value %d.", value1);
+        return false;
     }
+    http_service_enabled_ = value_b;
+    http_service_speed_ = value1;
 
     tzhttpd_log_debug("HttpConf parse cfgfile %s OK!", HttpCfgHelper::instance().get_cfgfile().c_str());
 

@@ -140,7 +140,10 @@ bool HttpVhost::handle_vhost_cfg(const libconfig::Setting& setting, std::shared_
 
 int HttpVhost::update_run_cfg(const libconfig::Config& cfg) {
 
-    return -1;
+    // to reduce the complication and performance impact,
+    // we do not support dynamic vhost conf.
+
+    return 0;
 }
 
 

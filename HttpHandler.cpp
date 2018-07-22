@@ -289,11 +289,14 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
         for(int i = 0; i < http_cgi_handlers.getLength(); ++i) {
 
             const libconfig::Setting& handler = http_cgi_handlers[i];
-            std::string uri_path;
-            std::string dl_path;
+            std::string uri_path {};
+            std::string dl_path {};
 
-            if(!handler.lookupValue("uri", uri_path) || !handler.lookupValue("dl_path", dl_path)) {
-                tzhttpd_log_err("skip err configure item...");
+            ConfUtil::conf_value(handler, "uri", uri_path);
+            ConfUtil::conf_value(handler, "dl_path", dl_path);
+
+            if(uri_path.empty() || dl_path.empty()) {
+                tzhttpd_log_err("skip err configure item %s:%s...", uri_path.c_str(), dl_path.c_str());
                 ret_code --;
                 continue;
             }
