@@ -5,6 +5,7 @@
  *
  */
 
+#include <signal.h>
 #include <iostream>
 #include <sstream>
 #include <thread>
@@ -18,6 +19,7 @@
 #include "HttpHandler.h"
 #include "HttpServer.h"
 
+#include "StrUtil.h"
 #include "SslSetup.h"
 #include "Log.h"
 
@@ -26,8 +28,6 @@ namespace tzhttpd {
 namespace http_handler {
 // init only once at startup
 extern std::string              http_server_version;
-extern std::string              http_docu_root;
-extern std::vector<std::string> http_docu_index;
 } // end namespace http_handler
 
 static const size_t bucket_size_ = 0xFF;
@@ -36,30 +36,26 @@ static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
 }
 
 
-// init http_doc_root/index, once init can guarantee no change it anymore,
-// work with them without protection
-std::once_flag http_docu_once;
-void init_http_docu(const std::string& server_version, const std::string& docu_root, const std::vector<std::string>& docu_index) {
-    tzhttpd_log_alert("Updating http docu root->%s, index_size: %d", docu_root.c_str(),
-              static_cast<int>(docu_index.size()));
-
+std::once_flag http_version_once;
+void init_http_version(const std::string& server_version) {
     http_handler::http_server_version = server_version;
-    http_handler::http_docu_root = docu_root;
-    http_handler::http_docu_index = docu_index;
 }
 
 
 bool HttpConf::load_config(const libconfig::Config& cfg) {
 
     int listen_port = 0;
-    if (!cfg.lookupValue("http.bind_addr", bind_addr_) || !cfg.lookupValue("http.listen_port", listen_port) ){
-        tzhttpd_log_err( "get http.bind_addr & http.listen_port error");
+    ConfUtil::conf_value(cfg, "http.bind_addr", bind_addr_);
+    ConfUtil::conf_value(cfg, "http.listen_port", listen_port);
+    if (bind_addr_.empty() || listen_port <=0 ){
+        tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d", bind_addr_.c_str(), listen_port);
         return false;
     }
     listen_port_ = static_cast<unsigned short>(listen_port);
 
     std::string ip_list;
-    if (cfg.lookupValue("http.safe_ip", ip_list)) {
+    ConfUtil::conf_value(cfg, "http.safe_ip", ip_list);
+    if (!ip_list.empty()) {
         std::vector<std::string> ip_vec;
         std::set<std::string> ip_set;
         boost::split(ip_vec, ip_list, boost::is_any_of(";"));
@@ -74,82 +70,55 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         std::swap(ip_set, safe_ip_);
     }
     if (!safe_ip_.empty()) {
-        tzhttpd_log_alert("safe_ip not empty, contain %d items", static_cast<int>(safe_ip_.size()));
+        tzhttpd_log_alert("safe_ip not empty, totally contain %d items", static_cast<int>(safe_ip_.size()));
     }
 
-    if (!cfg.lookupValue("http.backlog_size", backlog_size_)) {
-        backlog_size_ = 0;
+    ConfUtil::conf_value(cfg, "http.backlog_size", backlog_size_);
+    if (backlog_size_ < 0) {
+        tzhttpd_log_err( "invalid http.backlog_size %d.", backlog_size_);
+        return false;
     }
 
-
-    if (!cfg.lookupValue("http.thread_pool_size", io_thread_number_)) {
-        io_thread_number_ = 8;
-        tzhttpd_log_err("Using default thread_pool size: 8");
-    }
-
-    std::string server_version;
-    if (!cfg.lookupValue("http.version", server_version)) {
-        tzhttpd_log_err("get http.version failed!");
-    }
-
-    std::string docu_root;
-    if (!cfg.lookupValue("http.docu_root", docu_root)) {
-        tzhttpd_log_err("get http.docu_root failed!");
-    }
-
-    std::string str_docu_index;
-    std::vector<std::string> docu_index {};
-    if (!cfg.lookupValue("http.docu_index", str_docu_index)) {
-        tzhttpd_log_err("get http.docu_index failed!");
-    } else  {
-        std::vector<std::string> vec {};
-        boost::split(vec, str_docu_index, boost::is_any_of(";"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
-            std::string tmp = boost::trim_copy(*iter);
-            if (tmp.empty())
-                continue;
-
-            docu_index.push_back(tmp);
-        }
-        if (docu_index.empty()) {
-            tzhttpd_log_err("empty valid docu_index found, previous: %s", str_docu_index.c_str());
-        }
+    ConfUtil::conf_value(cfg, "http.thread_pool_size", io_thread_number_);
+    if (io_thread_number_ < 0) {
+        tzhttpd_log_err( "invalid http.io_thread_number %d", io_thread_number_);
+        return false;
     }
 
     // once init
-    if (!server_version.empty() && !docu_root.empty() && !docu_index.empty()) {
-        std::call_once(http_docu_once, init_http_docu, server_version, docu_root, docu_index);
+    std::string server_version;
+    ConfUtil::conf_value(cfg, "http.version", server_version);
+    if (!server_version.empty()) {
+        std::call_once(http_version_once, init_http_version, server_version);
     }
 
     // other http parameters
-    int value, value2;
-    if (!cfg.lookupValue("http.conn_time_out", value) ||
-        !cfg.lookupValue("http.conn_time_out_linger", value2)) {
-        tzhttpd_log_err("get http conn_time_out & linger configure value error, using default.");
-        conn_time_out_ = 5 * 60;
-        conn_time_out_linger_ = 10;
-    } else {
-        conn_time_out_ = value;
-        conn_time_out_linger_ = value2;
+    int value1, value2;
+    ConfUtil::conf_value(cfg, "http.conn_time_out", value1, 300);
+    ConfUtil::conf_value(cfg, "http.conn_time_out_linger", value2, 10);
+    if (value1 < 0 || value2 < 0 || value1 < value2) {
+        tzhttpd_log_err("invalid http conn_time_out %d & linger configure value %d, using default.", value1, value2);
+        return false;
     }
+    conn_time_out_ = value1;
+    conn_time_out_linger_ = value2;
 
-    if (!cfg.lookupValue("http.ops_cancel_time_out", value) || value < 0){
-        tzhttpd_log_err("get http ops_cancel_time_out configure value error, using default.");
-        ops_cancel_time_out_ = 0;
-    } else {
-        ops_cancel_time_out_ = value;
+    ConfUtil::conf_value(cfg, "http.ops_cancel_time_out", value1);
+    if (value1 < 0){
+        tzhttpd_log_err("invalid http ops_cancel_time_out value.");
+        return false;
     }
+    ops_cancel_time_out_ = value1;
 
     bool value_b;
-    if (!cfg.lookupValue("http.service_enable", value_b) ||
-        !cfg.lookupValue("http.service_speed", value) || value < 0){
-        tzhttpd_log_err("get http service enable/speed configure value error, using default.");
-        http_service_enabled_ = true;
-        http_service_speed_ = 0;
-    } else {
-        http_service_enabled_ = value_b;
-        http_service_speed_ = value;
+    ConfUtil::conf_value(cfg, "http.service_enable", value_b, true);
+    ConfUtil::conf_value(cfg, "http.service_speed", value1);
+    if (value1 < 0){
+        tzhttpd_log_err("invalid http.service_speed value %d.", value1);
+        return false;
     }
+    http_service_enabled_ = value_b;
+    http_service_speed_ = value1;
 
     tzhttpd_log_debug("HttpConf parse cfgfile %s OK!", HttpCfgHelper::instance().get_cfgfile().c_str());
 
@@ -191,6 +160,9 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 }
 
 bool HttpServer::init() {
+
+    // incase not forget
+    ::signal(SIGPIPE, SIG_IGN);
 
     boost::atomic<int> atomic_int;
     if (atomic_int.is_lock_free()) {
@@ -269,33 +241,23 @@ bool HttpServer::init() {
         std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
     if (HttpCfgHelper::instance().register_cfg_callback(
-            std::bind(&HttpServer::update_run_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
+            std::bind(&HttpServer::update_runtime_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
         tzhttpd_log_err("HttpServer register cfg callback failed!");
         return false;
     }
 
-    // default handler already static initialized
-
-    if (register_http_get_handler("^/manage$",
-            std::bind(&HttpServer::manage_http_get_handler, shared_from_this(), 
-                      std::placeholders::_1, std::placeholders::_2, 
-                      std::placeholders::_3, std::placeholders::_4), true) != 0) {
-        tzhttpd_log_err("HttpServer register manage page failed!");
+    // vhost_manager_ initialize
+    if (!vhost_manager_.init(cfg)) {
+        tzhttpd_log_err("HttpVhost initialize failed!");
         return false;
-    }
-
-    // load cgi_handlers
-    int ret_code = handler_.update_run_cfg(cfg);
-    if (ret_code != 0) {
-        tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
 
     return true;
 }
 
-int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
+int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
-    tzhttpd_log_alert("HttpServer::update_run_cfg called ...");
+    tzhttpd_log_debug("HttpServer::update_runtime_cfg called ...");
 
     HttpConf conf {};
     if (!conf.load_config(cfg)) {
@@ -324,7 +286,7 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
-        tzhttpd_log_alert("===> update http_service_speed: from %d to %d",
+        tzhttpd_log_alert("===> update http_service_speed: from %ld to %ld",
                   conf_.http_service_speed_.load(), conf.http_service_speed_.load());
         conf_.http_service_speed_ = conf.http_service_speed_.load();
 
@@ -357,12 +319,12 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
     }
 
     // reload cgi-handlers
-    int ret_code = handler_.update_run_cfg(cfg);
+    int ret_code = vhost_manager_.update_runtime_cfg(cfg);
     if (ret_code != 0) {
         tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
 
-    tzhttpd_log_alert("HttpServer::update_run_cfg called return %d ...", ret_code);
+    tzhttpd_log_alert("HttpServer::update_runtime_cfg called return %d ...", ret_code);
     return ret_code;
 }
 
@@ -435,14 +397,14 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
     do {
 
         if (ec) {
-            tzhttpd_log_err("Error during accept with %d, %s", ec, ec.message().c_str());
+            tzhttpd_log_err("Error during accept with %d, %s", ec.value(), ec.message().c_str());
             break;
         }
 
         boost::system::error_code ignore_ec;
         auto remote = sock_ptr->remote_endpoint(ignore_ec);
         if (ignore_ec) {
-            tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec, ignore_ec.message().c_str());
+            tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec.value(), ignore_ec.message().c_str());
             break;
         }
 

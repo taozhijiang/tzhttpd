@@ -18,6 +18,7 @@
 #include <boost/optional.hpp>
 #include <boost/noncopyable.hpp>
 
+#include "StrUtil.h"
 #include "Log.h"
 
 
@@ -33,7 +34,7 @@ public:
 
     bool init(const std::string& cfgfile);
 
-    int  update_cfg();
+    int  update_runtime_cfg();
     int  register_cfg_callback(CfgUpdateCallable func);
     std::string get_cfgfile() const {
         return cfgfile_;
@@ -58,12 +59,12 @@ public:
 
             std::swap(cfg_ptr, cfg_ptr_);
             cfg_update_time_ = ::time(NULL);
-            return cfg_ptr_->lookupValue(key, t);
+            return ConfUtil::conf_value(*cfg_ptr_, key, t);
 
         } else {
 
             std::lock_guard<std::mutex> lock(lock_);
-            return cfg_ptr_->lookupValue(key, t);
+            return ConfUtil::conf_value(*cfg_ptr_, key, t);
         }
     }
 

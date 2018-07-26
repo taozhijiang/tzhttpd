@@ -3,7 +3,7 @@
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  */
- 
+
 #ifndef __TZHTTPD_ALIVE_TIMER_H__
 #define __TZHTTPD_ALIVE_TIMER_H__
 
@@ -203,9 +203,10 @@ public:
 
         struct timeval checked_active_now;
         ::gettimeofday(&checked_active_now, NULL);
-        int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) + checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
-        if (active_elapse_ms > 10) {
-            tzhttpd_log_notice("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
+        int64_t active_elapse_ms = ( 1000000 * ( checked_active_now.tv_sec - checked_start.tv_sec ) +
+                                                 checked_active_now.tv_usec - checked_start.tv_usec ) / 1000;
+        if (active_elapse_ms > 5) {
+            tzhttpd_log_err("check active works too long elapse time: %ld ms, break now", active_elapse_ms);
             return true;
         }
 
@@ -243,7 +244,8 @@ public:
                 // (Old style) References and iterators to the erased elements are invalidated.
                 // Other references and iterators are not affected.
 
-                tzhttpd_log_debug("expire entry remove: %ld, now:%ld count:%ld", iter->first, current_sec, iter->second.size());
+                tzhttpd_log_debug("expire entry remove: %ld, now:%ld, diff:%ld, count:%ld",
+                                  iter->first, current_sec, current_sec - iter->first, iter->second.size());
                 remove_iter = iter ++;
                 time_items_.erase(remove_iter);
             }
@@ -256,9 +258,10 @@ public:
             if ((checked_count % 10) == 0) {  // 不能卡顿太长时间，否则正常的请求会被卡死
                 struct timeval checked_now;
                 ::gettimeofday(&checked_now, NULL);
-                int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) + checked_now.tv_usec - checked_start.tv_usec ) / 1000;
-                if (elapse_ms > 15) {
-                    tzhttpd_log_notice("check works too long elapse time: %ld ms, break now", elapse_ms);
+                int64_t elapse_ms = ( 1000000 * ( checked_now.tv_sec - checked_start.tv_sec ) +
+                                                  checked_now.tv_usec - checked_start.tv_usec ) / 1000;
+                if (elapse_ms > 5) {
+                    tzhttpd_log_err("check works too long elapse time: %ld ms, break now", elapse_ms);
                     break;
                 }
             }
@@ -268,8 +271,12 @@ public:
         for (iter = time_items_.begin() ; iter != time_items_.end(); ++ iter) {
             total_count += iter->second.size();
         }
-        tzhttpd_log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
-                        bucket_items_.size(), total_count, static_cast<int>(time_items_.size()));
+
+        if (total_count != 0 || bucket_items_.size() != 0) {
+            tzhttpd_log_debug("current alived hashed count:%ld, timed_count: %ld, need check timed_bucket: %d",
+                            bucket_items_.size(), total_count, static_cast<int>(time_items_.size()));
+        }
+
         if (bucket_items_.size() != total_count) {
             tzhttpd_log_err("mismatch item count, bug count:%ld, timed_count: %ld", bucket_items_.size(), total_count);
             SAFE_ASSERT(false);
@@ -343,7 +350,8 @@ private:
 
         // 在高并发的情况下会占用大量的时间，导致实时交易延迟而不能退出
         // 后续优化之
-        std::for_each(drop_items_.begin(), drop_items_.end(), std::bind(&AliveTimer::active_remove_item, this, std::placeholders::_1));
+        std::for_each(drop_items_.begin(), drop_items_.end(),
+                      std::bind(&AliveTimer::active_remove_item, this, std::placeholders::_1));
 
         int count = static_cast<int>(drop_items_.size());
         drop_items_.clear();

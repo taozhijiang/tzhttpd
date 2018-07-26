@@ -13,6 +13,7 @@
 #include "HttpServer.h"
 #include "HttpProto.h"
 #include "TCPConnAsync.h"
+#include "CheckPoint.h"
 
 namespace tzhttpd {
 
@@ -125,15 +126,20 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         SAFE_ASSERT(http_parser_.find_request_header(http_proto::header_options::content_length).empty());
 
         std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
+        std::string vhost_name = StrUtil::drop_host_port(
+                                    http_parser_.find_request_header(http_proto::header_options::host));
         HttpGetHandlerObjectPtr phandler_obj {};
         std::string response_body;
         std::string response_status;
         std::vector<std::string> response_header;
 
-        if (http_server_.find_http_get_handler(real_path_info, phandler_obj) != 0){
-            tzhttpd_log_err("uri %s handler not found, using default handler!", real_path_info.c_str());
-            phandler_obj = http_handler::default_http_get_phandler_obj;
-        } else if(!phandler_obj) {
+        if (http_server_.find_http_get_handler(vhost_name, real_path_info, phandler_obj) != 0){
+            tzhttpd_log_err("uri %s handler not found!", real_path_info.c_str());
+            fill_std_http_for_send(http_proto::StatusCode::client_error_bad_request);
+            goto write_return;
+        }
+
+        if(!phandler_obj) {
             tzhttpd_log_err("real_path_info %s found, but handler empty!", real_path_info.c_str());
             fill_std_http_for_send(http_proto::StatusCode::client_error_bad_request);
             goto write_return;
@@ -145,11 +151,18 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
-        int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header); // just call it!
-        if (call_code == 0) {
-            ++ phandler_obj->success_cnt_;
-        } else {
-            ++ phandler_obj->fail_cnt_;
+        {
+            std::string key = "GET_" + phandler_obj->path_;
+            CountPerfByMs call_perf { key };
+
+            // just call it!
+            int call_code = phandler_obj->handler_(http_parser_, response_body, response_status, response_header);
+            if (call_code == 0) {
+                ++ phandler_obj->success_cnt_;
+            } else {
+                ++ phandler_obj->fail_cnt_;
+                call_perf.set_error();
+            }
         }
 
         if (response_body.empty() || response_status.empty()) {
@@ -171,7 +184,7 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
         SAFE_ASSERT( additional_size <= len );
         if (len + 1 > p_buffer_->size()) {
-            tzhttpd_log_info( "relarge receive buffer size to: %d", (len + 256));
+            tzhttpd_log_info( "relarge receive buffer size to: %d", static_cast<int>(len + 256));
             p_buffer_->resize(len + 256);
         }
 
@@ -276,12 +289,14 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     }
 
     std::string real_path_info = http_parser_.find_request_header(http_proto::header_options::request_path_info);
+    std::string vhost_name = StrUtil::drop_host_port(
+                                        http_parser_.find_request_header(http_proto::header_options::host));
     HttpPostHandlerObjectPtr phandler_obj {};
     std::string response_body;
     std::string response_status;
     std::vector<std::string> response_header;
 
-    if (http_server_.find_http_post_handler(real_path_info, phandler_obj) != 0){
+    if (http_server_.find_http_post_handler(vhost_name, real_path_info, phandler_obj) != 0){
         tzhttpd_log_err("uri %s handler not found, and no default!", real_path_info.c_str());
         fill_std_http_for_send(http_proto::StatusCode::client_error_not_found);
     } else {
@@ -293,12 +308,19 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                 goto write_return;
             }
 
-            int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
-                                                   response_status, response_header); // call it!
-            if (call_code == 0) {
-                ++ phandler_obj->success_cnt_;
-            } else {
-                ++ phandler_obj->fail_cnt_;
+            {
+                std::string key = "POST_" + phandler_obj->path_;
+                CountPerfByMs call_perf { key };
+
+                // just call it!
+                int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
+                                                       response_status, response_header); // call it!
+                if (call_code == 0) {
+                    ++ phandler_obj->success_cnt_;
+                } else {
+                    ++ phandler_obj->fail_cnt_;
+                    call_perf.set_error();
+                }
             }
 
             if (response_body.empty() || response_status.empty()) {
@@ -434,7 +456,7 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
         // like itimeout trigger
         tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
     } else {
-        tzhttpd_log_err("Undetected error %d, %s ...", ec, ec.message().c_str());
+        tzhttpd_log_err("Undetected error %d, %s ...", ec.value(), ec.message().c_str());
         close_socket = true;
     }
 

@@ -21,11 +21,12 @@
 #include <boost/noncopyable.hpp>
 #include <boost/atomic/atomic.hpp>
 
+#include "StrUtil.h"
 #include "EQueue.h"
 #include "ThreadPool.h"
 #include "AliveTimer.h"
 
-#include "HttpHandler.h"
+#include "HttpVhost.h"
 #include "HttpParser.h"
 
 namespace tzhttpd {
@@ -115,7 +116,7 @@ public:
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     bool init();
 
-    int update_run_cfg(const libconfig::Config& cfg);
+    int update_runtime_cfg(const libconfig::Config& cfg);
     void service();
 
 private:
@@ -130,7 +131,7 @@ private:
     void timed_checker_handler(const boost::system::error_code& ec);
 
     HttpConf conf_;
-    HttpHandler handler_;
+    HttpVhost vhost_manager_;
 
     void do_accept();
     void accept_handler(const boost::system::error_code& ec, SocketPtr ptr);
@@ -164,19 +165,28 @@ public:
 
 
     int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
-        return handler_.register_http_get_handler(uri_regex, handler, built_in);
+        return vhost_manager_.register_http_get_handler(uri_regex, handler, built_in);
     }
     int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
-        return handler_.register_http_post_handler(uri_regex, handler, built_in);
+        return vhost_manager_.register_http_post_handler(uri_regex, handler, built_in);
     }
 
-    int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj) {
+    int register_http_get_handler(std::string vhost,
+                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+        return vhost_manager_.register_http_get_handler(vhost, uri_regex, handler, built_in);
+    }
+    int register_http_post_handler(std::string vhost,
+                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+        return vhost_manager_.register_http_post_handler(vhost, uri_regex, handler, built_in);
+    }
+
+    int find_http_get_handler(std::string vhost, std::string uri, HttpGetHandlerObjectPtr& phandler_obj) {
         do {
             if (!conf_.http_service_enabled_) {
 
                 // 服务关闭，但是还是允许特定页面的访问
-                uri = handler_.pure_uri_path(uri);
-                if (boost::iequals(uri, "/manage")) {
+                uri = StrUtil::pure_uri_path(uri);
+                if (boost::iequals(uri, "/internel_manage")) {
                     break; // fall through handler fetch
                 }
 
@@ -185,23 +195,18 @@ public:
             }
         } while (0);
 
-        return handler_.find_http_get_handler(uri, phandler_obj);
+        return vhost_manager_.find_http_get_handler(vhost, uri, phandler_obj);
     }
 
-    int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj) {
+    int find_http_post_handler(std::string vhost, std::string uri, HttpPostHandlerObjectPtr& phandler_obj) {
         if (!conf_.http_service_enabled_) {
             tzhttpd_log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
             return -1;
         }
 
-        return handler_.find_http_post_handler(uri, phandler_obj);
+        return vhost_manager_.find_http_post_handler(vhost, uri, phandler_obj);
     }
 
-private:
-    // manage页面和服务是强耦合的，所以这里还是弄成成员函数的方式
-    // @/manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
-    int manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                            std::string& status_line, std::vector<std::string>& add_header);
 
 public:
     ThreadPool io_service_threads_;

@@ -19,22 +19,61 @@ namespace http_proto {
 
     static const string content_ok = "{}";
 
-    static const string content_error =  "<html>"
-                  "<head><title>Internal Server Error</title></head>"
-                  "<body><h1>500 Internal Server Error</h1></body>"
-                  "</html>";
-    static const string content_bad_request = "<html>"
-                  "<head><title>Bad Request</title></head>"
-                  "<body><h1>400 Bad Request</h1></body>"
-                  "</html>";
-    static const string content_forbidden = "<html>"
-                  "<head><title>Forbidden</title></head>"
-                  "<body><h1>403 Forbidden</h1></body>"
-                  "</html>";
-    static const string content_not_found = "<html>"
-                  "<head><title>Not Found</title></head>"
-                  "<body><h1>404 Not Found</h1></body>"
-                  "</html>";
+    static const string content_error =
+                        "<html>"
+                        "<head><title>500 Internel Server Error</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>500 Internel Server Error</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_bad_request =
+                        "<html>"
+                        "<head><title>400 Bad Request</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>400 Bad Request</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_forbidden =
+                        "<html>"
+                        "<head><title>403 Forbidden</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>403 Forbidden</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_not_found =
+                        "<html>"
+                        "<head><title>404 Not Found</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>404 Not Found</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    static const string content_301 =
+                        "<html>"
+                        "<head><title>301 Moved Permanently</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>301 Moved Permanently</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
+
+    // 实际在HTTP协议上，302不应该改变请求的方式，303明确表示应该用
+    // GET方式访问重定向的Location。现在的实际上很多302被当做303处理了
+    static const string content_302 =
+                        "<html>"
+                        "<head><title>302 Found</title></head>"
+                        "<body bgcolor=\"white\">"
+                        "<center><h1>302 Found</h1></center>"
+                        "<hr><center>tzhttpd</center>"
+                        "</body>"
+                        "</html>";
 
     namespace header_options {  // header key words
 
@@ -216,6 +255,8 @@ namespace http_proto {
     static string header_name_value_separator_str = ": ";
     static string header_crlf_str = "\r\n";
     static string header_crlfcrlf_str = "\r\n\r\n";
+
+    std::string find_content_type(const std::string& suffix);
 
     /**
      * 由于最终的底层都是调用c_str()发送的，所以这里不添加额外的字符

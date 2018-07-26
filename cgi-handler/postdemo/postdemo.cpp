@@ -1,6 +1,7 @@
 #include <string>
 
 #include "../../CgiHelper.h"
+#include "../../Log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,8 @@ int module_exit() {
 
 
 int cgi_post_handler(const msg_t* param, const msg_t* post, msg_t* rsp, msg_t* rsp_header) {
+
+    tzhttpd::tzhttpd_log_debug("post call in cgi log...");
 
     std::string msg = "return from postdemo with param:" + std::string(param->data, param->len);
     msg += " , and postdata:" + std::string(post->data, param->len);
