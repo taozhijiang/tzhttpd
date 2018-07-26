@@ -1,6 +1,7 @@
 #include <string>
 
 #include "../../CgiHelper.h"
+#include "../../Log.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,8 @@ int module_exit() {
 
 
 int cgi_get_handler(const msg_t* param, msg_t* rsp, msg_t* rsp_header) {
+
+    tzhttpd::tzhttpd_log_debug("get call in cgi log...");
 
     std::string msg = "return from getdemo with param:" + std::string(param->data, param->len);
     fill_msg(rsp, msg.c_str(), msg.size());

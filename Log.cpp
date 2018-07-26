@@ -45,7 +45,7 @@ void log_api(int priority, const char *file, int line, const char *func, const c
 
     n = static_cast<int>(strlen(buf));
     if (likely(std::find(buf, buf + n, '\n') == (buf + n))) {
-        buf[n] = '\n';   // 兼容老的pbi_tzhttpd_log_service
+        buf[n] = '\n';   // 兼容老的log_service
         if (checkpoint_log_store_func_impl_) {
             checkpoint_log_store_func_impl_(priority, "%s", buf);
         } else {
@@ -65,7 +65,6 @@ void log_api(int priority, const char *file, int line, const char *func, const c
             } else {
                 fprintf(stdout, "%s", message.c_str());
             }
-            syslog(priority, "%s", message.c_str());
         }
     }
 }

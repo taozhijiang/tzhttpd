@@ -156,7 +156,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
         if (!content_type.empty()) {
             add_header.push_back(content_type);
             tzhttpd_log_debug("Adding content_type header for %s(%s) -> %s",
-                              did_file_full_path.c_str(), iter->first.c_str(), content_type.c_str());
+                              did_file_full_path.c_str(), suffix.c_str(), content_type.c_str());
         }
     }
 
@@ -198,7 +198,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>::iterator it;
     for (it = get_handler_.begin(); it != get_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_r.c_str());
+            tzhttpd_log_err("[vhost:%s] Handler for %s(%s) already exists, we will skip it!",
+                            vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
             return -1;
         }
     }
@@ -206,12 +207,13 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     UriRegex rgx {uri};
     HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(uri, handler, built_in, working);
     if (!phandler_obj) {
-        tzhttpd_log_err("Create get handler object for %s failed.", uri.c_str());
+        tzhttpd_log_err("[vhost:%s] create get handler object for %s failed.",
+                        vhost_name_.c_str(), uri.c_str());
         return -2;
     }
     get_handler_.push_back({rgx, phandler_obj});
 
-    tzhttpd_log_alert("Register GetHandler for %s %s(%s) OK!",
+    tzhttpd_log_alert("[vhost:%s] register_http_get_handler for %s(%s) OK!",
                       vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
     return 0;
 }
@@ -225,7 +227,8 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     std::vector<std::pair<UriRegex, HttpPostHandlerObjectPtr>>::iterator it;
     for (it = post_handler_.begin(); it != post_handler_.end(); ++it) {
         if (it->first.str() == uri ) {
-            tzhttpd_log_err("Handler for %s(%s) already exists, we will skip it!", uri.c_str(), uri_r.c_str());
+            tzhttpd_log_err("[vhost:%s] Handler for %s(%s) already exists, we will skip it!",
+                            vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
             return -1;
         }
     }
@@ -233,12 +236,13 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     UriRegex rgx {uri};
     HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(uri, handler, built_in, working);
     if (!phandler_obj) {
-        tzhttpd_log_err("Create post handler object for %s failed.", uri.c_str());
+        tzhttpd_log_err("[vhost:%s] Create post handler object for %s failed.",
+                        vhost_name_.c_str(), uri.c_str());
         return -2;
     }
     post_handler_.push_back({ rgx, phandler_obj });
 
-    tzhttpd_log_alert("Register PostHandler for %s %s(%s) OK!",
+    tzhttpd_log_alert("[vhost:%s] register_http_post_handler for %s(%s) OK!",
                       vhost_name_.c_str(), uri.c_str(), uri_r.c_str());
     return 0;
 }
@@ -263,7 +267,8 @@ int HttpHandler::find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr&
         }
     }
 
-    tzhttpd_log_debug("http get handler for %s not found, using default...", uri.c_str());
+    tzhttpd_log_debug("[vhost:%s] http get handler for %s not found, using default...",
+                      vhost_name_.c_str(),uri.c_str());
     phandler_obj = default_http_get_phandler_obj_;
     return 0;
 }
@@ -295,7 +300,8 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
                            std::map<std::string, std::string>& path_map) {
 
     if (!setting.exists(key)) {
-        tzhttpd_log_notice("handlers for %s not found!", key.c_str());
+        tzhttpd_log_notice("[vhost:%s] handlers for %s not found!",
+                           vhost_name_.c_str(),key.c_str());
         return 0;
     }
 
@@ -314,16 +320,19 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
             ConfUtil::conf_value(handler, "dl_path", dl_path);
 
             if(uri_path.empty() || dl_path.empty()) {
-                tzhttpd_log_err("skip err configure item %s:%s...", uri_path.c_str(), dl_path.c_str());
+                tzhttpd_log_err("[vhost:%s] skip err configure item %s:%s...",
+                                vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
                 ret_code --;
                 continue;
             }
 
-            tzhttpd_log_alert("detect handler uri:%s, dl_path:%s", uri_path.c_str(), dl_path.c_str());
+            tzhttpd_log_debug("[vhost:%s] detect handler uri:%s, dl_path:%s",
+                              vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
             path_map[uri_path] = dl_path;
         }
     } catch (...) {
-        tzhttpd_log_err("Parse %s error!!!", key.c_str());
+        tzhttpd_log_err("[vhost:%s] Parse %s error!!!",
+                        vhost_name_.c_str(), key.c_str());
         ret_code --;
     }
 
@@ -343,19 +352,20 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
         // we will not override handler directly, consider using /manage
         if (check_exist_http_get_handler(iter->first)) {
-            tzhttpd_log_alert("HttpGet for %s already exists, skip it.", iter->first.c_str());
+            tzhttpd_log_alert("[vhost:%s] HttpGet for %s already exists, skip it.",
+                              vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
         http_handler::CgiGetWrapper getter(iter->second);
         if (!getter.init()) {
-            tzhttpd_log_err("init get for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
+            tzhttpd_log_err("[vhost:%s] init get for %s @ %s failed, skip it!",
+                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
             ret_code --;
             continue;
         }
 
         register_http_get_handler(iter->first, getter, false);
-        tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 
 
@@ -366,19 +376,20 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
         // we will not override handler directly, consider using /manage
         if (check_exist_http_post_handler(iter->first)) {
-            tzhttpd_log_alert("HttpPost for %s already exists, skip it.", iter->first.c_str());
+            tzhttpd_log_alert("[vhost:%s] HttpPost for %s already exists, skip it.",
+                              vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
         http_handler::CgiPostWrapper poster(iter->second);
         if (!poster.init()) {
-            tzhttpd_log_err("init post for %s @ %s failed, skip it!", iter->first.c_str(), iter->second.c_str());
+            tzhttpd_log_err("[vhost:%s] init post for %s @ %s failed, skip it!",
+                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
             ret_code --;
             continue;
         }
 
         register_http_post_handler(iter->first, poster, false);
-        tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", iter->first.c_str(), iter->second.c_str());
     }
 
     return ret_code;

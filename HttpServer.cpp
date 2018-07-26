@@ -97,7 +97,7 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     ConfUtil::conf_value(cfg, "http.conn_time_out", value1, 300);
     ConfUtil::conf_value(cfg, "http.conn_time_out_linger", value2, 10);
     if (value1 < 0 || value2 < 0 || value1 < value2) {
-        tzhttpd_log_err("invalid http conn_time_out %d & linger configure value %d, using default.");
+        tzhttpd_log_err("invalid http conn_time_out %d & linger configure value %d, using default.", value1, value2);
         return false;
     }
     conn_time_out_ = value1;
@@ -252,13 +252,6 @@ bool HttpServer::init() {
         return false;
     }
 
-    // reload cgi-handlers
-    int ret_code = vhost_manager_.update_runtime_cfg(cfg);
-    if (ret_code != 0) {
-        tzhttpd_log_err("update_runtime_cfg for all vhosts cgi-handler return %d", ret_code);
-        return false;
-    }
-
     return true;
 }
 
@@ -293,7 +286,7 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
-        tzhttpd_log_alert("===> update http_service_speed: from %d to %d",
+        tzhttpd_log_alert("===> update http_service_speed: from %ld to %ld",
                   conf_.http_service_speed_.load(), conf.http_service_speed_.load());
         conf_.http_service_speed_ = conf.http_service_speed_.load();
 
@@ -404,7 +397,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
     do {
 
         if (ec) {
-            tzhttpd_log_err("Error during accept with %d, %s", ec, ec.message().c_str());
+            tzhttpd_log_err("Error during accept with %d, %s", ec.value(), ec.message().c_str());
             break;
         }
 

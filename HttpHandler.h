@@ -372,12 +372,12 @@ int HttpHandler::do_switch_http_handler(const std::string& uri_r, bool on, T& ha
     for (auto it = handlers.begin(); it != handlers.end(); ++ it) {
         if (it->first.str() == uri ) {
             if (it->second->working_ == on) {
-                tzhttpd_log_err("uri handler for %s already in %s status...",
-                                it->first.str().c_str(), on ? "on" : "off");
+                tzhttpd_log_err("[vhost:%s] uri handler for %s already in %s status...",
+                                vhost_name_.c_str(), it->first.str().c_str(), on ? "on" : "off");
                 return -1;
             } else {
-                tzhttpd_log_alert("uri handler for %s update from %s to %s status...",
-                                 it->first.str().c_str(),
+                tzhttpd_log_alert("[vhost:%s] uri handler for %s update from %s to %s status...",
+                                 vhost_name_.c_str(), it->first.str().c_str(),
                                  it->second->working_ ? "on" : "off", on ? "on" : "off");
                 it->second->working_ = on;
                 return 0;
@@ -406,8 +406,8 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
     }
 
     if (p_handler_object && p_handler_object->built_in_) {
-        tzhttpd_log_err("handler for %s is built_in type, we do not consider support replacement.",
-                        p_handler_object->path_.c_str());
+        tzhttpd_log_err("[vhost:%s] handler for %s is built_in type, we do not consider support replacement.",
+                        vhost_name_.c_str(), p_handler_object->path_.c_str());
         return -1;
     }
 
@@ -419,8 +419,8 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
         }
 
         if (p_handler_object.use_count() > 2) {
-            tzhttpd_log_err("handler for %s use_count: %ld, may disable it first and update...",
-                            uri_r.c_str(), p_handler_object.use_count());
+            tzhttpd_log_err("[vhost:%s] handler for %s use_count: %ld, may disable it first and update...",
+                            vhost_name_.c_str(), uri_r.c_str(), p_handler_object.use_count());
             return -2;
         }
 
@@ -430,10 +430,12 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
         SAFE_ASSERT(it < handlers.end());
         handlers.erase(it);
 
-        tzhttpd_log_alert("remove handler %s done!", uri_r.c_str());
+        tzhttpd_log_alert("[vhost:%s] remove handler %s done!",
+                          vhost_name_.c_str(), uri_r.c_str());
     } else {
 
-        tzhttpd_log_alert("handler %s not installed, just pass!", uri_r.c_str());
+        tzhttpd_log_alert("[vhost:%s] handler %s not installed, just pass!",
+                          vhost_name_.c_str(), uri_r.c_str());
     }
 
     return 0;

@@ -184,7 +184,7 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
         SAFE_ASSERT( additional_size <= len );
         if (len + 1 > p_buffer_->size()) {
-            tzhttpd_log_info( "relarge receive buffer size to: %d", (len + 256));
+            tzhttpd_log_info( "relarge receive buffer size to: %d", static_cast<int>(len + 256));
             p_buffer_->resize(len + 256);
         }
 
