@@ -131,14 +131,32 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
 
     // do handler helper
     if (OK && !did_file_full_path.empty()) {
+
         boost::to_lower(did_file_full_path);
-        for (auto iter = cache_controls_.begin(); iter != cache_controls_.end(); ++iter) {
-            if (boost::algorithm::ends_with(did_file_full_path, iter->first)) {
-                add_header.push_back(iter->second);
-                tzhttpd_log_debug("Adding cache header for %s(%s) -> %s",
-                                  did_file_full_path.c_str(), iter->first.c_str(), iter->second.c_str());
-                break;
-            }
+        // 取出扩展名
+        std::string::size_type pos = did_file_full_path.rfind(".");
+        std::string suffix {};
+        if (pos != std::string::npos && (did_file_full_path.size() - pos) < 6) {
+            suffix = did_file_full_path.substr(pos);
+        }
+
+        if (suffix.empty()) {
+            return 0;
+        }
+
+        // handle with specified suffix, for cache and content_type
+        auto iter = cache_controls_.find(suffix);
+        if (iter != cache_controls_.end()) {
+            add_header.push_back(iter->second);
+            tzhttpd_log_debug("Adding cache header for %s(%s) -> %s",
+                              did_file_full_path.c_str(), iter->first.c_str(), iter->second.c_str());
+        }
+
+        std::string content_type = http_proto::find_content_type(suffix);
+        if (!content_type.empty()) {
+            add_header.push_back(content_type);
+            tzhttpd_log_debug("Adding content_type header for %s(%s) -> %s",
+                              did_file_full_path.c_str(), iter->first.c_str(), content_type.c_str());
         }
     }
 
@@ -312,7 +330,7 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
     return ret_code;
 }
 
-int HttpHandler::update_run_cfg(const libconfig::Setting& setting) {
+int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
     int ret_code = 0;
     std::string key;

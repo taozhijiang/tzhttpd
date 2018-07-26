@@ -110,6 +110,75 @@ string http_std_response_generate(const std::string& http_ver, enum StatusCode s
 }
 
 
+static const std::map<std::string, std::string> content_types = {
+    { ".avi", "Content-Type: video/x-msvideo" },
+    { ".bin", "Content-Type: application/octet-stream" },
+    { ".bmp", "Content-Type: image/bmp" },
+    { ".bz", "Content-Type: application/x-bzip" },
+    { ".bz2", "Content-Type: application/x-bzip2" },
+    { ".csh", "Content-Type: application/x-csh" },
+    { ".css", "Content-Type: text/css" },
+    { ".csv", "Content-Type: text/csv" },
+    { ".doc", "Content-Type: application/msword" },
+    { ".docx", "Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+    { ".eot", "Content-Type: application/vnd.ms-fontobject" },
+    { ".epub", "Content-Type: application/epub+zip" },
+    { ".gif", "Content-Type: image/gif" },
+    { ".htm", "Content-Type: text/html" },
+    { ".html", "Content-Type: text/html" },
+    { ".ico", "Content-Type: image/x-icon" },
+    { ".jar", "Content-Type: application/java-archive" },
+    { ".jpeg", "Content-Type: image/jpeg" },
+    { ".jpg", "Content-Type: image/jpeg" },
+    { ".js", "Content-Type: application/javascript" },
+    { ".json", "Content-Type: application/json" },
+    { ".mid", "Content-Type: audio/midi" },
+    { ".midi", "Content-Type: audio/midi" },
+    { ".mpeg", "Content-Type: video/mpeg" },
+    { ".odp", "Content-Type: application/vnd.oasis.opendocument.presentation" },
+    { ".ods", "Content-Type: application/vnd.oasis.opendocument.spreadsheet" },
+    { ".odt", "Content-Type: application/vnd.oasis.opendocument.text" },
+    { ".oga", "Content-Type: audio/ogg" },
+    { ".ogv", "Content-Type: video/ogg" },
+    { ".ogx", "Content-Type: application/ogg" },
+    { ".otf", "Content-Type: font/otf" },
+    { ".png", "Content-Type: image/png" },
+    { ".pdf", "Content-Type: application/pdf" },
+    { ".ppt", "Content-Type: application/vnd.ms-powerpoint" },
+    { ".pptx", "Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+    { ".rar", "Content-Type: application/x-rar-compressed" },
+    { ".rtf", "Content-Type: application/rtf" },
+    { ".sh", "Content-Type: application/x-sh" },
+    { ".svg", "Content-Type: image/svg+xml" },
+    { ".swf", "Content-Type: application/x-shockwave-flash" },
+    { ".tar", "Content-Type: application/x-tar" },
+    { ".tif", "Content-Type: image/tiff" },
+    { ".tiff", "Content-Type: image/tiff" },
+    { ".ts", "Content-Type: application/typescript" },
+    { ".ttf", "Content-Type: font/ttf" },
+    { ".txt", "Content-Type: text/plain" },
+    { ".vsd", "Content-Type: application/vnd.visio" },
+    { ".wav", "Content-Type: audio/wav" },
+    { ".woff", "Content-Type: font/woff" },
+    { ".woff2", "Content-Type: font/woff2" },
+    { ".xhtml", "Content-Type: application/xhtml+xml" },
+    { ".xls", "Content-Type: application/vnd.ms-excel" },
+    { ".xlsx", "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    { ".xml", "Content-Type: application/xml" },
+    { ".zip", "Content-Type: application/zip" },
+    { ".3gp", "Content-Type: video/3gpp" },
+    { ".7z", "Content-Type: application/x-7z-compressed" },
+};
+
+std::string find_content_type(const std::string& suffix) {
+    auto iter = content_types.find(suffix);
+    if (iter != content_types.cend()) {
+        return iter->second;
+    }
+
+    return "";
+}
+
 }  // end namespace http_proto
 }  // end namespace tzhttpd
 

@@ -41,7 +41,7 @@ bool HttpCfgHelper::init(const std::string& cfgfile) {
     return true;
 }
 
-int HttpCfgHelper::update_cfg() {
+int HttpCfgHelper::update_runtime_cfg() {
 
     if (cfgfile_.empty()) {
         tzhttpd_log_err("cfg_file is empty, may not init HttpCfgHelper ? ...");

@@ -116,7 +116,7 @@ public:
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     bool init();
 
-    int update_run_cfg(const libconfig::Config& cfg);
+    int update_runtime_cfg(const libconfig::Config& cfg);
     void service();
 
 private:

@@ -23,8 +23,8 @@ namespace tzhttpd {
 
 using namespace tzhttpd::http_proto;
 
-int HttpVhost::internel_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                     std::string& status_line, std::vector<std::string>& add_header) {
+int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+                                                std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
@@ -50,7 +50,7 @@ int HttpVhost::internel_manage_http_get_handler(const HttpParser& http_parser, s
 
         // 配置文件动态更新
         tzhttpd_log_debug("do configure reconfigure ....");
-        ret = HttpCfgHelper::instance().update_cfg();
+        ret = HttpCfgHelper::instance().update_runtime_cfg();
 
     } else if (cmd == "switch_handler") {
 
@@ -75,9 +75,9 @@ int HttpVhost::internel_manage_http_get_handler(const HttpParser& http_parser, s
     } else if (cmd == "update_handler") {
 
         //
-        // curl 'http://172.16.10.137:18430/internel_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // curl 'http://172.16.10.137:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
         // cp libgetdemo.so ../cgi-bin
-        // curl 'http://172.16.10.137:18430/internel_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // curl 'http://172.16.10.137:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
         // curl 'http://172.16.10.137:18430/cgi-bin/getdemo.cgi'
 
         // 更新 non-build_in uri
@@ -116,7 +116,7 @@ int HttpVhost::internel_manage_http_get_handler(const HttpParser& http_parser, s
         if (response.empty() || status_line.empty()) {
             response = http_proto::content_error;
             status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
+                                                        StatusCode::server_error_internal_server_error);
         }
     }
 

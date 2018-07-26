@@ -241,7 +241,7 @@ bool HttpServer::init() {
         std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
     if (HttpCfgHelper::instance().register_cfg_callback(
-            std::bind(&HttpServer::update_run_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
+            std::bind(&HttpServer::update_runtime_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
         tzhttpd_log_err("HttpServer register cfg callback failed!");
         return false;
     }
@@ -253,17 +253,18 @@ bool HttpServer::init() {
     }
 
     // reload cgi-handlers
-    int ret_code = vhost_manager_.update_run_cfg(cfg);
+    int ret_code = vhost_manager_.update_runtime_cfg(cfg);
     if (ret_code != 0) {
-        tzhttpd_log_err("register all vhosts cgi-handler return %d", ret_code);
+        tzhttpd_log_err("update_runtime_cfg for all vhosts cgi-handler return %d", ret_code);
+        return false;
     }
 
     return true;
 }
 
-int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
+int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
-    tzhttpd_log_alert("HttpServer::update_run_cfg called ...");
+    tzhttpd_log_debug("HttpServer::update_runtime_cfg called ...");
 
     HttpConf conf {};
     if (!conf.load_config(cfg)) {
@@ -325,12 +326,12 @@ int HttpServer::update_run_cfg(const libconfig::Config& cfg) {
     }
 
     // reload cgi-handlers
-    int ret_code = vhost_manager_.update_run_cfg(cfg);
+    int ret_code = vhost_manager_.update_runtime_cfg(cfg);
     if (ret_code != 0) {
         tzhttpd_log_err("register cgi-handler return %d", ret_code);
     }
 
-    tzhttpd_log_alert("HttpServer::update_run_cfg called return %d ...", ret_code);
+    tzhttpd_log_alert("HttpServer::update_runtime_cfg called return %d ...", ret_code);
     return ret_code;
 }
 

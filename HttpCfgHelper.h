@@ -34,7 +34,7 @@ public:
 
     bool init(const std::string& cfgfile);
 
-    int  update_cfg();
+    int  update_runtime_cfg();
     int  register_cfg_callback(CfgUpdateCallable func);
     std::string get_cfgfile() const {
         return cfgfile_;

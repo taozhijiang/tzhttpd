@@ -64,11 +64,21 @@ bool HttpVhost::init(const libconfig::Config& cfg) {
         return false;
     }
 
-    tzhttpd_log_alert("Already configured(registered) vhost count: %d", static_cast<int>(vhosts_.size()));
+    tzhttpd_log_alert("Already configured(registered) vhost (except default) count: %d", static_cast<int>(vhosts_.size()));
     int i = 0;
     for (auto iter = vhosts_.cbegin(); iter != vhosts_.cend(); ++iter) {
         tzhttpd_log_alert("%d: %s", ++i, iter->first.c_str());
     }
+
+    // only for default vhost, add manage interface
+    if (register_http_get_handler("^/internal_manage$",
+                                  std::bind(&HttpVhost::internal_manage_http_get_handler, this,
+                                            std::placeholders::_1, std::placeholders::_2,
+                                            std::placeholders::_3, std::placeholders::_4), true) != 0) {
+        tzhttpd_log_err("Http default vhost register manage page failed!");
+        return false;
+    }
+
 
     return true;
 }
@@ -128,9 +138,12 @@ bool HttpVhost::handle_vhost_cfg(const libconfig::Setting& setting, std::shared_
         return false;
     }
 
-    int ret_code = phandler->update_run_cfg(setting);
+    // 启动时候，针对vhost配置参数要严格一些
+    int ret_code = phandler->update_runtime_cfg(setting);
     if (ret_code != 0) {
-        tzhttpd_log_err("update run cfg failed with %d ...", ret_code);
+        tzhttpd_log_err("update vhost runtime cfg failed with %d ...", ret_code);
+        phandler.reset();
+        return false;
     }
 
     handler = phandler;
@@ -138,12 +151,54 @@ bool HttpVhost::handle_vhost_cfg(const libconfig::Setting& setting, std::shared_
 }
 
 
-int HttpVhost::update_run_cfg(const libconfig::Config& cfg) {
+int HttpVhost::update_runtime_cfg(const libconfig::Config& cfg) {
 
     // to reduce the complication and performance impact,
-    // we do not support dynamic vhost conf.
+    // we do not support dynamic add/remove vhosts.
+    //
 
-    return 0;
+    // but low level vhost setting should be able to do corresponding update
+
+    int ret = 0;
+
+    try {
+
+        const libconfig::Setting &http_vhosts = cfg.lookup("http.vhosts");
+
+        for(int i = 0; i < http_vhosts.getLength(); ++i) {
+
+            const libconfig::Setting& http_vhost = http_vhosts[i];
+            std::string server_name {};
+            ConfUtil::conf_value(http_vhost,"server_name", server_name);
+
+            if (server_name == "[default]") {
+                ret += default_vhost_->update_runtime_cfg(http_vhost);
+                continue;
+            }
+
+            auto iter = vhosts_.find(server_name);
+            if (iter == vhosts_.cend()) {
+                tzhttpd_log_err("vhost %s not found, and we don't support dynamic add!", server_name.c_str());
+                ret += -1;
+                continue;
+            }
+
+            // 运行时候动态配置，允许错误配置
+            int cur_ret = iter->second->update_runtime_cfg(http_vhost);
+            tzhttpd_log_debug("vhost %s update_runtime_cfg return: %d", iter->first.c_str(), cur_ret);
+            ret += cur_ret;
+        }
+
+    } catch (std::exception& e) {
+        tzhttpd_log_err("Parse cfg key http.vhosts error with %s!!!", e.what());
+        ret += -1;
+
+    } catch (...) {
+        tzhttpd_log_err("Parse cfg key http.vhosts error!!!");
+        ret += -1;
+    }
+
+    return ret;
 }
 
 

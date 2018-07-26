@@ -25,7 +25,7 @@ public:
     }
 
     bool init(const libconfig::Config& cfg);
-    int update_run_cfg(const libconfig::Config& cfg);
+    int update_runtime_cfg(const libconfig::Config& cfg);
 
 private:
     // 只在系统启动的时候进行被调用
@@ -93,7 +93,7 @@ public:
 
 
     //
-    // internel manage part
+    // internal manage part
     //
 
     // handler switch on/off
@@ -162,8 +162,8 @@ private:
 
     // impl in HttpServerManager.cpp
     //
-    // @/internel_manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
-    int internel_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
+    // @/internal_manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
+    int internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
                                          std::string& status_line, std::vector<std::string>& add_header);
 
 };

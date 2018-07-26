@@ -299,7 +299,7 @@ public:
     int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
     int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj);
 
-    int update_run_cfg(const libconfig::Setting& setting);
+    int update_runtime_cfg(const libconfig::Setting& setting);
 
 private:
     template<typename T>

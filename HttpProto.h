@@ -256,6 +256,8 @@ namespace http_proto {
     static string header_crlf_str = "\r\n";
     static string header_crlfcrlf_str = "\r\n\r\n";
 
+    std::string find_content_type(const std::string& suffix);
+
     /**
      * 由于最终的底层都是调用c_str()发送的，所以这里不添加额外的字符
      */
