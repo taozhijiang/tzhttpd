@@ -1,3 +1,11 @@
+/*-
+ * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
+
 #ifndef _TZ_MONITOR_CLIENT_H__
 #define _TZ_MONITOR_CLIENT_H__
 
@@ -8,13 +16,7 @@
 #include <boost/noncopyable.hpp>
 #include "EventTypes.h"
 
-#ifndef _DEFINE_GET_POINTER_MARKER_
-#define _DEFINE_GET_POINTER_MARKER_
-template<class T>
-T * get_pointer(std::shared_ptr<T> const& p) {
-    return p.get();
-}
-#endif // _DEFINE_GET_POINTER_MARKER_
+typedef void(* CP_log_store_func_t)(int priority, const char *format, ...);
 
 namespace TzMonitor {
 
@@ -25,8 +27,8 @@ public:
 
     ~TzMonitorClient();
 
-    bool init(const std::string& cfgFile);
-    bool init(const libconfig::Config& cfg);
+    bool init(const std::string& cfgFile, CP_log_store_func_t log_func);
+    bool init(const libconfig::Config& cfg, CP_log_store_func_t log_func);
     int update_run_cfg(const libconfig::Config& cfg);
 
     int report_event(const std::string& name, int64_t value, std::string flag = "T");

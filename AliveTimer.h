@@ -7,10 +7,11 @@
 #ifndef __TZHTTPD_ALIVE_TIMER_H__
 #define __TZHTTPD_ALIVE_TIMER_H__
 
+#include <xtra_rhel6.h>
+
 #include <set>
 #include <boost/unordered_map.hpp> // C++11
 
-#include "LocalHead.h"
 #include "Log.h"
 
 namespace tzhttpd {

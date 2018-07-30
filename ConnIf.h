@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_CONN_IF_H__
 #define __TZHTTPD_CONN_IF_H__
 
-#include "LocalHead.h"
+#include <xtra_asio.h>
 
 namespace tzhttpd {
 
