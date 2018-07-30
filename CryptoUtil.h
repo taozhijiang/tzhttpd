@@ -8,19 +8,17 @@
 #ifndef __TZHTTPD_CRYPTO_UTIL_H__
 #define __TZHTTPD_CRYPTO_UTIL_H__
 
+#include <xtra_rhel6.h>
+
 #include <cmath>
 #include <iomanip>
 #include <istream>
 #include <sstream>
-#include <string>
-#include <vector>
 
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
-
-#include "LocalHead.h"
 
 // 类静态函数可以直接将函数定义丢在头文件中
 

@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
 
 
     monitor_ptr_ = std::make_shared<TzMonitor::TzMonitorClient>("1");
-    if(!monitor_ptr_->init(cfgfile)) {
+    if(!monitor_ptr_->init(cfgfile, syslog)) {
         fprintf(stderr, "init tzmonitor client failed!");
         return -1;
     }

@@ -8,6 +8,7 @@
 #ifndef __TZHTTPD_HTTP_SERVER_H__
 #define __TZHTTPD_HTTP_SERVER_H__
 
+#include <xtra_asio.h>
 
 #include <libconfig.h++>
 

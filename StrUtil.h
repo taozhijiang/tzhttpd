@@ -13,7 +13,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include "LocalHead.h"
 #include "Log.h"
 
 // 类静态函数可以直接将函数定义丢在头文件中

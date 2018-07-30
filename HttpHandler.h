@@ -10,16 +10,13 @@
 
 // 所有的http uri 路由
 
-#include <libconfig.h++>
+#include <xtra_rhel6.h>
 
-#include <vector>
-#include <string>
-#include <memory>
+#include <libconfig.h++>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 #include <boost/thread/locks.hpp>
-#include <boost/thread/shared_mutex.hpp>
 
 #include "StrUtil.h"
 
