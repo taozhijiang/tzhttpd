@@ -21,16 +21,16 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 ### Manage URI
 ```bash
 # dynamic reload cfg
-curl 'http://127.0.0.1:18430/internel_manage?cmd=reload&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=reload&auth=d44bfc666db304b2f72b4918c8b46f78'
 
 # disable & enable handler
-curl 'http://127.0.0.1:18430/internel_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
-curl 'http://127.0.0.1:18430/internel_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
 
 # steps to dynamic update handler from so, without impact other service
-curl 'http://127.0.0.1:18430/internel_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
 cp libgetdemo.so ../cgi-bin 
-curl 'http://127.0.0.1:18430/internel_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
 ```
 
 ### NOTE

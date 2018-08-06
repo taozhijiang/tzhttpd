@@ -187,7 +187,7 @@ public:
 
                 // 服务关闭，但是还是允许特定页面的访问
                 uri = StrUtil::pure_uri_path(uri);
-                if (boost::iequals(uri, "/internel_manage")) {
+                if (boost::iequals(uri, "/internal_manage")) {
                     break; // fall through handler fetch
                 }
 
