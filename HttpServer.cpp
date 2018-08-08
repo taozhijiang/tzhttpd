@@ -272,21 +272,21 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
     std::swap(conf.safe_ip_, conf_.safe_ip_);
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
-        tzhttpd_log_alert("===> update socket/session conn cancel time_out: from %d to %d",
+        tzhttpd_log_alert("=> update socket/session conn cancel time_out: from %d to %d",
                   conf_.ops_cancel_time_out_.load(), conf.ops_cancel_time_out_.load());
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
     }
 
     // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了manage管理页面可用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
-        tzhttpd_log_alert("===> update http_service_enabled: from %d to %d",
+        tzhttpd_log_alert("=> update http_service_enabled: from %d to %d",
                   conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
         conf_.http_service_enabled_ = conf.http_service_enabled_.load();
     }
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
-        tzhttpd_log_alert("===> update http_service_speed: from %ld to %ld",
+        tzhttpd_log_alert("=> update http_service_speed: from %ld to %ld",
                   conf_.http_service_speed_.load(), conf.http_service_speed_.load());
         conf_.http_service_speed_ = conf.http_service_speed_.load();
 
@@ -310,7 +310,7 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
     // 当前不支持缩减线程
     if (conf.io_thread_number_ > conf_.io_thread_number_) {
-        tzhttpd_log_alert("===> resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
+        tzhttpd_log_alert("=> resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
         conf_.io_thread_number_ = conf.io_thread_number_;
         if (io_service_threads_.resize_threads(conf_.io_thread_number_) != 0) {
             tzhttpd_log_err("resize io_thread_num may failed!");
