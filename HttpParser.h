@@ -48,6 +48,10 @@ public:
         return method_;
     }
 
+    std::string get_uri() const {
+        return uri_;
+    }
+
     std::string get_version() const {
         return version_;
     }
@@ -254,8 +258,8 @@ private:
                         method_ = HTTP_METHOD::UNKNOWN;
                     }
 
-                    std::string uri = normalize_request_uri(std::string(what[2]));
-                    request_headers_.insert(std::make_pair(http_proto::header_options::request_uri, uri));
+                    uri_ = normalize_request_uri(std::string(what[2]));
+                    request_headers_.insert(std::make_pair(http_proto::header_options::request_uri, uri_));
                     request_headers_.insert(std::make_pair(http_proto::header_options::http_version, boost::algorithm::trim_copy(std::string(what[3]))));
 
                     version_ = boost::algorithm::trim_copy(std::string(what[3]));
@@ -271,6 +275,7 @@ private:
     UriParamContainer request_uri_params_;
     enum HTTP_METHOD method_;
     std::string version_;
+    std::string uri_;
 };
 
 } // end namespace tzhttpd

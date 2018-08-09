@@ -52,7 +52,7 @@ private:
 template<typename T>
 class AliveTimer {
 public:
-    typedef std::shared_ptr<AliveItem<T> >               active_item_ptr;     // internel use
+    typedef std::shared_ptr<AliveItem<T> >               active_item_ptr;     // internal use
     typedef std::map<time_t, std::set<active_item_ptr> > TimeContainer;       //
     typedef std::map<T*, active_item_ptr >               BucketContainer;     //
     typedef std::set<T* >                                DropContainer;       // 主动删除

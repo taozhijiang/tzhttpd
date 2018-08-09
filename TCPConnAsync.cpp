@@ -420,6 +420,16 @@ void TCPConnAsync::fill_http_for_send(const string& str, const string& status_li
     w_size_ = content.size();
     w_pos_  = 0;
 
+    std::string str_method = "UNKNOWN";
+    auto method = http_parser_.get_method();
+    if (method == HTTP_METHOD::GET) {
+        str_method = "GET";
+    } else if(method == HTTP_METHOD::POST) {
+        str_method = "POST";
+    }
+    tzhttpd_log_info("\n =====> \"%s %s\" %s",
+                     str_method.c_str(), http_parser_.get_uri().c_str(), status_line.c_str());
+
     return;
 }
 
@@ -427,7 +437,8 @@ void TCPConnAsync::fill_http_for_send(const string& str, const string& status_li
 void TCPConnAsync::fill_std_http_for_send(enum http_proto::StatusCode code) {
 
     string http_ver = http_parser_.get_version();
-    string content = http_proto::http_std_response_generate(http_ver, code, keep_continue());
+    std::string status_line = generate_response_status_line(http_ver, code);
+    string content = http_proto::http_std_response_generate(http_ver, status_line, keep_continue());
     if (content.size() + 1 > p_write_->size())
         p_write_->resize(content.size() + 1);
 
@@ -435,6 +446,16 @@ void TCPConnAsync::fill_std_http_for_send(enum http_proto::StatusCode code) {
 
     w_size_ = content.size();
     w_pos_  = 0;
+
+    std::string str_method = "UNKNOWN";
+    auto method = http_parser_.get_method();
+    if (method == HTTP_METHOD::GET) {
+        str_method = "GET";
+    } else if(method == HTTP_METHOD::POST) {
+        str_method = "POST";
+    }
+    tzhttpd_log_info("\n =====> \"%s %s\" %s",
+                     str_method.c_str(), http_parser_.get_uri().c_str(), status_line.c_str());
 
     return;
 }
