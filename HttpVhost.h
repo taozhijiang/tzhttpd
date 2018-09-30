@@ -162,9 +162,9 @@ private:
 
     // impl in HttpServerManager.cpp
     //
-    // @/internal_manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
+    // @/internal_manage?cmd=xxx
     int internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                         std::string& status_line, std::vector<std::string>& add_header);
+            std::string& status_line, std::vector<std::string>& add_header);
 
 };
 

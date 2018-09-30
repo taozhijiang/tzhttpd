@@ -70,7 +70,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
     }
 
     std::string real_file_path = http_docu_root_ +
-        "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
+            "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
 
     // check dest exist?
     if (::access(real_file_path.c_str(), R_OK) != 0) {
@@ -190,6 +190,7 @@ int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri
 
 
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
+                                           const std::set<std::string>& basic_auth,
                                            bool built_in, bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
@@ -205,7 +206,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     }
 
     UriRegex rgx {uri};
-    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(uri, handler, built_in, working);
+    HttpGetHandlerObjectPtr phandler_obj =
+        std::make_shared<HttpGetHandlerObject>(uri, handler, basic_auth, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] create get handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -219,6 +221,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
 }
 
 int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
+                                            const std::set<std::string>& basic_auth,
                                             bool built_in, bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
@@ -234,7 +237,8 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     }
 
     UriRegex rgx {uri};
-    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(uri, handler, built_in, working);
+    HttpPostHandlerObjectPtr phandler_obj =
+        std::make_shared<HttpPostHandlerObject>(uri, handler, basic_auth, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] Create post handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -296,8 +300,8 @@ int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPt
 }
 
 
-int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string& key,
-                           std::map<std::string, std::string>& path_map) {
+int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::string& key,
+                                  std::map<std::string, HandlerCfg>& handleCfg) {
 
     if (!setting.exists(key)) {
         tzhttpd_log_notice("[vhost:%s] handlers for %s not found!",
@@ -305,7 +309,7 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
         return 0;
     }
 
-    path_map.clear();
+    handleCfg.clear();
     int ret_code = 0;
     try {
 
@@ -328,7 +332,17 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
 
             tzhttpd_log_debug("[vhost:%s] detect handler uri:%s, dl_path:%s",
                               vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
-            path_map[uri_path] = dl_path;
+
+            // TODO basic_auth
+            std::set<std::string> basic_auth {};
+            do_parse_basic_auth(handler, basic_auth);
+
+            HandlerCfg cfg;
+            cfg.url_ = uri_path;
+            cfg.dl_path_ = dl_path;
+            cfg.basic_auth_ = basic_auth;
+
+            handleCfg[uri_path] = cfg;
         }
     } catch (...) {
         tzhttpd_log_err("[vhost:%s] Parse %s error!!!",
@@ -339,57 +353,88 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
     return ret_code;
 }
 
+
+int HttpHandler::do_parse_basic_auth(const libconfig::Setting& setting, std::set<std::string>& auth_set) {
+
+    if (!setting.exists("basic_auth"))
+        return -1;
+
+    const libconfig::Setting& http_basic_auth = setting["basic_auth"];
+    for(int i = 0; i < http_basic_auth.getLength(); ++i) {
+        const libconfig::Setting& item = http_basic_auth[i];
+        std::string auth_user;
+        std::string auth_passwd;
+        ConfUtil::conf_value(item, "user", auth_user);
+        ConfUtil::conf_value(item, "passwd", auth_passwd);
+        if (auth_user.empty() || auth_passwd.empty()) {
+            tzhttpd_log_err("skip err auth item ....");
+            continue;
+        }
+
+        std::string auth_str = auth_user + ":" + auth_passwd;
+        std::string auth_base = CryptoUtil::base64_encode(auth_str);
+        tzhttpd_log_debug("detected auth for user %s ", auth_user.c_str());
+        auth_set.insert(auth_base);
+    }
+
+    return 0;
+}
+
 int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
     int ret_code = 0;
     std::string key;
-    std::map<std::string, std::string> path_map {};
+    std::map<std::string, HandlerCfg> path_map {};
 
     key = "cgi_get_handlers";
     path_map.clear();
-    ret_code += parse_cfg(setting, key, path_map);
+    ret_code += do_parse_handler(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
-        // we will not override handler directly, consider using /manage
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
         if (check_exist_http_get_handler(iter->first)) {
             tzhttpd_log_alert("[vhost:%s] HttpGet for %s already exists, skip it.",
                               vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
-        http_handler::CgiGetWrapper getter(iter->second);
+        http_handler::CgiGetWrapper getter(iter->second.dl_path_);
         if (!getter.init()) {
             tzhttpd_log_err("[vhost:%s] init get for %s @ %s failed, skip it!",
-                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
+                            vhost_name_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
             ret_code --;
             continue;
         }
 
-        register_http_get_handler(iter->first, getter, false);
+        register_http_get_handler(iter->first, getter, iter->second.basic_auth_, false);
     }
 
 
     key = "cgi_post_handlers";
     path_map.clear();
-    ret_code += parse_cfg(setting, key, path_map);
+    ret_code += do_parse_handler(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
-        // we will not override handler directly, consider using /manage
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
         if (check_exist_http_post_handler(iter->first)) {
             tzhttpd_log_alert("[vhost:%s] HttpPost for %s already exists, skip it.",
                               vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
-        http_handler::CgiPostWrapper poster(iter->second);
+        http_handler::CgiPostWrapper poster(iter->second.dl_path_);
         if (!poster.init()) {
             tzhttpd_log_err("[vhost:%s] init post for %s @ %s failed, skip it!",
-                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
+                            vhost_name_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
             ret_code --;
             continue;
         }
 
-        register_http_post_handler(iter->first, poster, false);
+        register_http_post_handler(iter->first, poster, iter->second.basic_auth_, false);
     }
 
     return ret_code;

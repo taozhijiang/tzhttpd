@@ -277,7 +277,7 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
     }
 
-    // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了manage管理页面可用
+    // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了internal_manage管理页面可用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
         tzhttpd_log_alert("=> update http_service_enabled: from %d to %d",
                   conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
