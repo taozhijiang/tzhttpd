@@ -33,34 +33,32 @@ private:
 
 public:
 
-    // register handler in default_vhost_
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
-        return default_vhost_->register_http_get_handler(uri_regex, handler, built_in);
-    }
-
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
-        return default_vhost_->register_http_post_handler(uri_regex, handler, built_in);
-    }
-
-
     // register handler in specified vhost
-    int register_http_get_handler(std::string vhost,
-                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+    int register_http_get_handler(std::string vhost, std::string uri_regex, const HttpGetHandler& handler,
+                                  bool built_in, const std::set<std::string>& basic_auth) {
+        if (vhost.empty()) {
+            return default_vhost_->register_http_get_handler(uri_regex, handler, built_in, basic_auth);
+        }
+
         vhost = StrUtil::drop_host_port(vhost);
         auto iter = vhosts_.find(vhost);
         if (iter != vhosts_.end()) {
-            return iter->second->register_http_get_handler(uri_regex, handler, built_in);
+            return iter->second->register_http_get_handler(uri_regex, handler, built_in, basic_auth);
         }
         tzhttpd_log_err("vhost: %s not found for get %s !", vhost.c_str(), uri_regex.c_str());
         return -1;
     }
 
-    int register_http_post_handler(std::string vhost,
-                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+    int register_http_post_handler(std::string vhost, std::string uri_regex, const HttpPostHandler& handler,
+                                   bool built_in, const std::set<std::string>& basic_auth) {
+        if (vhost.empty()) {
+            return default_vhost_->register_http_post_handler(uri_regex, handler, built_in, basic_auth);
+        }
+
         vhost = StrUtil::drop_host_port(vhost);
         auto iter = vhosts_.find(vhost);
         if (iter != vhosts_.end()) {
-            return iter->second->register_http_post_handler(uri_regex, handler, built_in);
+            return iter->second->register_http_post_handler(uri_regex, handler, built_in, basic_auth);
         }
         tzhttpd_log_err("vhost: %s not found for post %s !", vhost.c_str(), uri_regex.c_str());
         return -1;

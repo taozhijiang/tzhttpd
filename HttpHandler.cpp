@@ -190,8 +190,8 @@ int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri
 
 
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
-                                           const std::set<std::string>& basic_auth,
-                                           bool built_in, bool working){
+                                           bool built_in, const std::set<std::string>& basic_auth,
+                                           bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -221,8 +221,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
 }
 
 int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
-                                            const std::set<std::string>& basic_auth,
-                                            bool built_in, bool working){
+                                            bool built_in, const std::set<std::string>& basic_auth,
+                                            bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -333,7 +333,6 @@ int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::
             tzhttpd_log_debug("[vhost:%s] detect handler uri:%s, dl_path:%s",
                               vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
 
-            // TODO basic_auth
             std::set<std::string> basic_auth {};
             do_parse_basic_auth(handler, basic_auth);
 
@@ -408,7 +407,7 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
             continue;
         }
 
-        register_http_get_handler(iter->first, getter, iter->second.basic_auth_, false);
+        register_http_get_handler(iter->first, getter, false, iter->second.basic_auth_);
     }
 
 
@@ -434,7 +433,7 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
             continue;
         }
 
-        register_http_post_handler(iter->first, poster, iter->second.basic_auth_, false);
+        register_http_post_handler(iter->first, poster, false, iter->second.basic_auth_);
     }
 
     return ret_code;

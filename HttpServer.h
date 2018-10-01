@@ -165,20 +165,50 @@ public:
     int conn_destroy(ConnTypePtr p_conn);
 
 
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
-        return vhost_manager_.register_http_get_handler(uri_regex, handler, built_in);
+    // 用户态的接口，所以这里的basic_auth 是 user:passwd形式，没有进行base64转码
+    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in,
+                                  const std::set<std::string>& basic_auth_raw = std::set<std::string>()) {
+        return register_http_get_handler("", uri_regex, handler,
+                                         built_in, basic_auth_raw);
     }
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
-        return vhost_manager_.register_http_post_handler(uri_regex, handler, built_in);
+    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in,
+                                   const std::set<std::string>& basic_auth_raw = std::set<std::string>()) {
+        return register_http_post_handler("", uri_regex, handler,
+                                          built_in, basic_auth_raw);
     }
 
     int register_http_get_handler(std::string vhost,
-                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
-        return vhost_manager_.register_http_get_handler(vhost, uri_regex, handler, built_in);
+                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in,
+                                  const std::set<std::string>& basic_auth_raw = std::set<std::string>()) {
+
+        std::set<std::string> basic_auth {};
+        if (!basic_auth_raw.empty()) {
+            for (auto iter = basic_auth_raw.begin(); iter != basic_auth_raw.end(); ++iter) {
+                std::string auth_item = CryptoUtil::base64_encode(*iter);
+                if (!auth_item.empty())
+                    basic_auth.insert(auth_item);
+            }
+        }
+
+        return vhost_manager_.register_http_get_handler(vhost, uri_regex, handler,
+                                                        built_in, basic_auth);
     }
+
     int register_http_post_handler(std::string vhost,
-                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
-        return vhost_manager_.register_http_post_handler(vhost, uri_regex, handler, built_in);
+                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in,
+                                   const std::set<std::string>& basic_auth_raw = std::set<std::string>()) {
+
+        std::set<std::string> basic_auth {};
+        if (!basic_auth_raw.empty()) {
+            for (auto iter = basic_auth_raw.begin(); iter != basic_auth_raw.end(); ++iter) {
+                std::string auth_item = CryptoUtil::base64_encode(*iter);
+                if (!auth_item.empty())
+                    basic_auth.insert(auth_item);
+            }
+        }
+
+        return vhost_manager_.register_http_post_handler(vhost, uri_regex, handler,
+                                                         built_in, basic_auth);
     }
 
     int find_http_get_handler(std::string vhost, std::string uri, HttpGetHandlerObjectPtr& phandler_obj) {

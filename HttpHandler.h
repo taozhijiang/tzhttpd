@@ -292,7 +292,7 @@ public:
             return -4;
         }
 
-        register_http_get_handler(uri, getter, false, on);
+        register_http_get_handler(uri, getter, false, handlerCfg->second.basic_auth_, on);
         tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
 
         return 0;
@@ -343,23 +343,10 @@ public:
             return -4;
         }
 
-        register_http_post_handler(uri, poster, false, on);
+        register_http_post_handler(uri, poster, false, handlerCfg->second.basic_auth_, on);
         tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
 
         return 0;
-    }
-
-
-    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
-                                  bool built_in, bool working = true) {
-        std::set<std::string> empty_auth {};
-        return register_http_get_handler(uri_r, handler, empty_auth, built_in, working);
-    }
-
-    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
-                                   bool built_in, bool working = true) {
-        std::set<std::string> empty_auth {};
-        return register_http_post_handler(uri_r, handler, empty_auth, built_in, working);
     }
 
     // uri match
@@ -368,13 +355,10 @@ public:
 
     int update_runtime_cfg(const libconfig::Setting& setting);
 
-private:
-    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
-                                  const std::set<std::string>& basic_auth,
-                                  bool built_in, bool working = true);
-    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
-                                   const std::set<std::string>& basic_auth,
-                                   bool built_in, bool working = true);
+    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in,
+                                  const std::set<std::string>& basic_auth, bool working = true);
+    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in,
+                                   const std::set<std::string>& basic_auth, bool working = true);
 
 private:
     template<typename T>
