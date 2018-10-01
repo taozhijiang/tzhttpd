@@ -39,9 +39,6 @@ int main(int argc, char* argv[]) {
 
     http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler, true);
 
-    std::set<std::string> auth = { "usr1:passwd1", "usr2:passwd2"};
-    http_server_ptr->register_http_get_handler("^/test_auth$", tzhttpd::get_test_handler, true, auth);
-
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();
 

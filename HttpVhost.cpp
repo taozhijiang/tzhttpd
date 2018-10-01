@@ -83,8 +83,7 @@ bool HttpVhost::init(const libconfig::Config& cfg) {
                                   std::bind(&HttpVhost::internal_manage_http_get_handler, this,
                                             std::placeholders::_1, std::placeholders::_2,
                                             std::placeholders::_3, std::placeholders::_4),
-                                  true,
-                                  control_auth_set ) != 0) {
+                                  true) != 0) {
         tzhttpd_log_err("Http default vhost register manage page failed!");
         return false;
     }

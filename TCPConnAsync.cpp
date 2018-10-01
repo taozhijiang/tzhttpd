@@ -151,7 +151,8 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
-        if (!phandler_obj->basic_auth_check(http_parser_.find_request_header(http_proto::header_options::auth))) {
+        if (!phandler_obj->check_basic_auth(real_path_info,
+                                            http_parser_.find_request_header(http_proto::header_options::auth))) {
             tzhttpd_log_err("basic_auth for %s failed ...", real_path_info.c_str());
             fill_std_http_for_send(http_proto::StatusCode::client_error_unauthorized);
             goto write_return;
@@ -314,7 +315,8 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                 goto write_return;
             }
 
-            if (!phandler_obj->basic_auth_check(http_parser_.find_request_header(http_proto::header_options::auth))) {
+            if (!phandler_obj->check_basic_auth(real_path_info,
+                                                http_parser_.find_request_header(http_proto::header_options::auth))) {
                 tzhttpd_log_err("basic_auth for %s failed ...", real_path_info.c_str());
                 fill_std_http_for_send(http_proto::StatusCode::client_error_unauthorized);
                 goto write_return;

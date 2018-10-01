@@ -13,9 +13,6 @@
 #include <xtra_rhel6.h>
 
 #include <libconfig.h++>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "StrUtil.h"
@@ -25,10 +22,12 @@
 #include "SlibLoader.h"
 
 #include "HttpCfgHelper.h"
+#include "HttpAuth.h"
 
 namespace tzhttpd {
 
 class HttpParser;
+class HttpHandler;
 
 typedef std::function<int (const HttpParser& http_parser, \
                            std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpGetHandler;
@@ -46,46 +45,18 @@ struct HttpHandlerObject {
     boost::atomic<bool>    working_;       //  启用，禁用等标记
 
     T handler_;
-
-    std::set<std::string>  basic_auth_;
+    const HttpHandler&     vhost_;
 
     HttpHandlerObject(const std::string& path, const T& t,
+                      const HttpHandler& vhost,
                       bool built_in = false, bool working = true):
         path_(path),
         built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
         handler_(t),
-        basic_auth_({}) {
+        vhost_(vhost) {
     }
 
-    HttpHandlerObject(const std::string& path, const T& t,
-                      const std::set<std::string>& basic_auth,
-                      bool built_in = false, bool working = true):
-        path_(path),
-        built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
-        handler_(t),
-        basic_auth_(basic_auth) {
-    }
-
-    bool basic_auth_check(const std::string raw_basic_str) {
-
-        if (basic_auth_.empty())
-            return true;
-
-        if (raw_basic_str.empty())
-            return false;
-
-        std::vector<std::string> vec{};
-        boost::split(vec, raw_basic_str, boost::is_any_of(" \t\n"));
-        if (vec.size() != 2 || !strcasestr(vec[0].c_str(), "Basic")) {
-            return false;
-        }
-
-        auto auth_code = boost::algorithm::trim_copy(vec[1]);
-        if (basic_auth_.find(auth_code) == basic_auth_.end())
-            return false;
-
-        return true;
-    }
+    bool check_basic_auth(const std::string& uri, const std::string auth_str) const;
 };
 
 typedef HttpHandlerObject<HttpGetHandler>  HttpGetHandlerObject;
@@ -94,20 +65,6 @@ typedef HttpHandlerObject<HttpPostHandler> HttpPostHandlerObject;
 typedef std::shared_ptr<HttpGetHandlerObject>  HttpGetHandlerObjectPtr;
 typedef std::shared_ptr<HttpPostHandlerObject> HttpPostHandlerObjectPtr;
 
-
-class UriRegex: public boost::regex {
-public:
-    explicit UriRegex(const std::string& regexStr) :
-        boost::regex(regexStr), str_(regexStr) {
-    }
-
-    std::string str() const {
-        return str_;
-    }
-
-private:
-    std::string str_;
-};
 
 
 class HttpHandler {
@@ -156,13 +113,17 @@ public:
                                                              code, uri,
                                                              std::placeholders::_1, dummy_post,
                                                              std::placeholders::_2,
-                                                             std::placeholders::_3, std::placeholders::_4 ), true);
+                                                             std::placeholders::_3, std::placeholders::_4 ),
+                                                    *this, true);
+
             http_redirect_post_phandler_obj_ = std::make_shared<HttpPostHandlerObject>("[redirect]",
                                                    std::bind(&HttpHandler::http_redirect_handler, this,
                                                              code, uri,
                                                              std::placeholders::_1, std::placeholders::_2,
                                                              std::placeholders::_3, std::placeholders::_4,
-                                                             std::placeholders::_5 ), true);
+                                                             std::placeholders::_5 ),
+                                                    *this, true);
+
             if (!http_redirect_get_phandler_obj_ || !http_redirect_post_phandler_obj_) {
                 tzhttpd_log_err("Create redirect handler for %s failed!", vhost_name_.c_str());
                 return false;
@@ -178,7 +139,8 @@ public:
         default_http_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[default]",
                                                std::bind(&HttpHandler::default_http_get_handler, this,
                                                          std::placeholders::_1, std::placeholders::_2,
-                                                         std::placeholders::_3, std::placeholders::_4 ), true);
+                                                         std::placeholders::_3, std::placeholders::_4 ),
+                                                    *this, true);
         if (!default_http_get_phandler_obj_) {
             tzhttpd_log_err("Create default get handler for %s failed!", vhost_name_.c_str());
             return false;
@@ -220,7 +182,13 @@ public:
             }
         }
 
-
+        if (setting.exists("basic_auth")) {
+            http_auth_.reset(new HttpAuth());
+            if (!http_auth_ || !http_auth_->init(setting)) {
+                tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
+                return false;
+            }
+        }
 
         return true;
     }
@@ -292,7 +260,7 @@ public:
             return -4;
         }
 
-        register_http_get_handler(uri, getter, false, handlerCfg->second.basic_auth_, on);
+        register_http_get_handler(uri, getter, false, on);
         tzhttpd_log_debug("register_http_get_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
 
         return 0;
@@ -343,7 +311,7 @@ public:
             return -4;
         }
 
-        register_http_post_handler(uri, poster, false, handlerCfg->second.basic_auth_, on);
+        register_http_post_handler(uri, poster, false, on);
         tzhttpd_log_debug("register_http_post_handler for %s @ %s OK!", uri.c_str(), dl_path.c_str());
 
         return 0;
@@ -356,9 +324,13 @@ public:
     int update_runtime_cfg(const libconfig::Setting& setting);
 
     int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in,
-                                  const std::set<std::string>& basic_auth, bool working = true);
+                                  bool working = true);
     int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in,
-                                   const std::set<std::string>& basic_auth, bool working = true);
+                                   bool working = true);
+
+    bool check_basic_auth(const std::string& uri, const std::string& auth_str) const {
+        return http_auth_ && http_auth_->check_basic_auth(uri, auth_str);
+    }
 
 private:
     template<typename T>
@@ -373,14 +345,10 @@ private:
     struct HandlerCfg {
         std::string url_;
         std::string dl_path_;
-        std::set<std::string> basic_auth_;
     };
-
 
     int do_parse_handler(const libconfig::Setting& setting, const std::string& key,
                          std::map<std::string, HandlerCfg>& handlerCfg);
-
-    int do_parse_basic_auth(const libconfig::Setting& setting, std::set<std::string>& auth_set);
 
 private:
 
@@ -411,8 +379,7 @@ private:
 
     std::map<std::string, std::string> cache_controls_;
 
-    std::set<std::string> basic_auth_;
-
+    std::unique_ptr<HttpAuth> http_auth_;
 };
 
 
@@ -510,6 +477,13 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
     }
 
     return 0;
+}
+
+
+
+template<typename T>
+bool HttpHandlerObject<T>::check_basic_auth(const std::string& uri, const std::string auth_str) const {
+    return vhost_.check_basic_auth(uri, auth_str);
 }
 
 } // end namespace tzhttpd

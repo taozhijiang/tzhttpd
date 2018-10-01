@@ -190,8 +190,7 @@ int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri
 
 
 int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
-                                           bool built_in, const std::set<std::string>& basic_auth,
-                                           bool working){
+                                           bool built_in, bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -207,7 +206,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
 
     UriRegex rgx {uri};
     HttpGetHandlerObjectPtr phandler_obj =
-        std::make_shared<HttpGetHandlerObject>(uri, handler, basic_auth, built_in, working);
+        std::make_shared<HttpGetHandlerObject>(uri, handler, *this, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] create get handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -221,8 +220,7 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
 }
 
 int HttpHandler::register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
-                                            bool built_in, const std::set<std::string>& basic_auth,
-                                            bool working){
+                                            bool built_in, bool working){
 
     std::string uri = StrUtil::pure_uri_path(uri_r);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -238,7 +236,7 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
 
     UriRegex rgx {uri};
     HttpPostHandlerObjectPtr phandler_obj =
-        std::make_shared<HttpPostHandlerObject>(uri, handler, basic_auth, built_in, working);
+        std::make_shared<HttpPostHandlerObject>(uri, handler, *this, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] Create post handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -333,13 +331,9 @@ int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::
             tzhttpd_log_debug("[vhost:%s] detect handler uri:%s, dl_path:%s",
                               vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
 
-            std::set<std::string> basic_auth {};
-            do_parse_basic_auth(handler, basic_auth);
-
             HandlerCfg cfg;
             cfg.url_ = uri_path;
             cfg.dl_path_ = dl_path;
-            cfg.basic_auth_ = basic_auth;
 
             handleCfg[uri_path] = cfg;
         }
@@ -350,33 +344,6 @@ int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::
     }
 
     return ret_code;
-}
-
-
-int HttpHandler::do_parse_basic_auth(const libconfig::Setting& setting, std::set<std::string>& auth_set) {
-
-    if (!setting.exists("basic_auth"))
-        return -1;
-
-    const libconfig::Setting& http_basic_auth = setting["basic_auth"];
-    for(int i = 0; i < http_basic_auth.getLength(); ++i) {
-        const libconfig::Setting& item = http_basic_auth[i];
-        std::string auth_user;
-        std::string auth_passwd;
-        ConfUtil::conf_value(item, "user", auth_user);
-        ConfUtil::conf_value(item, "passwd", auth_passwd);
-        if (auth_user.empty() || auth_passwd.empty()) {
-            tzhttpd_log_err("skip err auth item ....");
-            continue;
-        }
-
-        std::string auth_str = auth_user + ":" + auth_passwd;
-        std::string auth_base = CryptoUtil::base64_encode(auth_str);
-        tzhttpd_log_debug("detected auth for user %s ", auth_user.c_str());
-        auth_set.insert(auth_base);
-    }
-
-    return 0;
 }
 
 int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
@@ -407,7 +374,7 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
             continue;
         }
 
-        register_http_get_handler(iter->first, getter, false, iter->second.basic_auth_);
+        register_http_get_handler(iter->first, getter, false);
     }
 
 
@@ -433,7 +400,7 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
             continue;
         }
 
-        register_http_post_handler(iter->first, poster, false, iter->second.basic_auth_);
+        register_http_post_handler(iter->first, poster, false);
     }
 
     return ret_code;
