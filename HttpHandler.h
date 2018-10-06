@@ -108,21 +108,23 @@ public:
                 return false;
             }
 
-            http_redirect_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[redirect]",
-                                                   std::bind(&HttpHandler::http_redirect_handler, this,
-                                                             code, uri,
-                                                             std::placeholders::_1, dummy_post,
-                                                             std::placeholders::_2,
-                                                             std::placeholders::_3, std::placeholders::_4 ),
-                                                    *this, true);
+            http_redirect_get_phandler_obj_ =
+                std::make_shared<HttpGetHandlerObject>("[redirect]",
+                        std::bind(&HttpHandler::http_redirect_handler, this,
+                                 code, uri,
+                                 std::placeholders::_1, dummy_post,
+                                 std::placeholders::_2,
+                                 std::placeholders::_3, std::placeholders::_4 ),
+                        *this, true);
 
-            http_redirect_post_phandler_obj_ = std::make_shared<HttpPostHandlerObject>("[redirect]",
-                                                   std::bind(&HttpHandler::http_redirect_handler, this,
-                                                             code, uri,
-                                                             std::placeholders::_1, std::placeholders::_2,
-                                                             std::placeholders::_3, std::placeholders::_4,
-                                                             std::placeholders::_5 ),
-                                                    *this, true);
+            http_redirect_post_phandler_obj_ =
+                std::make_shared<HttpPostHandlerObject>("[redirect]",
+                        std::bind(&HttpHandler::http_redirect_handler, this,
+                                 code, uri,
+                                 std::placeholders::_1, std::placeholders::_2,
+                                 std::placeholders::_3, std::placeholders::_4,
+                                 std::placeholders::_5 ),
+                        *this, true);
 
             if (!http_redirect_get_phandler_obj_ || !http_redirect_post_phandler_obj_) {
                 tzhttpd_log_err("Create redirect handler for %s failed!", vhost_name_.c_str());
@@ -136,11 +138,12 @@ public:
         }
 
 
-        default_http_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[default]",
-                                               std::bind(&HttpHandler::default_http_get_handler, this,
-                                                         std::placeholders::_1, std::placeholders::_2,
-                                                         std::placeholders::_3, std::placeholders::_4 ),
-                                                    *this, true);
+        default_http_get_phandler_obj_ =
+            std::make_shared<HttpGetHandlerObject>("[default]",
+                    std::bind(&HttpHandler::default_http_get_handler, this,
+                         std::placeholders::_1, std::placeholders::_2,
+                         std::placeholders::_3, std::placeholders::_4 ),
+                    *this, true);
         if (!default_http_get_phandler_obj_) {
             tzhttpd_log_err("Create default get handler for %s failed!", vhost_name_.c_str());
             return false;
@@ -329,7 +332,9 @@ public:
                                    bool working = true);
 
     bool check_basic_auth(const std::string& uri, const std::string& auth_str) const {
-        return http_auth_ && http_auth_->check_basic_auth(uri, auth_str);
+        if (!http_auth_)
+            return true;
+        return http_auth_->check_basic_auth(uri, auth_str);
     }
 
 private:

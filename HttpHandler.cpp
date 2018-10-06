@@ -39,14 +39,16 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
     if (stat(regular_file_path.c_str(), &sb) == -1) {
         tzhttpd_log_err("Stat file error: %s", regular_file_path.c_str());
         response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::server_error_internal_server_error);
         return false;
     }
 
     if (sb.st_size > 100*1024*1024 /*100M*/) {
         tzhttpd_log_err("Too big file size: %ld", sb.st_size);
         response = http_proto::content_bad_request;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::client_error_bad_request);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::client_error_bad_request);
         return false;
     }
 
@@ -55,7 +57,8 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
     std::stringstream buffer;
     buffer << fin.rdbuf();
     response = buffer.str();
-    status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
+    status_line = generate_response_status_line(http_parser.get_version(),
+            StatusCode::success_ok);
 
     return true;
 }
@@ -76,7 +79,8 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
     if (::access(real_file_path.c_str(), R_OK) != 0) {
         tzhttpd_log_err("File not found: %s", real_file_path.c_str());
         response = http_proto::content_not_found;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::client_error_not_found);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::client_error_not_found);
         return -1;
     }
 
@@ -86,7 +90,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
         tzhttpd_log_err("Stat file error: %s", real_file_path.c_str());
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
+                StatusCode::server_error_internal_server_error);
         return -1;
     }
 
@@ -120,7 +124,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
                     // default, 404
                     response = http_proto::content_not_found;
                     status_line = generate_response_status_line(http_parser.get_version(),
-                                                                StatusCode::client_error_not_found);
+                            StatusCode::client_error_not_found);
                 }
             }
             break;
@@ -170,18 +174,18 @@ int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri
 
     if (red_code == "301") {
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::redirection_moved_permanently);
+                StatusCode::redirection_moved_permanently);
         response = http_proto::content_301;
         add_header.push_back("Location: " + red_uri);
     } else if(red_code == "302"){
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::redirection_found);
+                StatusCode::redirection_found);
         response = http_proto::content_302;
         add_header.push_back("Location: " + red_uri);
     } else {
         tzhttpd_log_err("unknown red_code: %s", red_code.c_str());
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
+                StatusCode::server_error_internal_server_error);
         response = http_proto::content_error;
     }
 
@@ -338,8 +342,7 @@ int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::
             handleCfg[uri_path] = cfg;
         }
     } catch (...) {
-        tzhttpd_log_err("[vhost:%s] Parse %s error!!!",
-                        vhost_name_.c_str(), key.c_str());
+        tzhttpd_log_err("[vhost:%s] Parse %s error!!!", vhost_name_.c_str(), key.c_str());
         ret_code --;
     }
 
@@ -401,6 +404,19 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
         }
 
         register_http_post_handler(iter->first, poster, false);
+    }
+
+
+    // for http auth dynamic load
+    if (setting.exists("basic_auth")) {
+        if (!http_auth_) {
+            http_auth_.reset(new HttpAuth());
+        }
+
+        if (!http_auth_ || !http_auth_->init(setting)) {
+            tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
+            ret_code --;
+        }
     }
 
     return ret_code;

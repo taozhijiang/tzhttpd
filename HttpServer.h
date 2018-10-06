@@ -166,24 +166,34 @@ public:
 
 
     // 用户态的接口，所以这里的basic_auth 是 user:passwd形式，没有进行base64转码
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+    int register_http_get_handler(std::string uri_regex,
+                                  const HttpGetHandler& handler,
+                                  bool built_in) {
         return register_http_get_handler("", uri_regex, handler, built_in);
     }
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+    int register_http_post_handler(std::string uri_regex,
+                                   const HttpPostHandler& handler,
+                                   bool built_in) {
         return register_http_post_handler("", uri_regex, handler, built_in);
     }
 
     int register_http_get_handler(std::string vhost,
-                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+                                  std::string uri_regex,
+                                  const HttpGetHandler& handler,
+                                  bool built_in) {
         return vhost_manager_.register_http_get_handler(vhost, uri_regex, handler, built_in);
     }
 
     int register_http_post_handler(std::string vhost,
-                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+                                   std::string uri_regex,
+                                   const HttpPostHandler& handler,
+                                   bool built_in) {
         return vhost_manager_.register_http_post_handler(vhost, uri_regex, handler, built_in);
     }
 
-    int find_http_get_handler(std::string vhost, std::string uri, HttpGetHandlerObjectPtr& phandler_obj) {
+    int find_http_get_handler(std::string vhost,
+                              std::string uri,
+                              HttpGetHandlerObjectPtr& phandler_obj) {
         do {
             if (!conf_.http_service_enabled_) {
 
@@ -201,7 +211,9 @@ public:
         return vhost_manager_.find_http_get_handler(vhost, uri, phandler_obj);
     }
 
-    int find_http_post_handler(std::string vhost, std::string uri, HttpPostHandlerObjectPtr& phandler_obj) {
+    int find_http_post_handler(std::string vhost,
+                               std::string uri,
+                               HttpPostHandlerObjectPtr& phandler_obj) {
         if (!conf_.http_service_enabled_) {
             tzhttpd_log_err("http_service_enabled_ == false, reject request POST %s ... ", uri.c_str());
             return -1;

@@ -48,7 +48,8 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     ConfUtil::conf_value(cfg, "http.bind_addr", bind_addr_);
     ConfUtil::conf_value(cfg, "http.listen_port", listen_port);
     if (bind_addr_.empty() || listen_port <=0 ){
-        tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d", bind_addr_.c_str(), listen_port);
+        tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d",
+                         bind_addr_.c_str(), listen_port);
         return false;
     }
     listen_port_ = static_cast<unsigned short>(listen_port);
@@ -70,7 +71,8 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         std::swap(ip_set, safe_ip_);
     }
     if (!safe_ip_.empty()) {
-        tzhttpd_log_alert("safe_ip not empty, totally contain %d items", static_cast<int>(safe_ip_.size()));
+        tzhttpd_log_alert("safe_ip not empty, totally contain %d items",
+                          static_cast<int>(safe_ip_.size()));
     }
 
     ConfUtil::conf_value(cfg, "http.backlog_size", backlog_size_);
@@ -200,15 +202,17 @@ bool HttpServer::init() {
     }
 
     ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.listen_port_);
-    tzhttpd_log_alert("create listen endpoint for %s:%d", conf_.bind_addr_.c_str(), conf_.listen_port_);
+    tzhttpd_log_alert("create listen endpoint for %s:%d",
+                      conf_.bind_addr_.c_str(), conf_.listen_port_);
 
     tzhttpd_log_debug("socket/session conn time_out: %ds, linger: %ds",
-              conf_.conn_time_out_.load(), conf_.conn_time_out_linger_.load());
+                      conf_.conn_time_out_.load(), conf_.conn_time_out_linger_.load());
     conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
-                              conf_.conn_time_out_, conf_.conn_time_out_linger_);
+                      conf_.conn_time_out_, conf_.conn_time_out_linger_);
 
-    tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s", conf_.ops_cancel_time_out_.load(),
-              conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
+    tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s",
+                      conf_.ops_cancel_time_out_.load(),
+                      conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
     if (conf_.http_service_speed_) {
         conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
@@ -222,7 +226,7 @@ bool HttpServer::init() {
             std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
     tzhttpd_log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
-              conf_.http_service_speed_.load());
+                      conf_.http_service_speed_.load());
 
     if (!io_service_threads_.init_threads(
         std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
@@ -273,21 +277,21 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
     if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
         tzhttpd_log_alert("=> update socket/session conn cancel time_out: from %d to %d",
-                  conf_.ops_cancel_time_out_.load(), conf.ops_cancel_time_out_.load());
+                          conf_.ops_cancel_time_out_.load(), conf.ops_cancel_time_out_.load());
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
     }
 
     // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了internal_manage管理页面可用
     if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
         tzhttpd_log_alert("=> update http_service_enabled: from %d to %d",
-                  conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
+                          conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
         conf_.http_service_enabled_ = conf.http_service_enabled_.load();
     }
 
     if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
 
         tzhttpd_log_alert("=> update http_service_speed: from %ld to %ld",
-                  conf_.http_service_speed_.load(), conf.http_service_speed_.load());
+                          conf_.http_service_speed_.load(), conf.http_service_speed_.load());
         conf_.http_service_speed_ = conf.http_service_speed_.load();
 
         if (conf.http_service_speed_) { // 首次启用
@@ -310,7 +314,8 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
     // 当前不支持缩减线程
     if (conf.io_thread_number_ > conf_.io_thread_number_) {
-        tzhttpd_log_alert("=> resize io_thread_num from %d to %d", conf_.io_thread_number_, conf.io_thread_number_);
+        tzhttpd_log_alert("=> resize io_thread_num from %d to %d",
+                          conf_.io_thread_number_, conf.io_thread_number_);
         conf_.io_thread_number_ = conf.io_thread_number_;
         if (io_service_threads_.resize_threads(conf_.io_thread_number_) != 0) {
             tzhttpd_log_err("resize io_thread_num may failed!");

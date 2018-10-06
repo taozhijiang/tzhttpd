@@ -7,7 +7,8 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 3. Connection can be keep-alived, and automatically timed out and be removed.   
 4. Support loading handlers through .so library, this feature simulates legacy CGI deployment conveniently. This library try its best loading and updating handler with less impact for others. And more amazing thing is that you can just build one tzhttpd instance and copy it everywhere, and write your handlers and build them to individual so, add them to configure files, just like plugins.   
 5. Based on Boost library and C++0x standard, so can used in legacy but widely-deploied RHEL-6.x environment.   
-6. Not buggy, and has stood tests in a way.    
+6. Support regex-based Http Basic Authorization support.
+7. Not buggy, and has stood tests in a way.
 
 ### Possible usage
 1. General Web server, KIDDING. TZHTTPD does not support full HTTP protocal, so it may not behave well in this situation. But I also add the VHost, Cache Control features, and my [homepage](http://taozj.net) is hosted by this, it works fine.   
@@ -21,16 +22,16 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 ### Manage URI
 ```bash
 # dynamic reload cfg
-curl 'http://127.0.0.1:18430/internal_manage?cmd=reload&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=reload'
 
 # disable & enable handler
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
 
 # steps to dynamic update handler from so, without impact other service
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
 cp libgetdemo.so ../cgi-bin 
-curl 'http://127.0.0.1:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+curl 'http://127.0.0.1:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
 ```
 
 ### NOTE

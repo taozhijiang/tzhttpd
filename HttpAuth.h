@@ -22,17 +22,23 @@ namespace tzhttpd {
 
 // 每个VHost持有一个，主要用户Http BasicAuth鉴权
 
+typedef std::vector<std::pair<UriRegex, std::set<std::string>>> HttpAuthContain;
+
 class HttpAuth {
 
 public:
     HttpAuth():
-        basic_auth_({}) {
+        basic_auth_(new HttpAuthContain()) {
     }
 
     bool init(const libconfig::Setting& setting){
 
-        if (!setting.exists("basic_auth"))
+        if (!setting.exists("basic_auth")) {
+            tzhttpd_log_err("configure does not contains basic_auth.");
             return false;
+        }
+
+        std::shared_ptr<HttpAuthContain> basic_auth_load(new HttpAuthContain());
 
         const libconfig::Setting& basic_auth = setting["basic_auth"];
         for(int i = 0; i < basic_auth.getLength(); ++i) {
@@ -72,18 +78,29 @@ public:
             }
 
             UriRegex rgx {auth_uri_regex};
-            basic_auth_.push_back({ auth_uri_regex, auth_set});
+            basic_auth_load->push_back({ auth_uri_regex, auth_set});
             tzhttpd_log_debug("success add %d auth items for %s.",
                               static_cast<int>(auth_set.size()), auth_uri_regex.c_str());
+        }
+
+        tzhttpd_log_debug("total auth rules count: %d",
+                          static_cast<int>(basic_auth_load->size()));
+
+        {
+            std::lock_guard<std::mutex> lock(lock_);
+            basic_auth_.swap(basic_auth_load);
         }
 
         return true;
     }
 
+
 public:
     bool check_basic_auth(const std::string& uri, const std::string& auth_str){
 
         std::string auth_code {};
+
+        // 获取Http Header Auth字段
         {
             std::vector<std::string> vec{};
             boost::split(vec, auth_str, boost::is_any_of(" \t\n"));
@@ -94,10 +111,16 @@ public:
 
         std::string pure_uri = StrUtil::pure_uri_path(uri);
 
+        std::shared_ptr<HttpAuthContain> auth_rule {};
+        {
+            std::lock_guard<std::mutex> lock(lock_);
+            auth_rule = basic_auth_;
+        }
+
         // 如果在控制条目中，没有检索到就判为失败
         std::vector<std::pair<UriRegex, std::set<std::string>>>::const_iterator it;
         boost::smatch what;
-        for (it = basic_auth_.cbegin(); it != basic_auth_.cend(); ++it) {
+        for (it = auth_rule->cbegin(); it != auth_rule->cend(); ++it) {
             if (boost::regex_match(pure_uri, what, it->first)) {
                 if (it->second.find(auth_code) == it->second.end())
                     return false;
@@ -108,7 +131,8 @@ public:
     }
 
 private:
-    std::vector<std::pair<UriRegex, std::set<std::string>>> basic_auth_;
+    mutable std::mutex lock_;
+    std::shared_ptr<HttpAuthContain> basic_auth_;
 };
 
 

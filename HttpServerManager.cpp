@@ -23,15 +23,17 @@ namespace tzhttpd {
 
 using namespace tzhttpd::http_proto;
 
-int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                                std::string& status_line, std::vector<std::string>& add_header) {
+int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser,
+                                                std::string& response,
+                                                std::string& status_line,
+                                                std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
     if (params.EMPTY() || !params.EXIST("cmd")) {
         tzhttpd_log_err("manage page param check failed!");
         response = http_proto::content_bad_request;
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_bad_request);
+                StatusCode::client_error_bad_request);
         return 0;
     }
 
@@ -108,7 +110,7 @@ int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, s
         if (response.empty() || status_line.empty()) {
             response = http_proto::content_error;
             status_line = generate_response_status_line(http_parser.get_version(),
-                                                        StatusCode::server_error_internal_server_error);
+                    StatusCode::server_error_internal_server_error);
         }
     }
 

@@ -260,7 +260,8 @@ private:
 
                     uri_ = normalize_request_uri(std::string(what[2]));
                     request_headers_.insert(std::make_pair(http_proto::header_options::request_uri, uri_));
-                    request_headers_.insert(std::make_pair(http_proto::header_options::http_version, boost::algorithm::trim_copy(std::string(what[3]))));
+                    request_headers_.insert(std::make_pair(http_proto::header_options::http_version,
+                                                           boost::algorithm::trim_copy(std::string(what[3]))));
 
                     version_ = boost::algorithm::trim_copy(std::string(what[3]));
                 }
