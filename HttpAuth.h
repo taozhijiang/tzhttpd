@@ -49,6 +49,7 @@ public:
             }
             std::string auth_uri_regex;
             ConfUtil::conf_value(basic_auth_item, "uri", auth_uri_regex);
+            auth_uri_regex = StrUtil::pure_uri_path(auth_uri_regex);
 
             std::set<std::string> auth_set{};
             const libconfig::Setting& auth = basic_auth_item["auth"];
@@ -78,7 +79,7 @@ public:
             }
 
             UriRegex rgx {auth_uri_regex};
-            basic_auth_load->push_back({ auth_uri_regex, auth_set});
+            basic_auth_load->push_back({rgx, auth_set});
             tzhttpd_log_debug("success add %d auth items for %s.",
                               static_cast<int>(auth_set.size()), auth_uri_regex.c_str());
         }
@@ -117,13 +118,17 @@ public:
             auth_rule = basic_auth_;
         }
 
-        // 如果在控制条目中，没有检索到就判为失败
+        // 在配置文件中按照优先级的顺序向下检索，如果发现请求URI匹配了正则表达式
+        // 如果检索到了账号，表示授权成功，返回true
+        // 否则拒绝本次请求，不再尝试后续表达式匹配
         std::vector<std::pair<UriRegex, std::set<std::string>>>::const_iterator it;
         boost::smatch what;
         for (it = auth_rule->cbegin(); it != auth_rule->cend(); ++it) {
             if (boost::regex_match(pure_uri, what, it->first)) {
                 if (it->second.find(auth_code) == it->second.end())
                     return false;
+                else
+                    return true;
             }
         }
 
