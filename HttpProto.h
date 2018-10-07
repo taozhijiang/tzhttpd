@@ -86,6 +86,7 @@ namespace http_proto {
 
         static const std::string host("Host");
         static const std::string accept("Accept");
+        static const std::string auth("Authorization");
         static const std::string range("Range");
         static const std::string cookie("Cookie");
         static const std::string referer("Referer");

@@ -25,7 +25,7 @@ namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.3.2";
+std::string              http_server_version = "1.3.3";
 } // end namespace http_handler
 
 
@@ -39,14 +39,16 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
     if (stat(regular_file_path.c_str(), &sb) == -1) {
         tzhttpd_log_err("Stat file error: %s", regular_file_path.c_str());
         response = http_proto::content_error;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::server_error_internal_server_error);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::server_error_internal_server_error);
         return false;
     }
 
     if (sb.st_size > 100*1024*1024 /*100M*/) {
         tzhttpd_log_err("Too big file size: %ld", sb.st_size);
         response = http_proto::content_bad_request;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::client_error_bad_request);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::client_error_bad_request);
         return false;
     }
 
@@ -55,7 +57,8 @@ static bool check_and_sendfile(const HttpParser& http_parser, std::string regula
     std::stringstream buffer;
     buffer << fin.rdbuf();
     response = buffer.str();
-    status_line = generate_response_status_line(http_parser.get_version(), StatusCode::success_ok);
+    status_line = generate_response_status_line(http_parser.get_version(),
+            StatusCode::success_ok);
 
     return true;
 }
@@ -70,13 +73,14 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
     }
 
     std::string real_file_path = http_docu_root_ +
-        "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
+            "/" + http_parser.find_request_header(http_proto::header_options::request_path_info);
 
     // check dest exist?
     if (::access(real_file_path.c_str(), R_OK) != 0) {
         tzhttpd_log_err("File not found: %s", real_file_path.c_str());
         response = http_proto::content_not_found;
-        status_line = generate_response_status_line(http_parser.get_version(), StatusCode::client_error_not_found);
+        status_line = generate_response_status_line(http_parser.get_version(),
+                StatusCode::client_error_not_found);
         return -1;
     }
 
@@ -86,7 +90,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
         tzhttpd_log_err("Stat file error: %s", real_file_path.c_str());
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
+                StatusCode::server_error_internal_server_error);
         return -1;
     }
 
@@ -120,7 +124,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
                     // default, 404
                     response = http_proto::content_not_found;
                     status_line = generate_response_status_line(http_parser.get_version(),
-                                                                StatusCode::client_error_not_found);
+                            StatusCode::client_error_not_found);
                 }
             }
             break;
@@ -170,18 +174,18 @@ int HttpHandler::http_redirect_handler(std::string red_code, std::string red_uri
 
     if (red_code == "301") {
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::redirection_moved_permanently);
+                StatusCode::redirection_moved_permanently);
         response = http_proto::content_301;
         add_header.push_back("Location: " + red_uri);
     } else if(red_code == "302"){
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::redirection_found);
+                StatusCode::redirection_found);
         response = http_proto::content_302;
         add_header.push_back("Location: " + red_uri);
     } else {
         tzhttpd_log_err("unknown red_code: %s", red_code.c_str());
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::server_error_internal_server_error);
+                StatusCode::server_error_internal_server_error);
         response = http_proto::content_error;
     }
 
@@ -205,7 +209,8 @@ int HttpHandler::register_http_get_handler(const std::string& uri_r, const HttpG
     }
 
     UriRegex rgx {uri};
-    HttpGetHandlerObjectPtr phandler_obj = std::make_shared<HttpGetHandlerObject>(uri, handler, built_in, working);
+    HttpGetHandlerObjectPtr phandler_obj =
+        std::make_shared<HttpGetHandlerObject>(uri, handler, *this, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] create get handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -234,7 +239,8 @@ int HttpHandler::register_http_post_handler(const std::string& uri_r, const Http
     }
 
     UriRegex rgx {uri};
-    HttpPostHandlerObjectPtr phandler_obj = std::make_shared<HttpPostHandlerObject>(uri, handler, built_in, working);
+    HttpPostHandlerObjectPtr phandler_obj =
+        std::make_shared<HttpPostHandlerObject>(uri, handler, *this, built_in, working);
     if (!phandler_obj) {
         tzhttpd_log_err("[vhost:%s] Create post handler object for %s failed.",
                         vhost_name_.c_str(), uri.c_str());
@@ -296,8 +302,8 @@ int HttpHandler::find_http_post_handler(std::string uri, HttpPostHandlerObjectPt
 }
 
 
-int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string& key,
-                           std::map<std::string, std::string>& path_map) {
+int HttpHandler::do_parse_handler(const libconfig::Setting& setting, const std::string& key,
+                                  std::map<std::string, HandlerCfg>& handleCfg) {
 
     if (!setting.exists(key)) {
         tzhttpd_log_notice("[vhost:%s] handlers for %s not found!",
@@ -305,7 +311,7 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
         return 0;
     }
 
-    path_map.clear();
+    handleCfg.clear();
     int ret_code = 0;
     try {
 
@@ -328,11 +334,15 @@ int HttpHandler::parse_cfg(const libconfig::Setting& setting, const std::string&
 
             tzhttpd_log_debug("[vhost:%s] detect handler uri:%s, dl_path:%s",
                               vhost_name_.c_str(), uri_path.c_str(), dl_path.c_str());
-            path_map[uri_path] = dl_path;
+
+            HandlerCfg cfg;
+            cfg.url_ = uri_path;
+            cfg.dl_path_ = dl_path;
+
+            handleCfg[uri_path] = cfg;
         }
     } catch (...) {
-        tzhttpd_log_err("[vhost:%s] Parse %s error!!!",
-                        vhost_name_.c_str(), key.c_str());
+        tzhttpd_log_err("[vhost:%s] Parse %s error!!!", vhost_name_.c_str(), key.c_str());
         ret_code --;
     }
 
@@ -343,24 +353,26 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
     int ret_code = 0;
     std::string key;
-    std::map<std::string, std::string> path_map {};
+    std::map<std::string, HandlerCfg> path_map {};
 
     key = "cgi_get_handlers";
     path_map.clear();
-    ret_code += parse_cfg(setting, key, path_map);
+    ret_code += do_parse_handler(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
-        // we will not override handler directly, consider using /manage
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
         if (check_exist_http_get_handler(iter->first)) {
             tzhttpd_log_alert("[vhost:%s] HttpGet for %s already exists, skip it.",
                               vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
-        http_handler::CgiGetWrapper getter(iter->second);
+        http_handler::CgiGetWrapper getter(iter->second.dl_path_);
         if (!getter.init()) {
             tzhttpd_log_err("[vhost:%s] init get for %s @ %s failed, skip it!",
-                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
+                            vhost_name_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
             ret_code --;
             continue;
         }
@@ -371,25 +383,40 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
     key = "cgi_post_handlers";
     path_map.clear();
-    ret_code += parse_cfg(setting, key, path_map);
+    ret_code += do_parse_handler(setting, key, path_map);
     for (auto iter = path_map.cbegin(); iter != path_map.cend(); ++ iter) {
 
-        // we will not override handler directly, consider using /manage
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
         if (check_exist_http_post_handler(iter->first)) {
             tzhttpd_log_alert("[vhost:%s] HttpPost for %s already exists, skip it.",
                               vhost_name_.c_str(), iter->first.c_str());
             continue;
         }
 
-        http_handler::CgiPostWrapper poster(iter->second);
+        http_handler::CgiPostWrapper poster(iter->second.dl_path_);
         if (!poster.init()) {
             tzhttpd_log_err("[vhost:%s] init post for %s @ %s failed, skip it!",
-                            vhost_name_.c_str(), iter->first.c_str(), iter->second.c_str());
+                            vhost_name_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
             ret_code --;
             continue;
         }
 
         register_http_post_handler(iter->first, poster, false);
+    }
+
+
+    // for http auth dynamic load
+    if (setting.exists("basic_auth")) {
+        if (!http_auth_) {
+            http_auth_.reset(new HttpAuth());
+        }
+
+        if (!http_auth_ || !http_auth_->init(setting)) {
+            tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
+            ret_code --;
+        }
     }
 
     return ret_code;

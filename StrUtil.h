@@ -10,6 +10,8 @@
 
 #include <libconfig.h++>
 
+
+#include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -120,6 +122,22 @@ struct ConfUtil {
         return true;
     }
 
+};
+
+
+
+class UriRegex: public boost::regex {
+public:
+    explicit UriRegex(const std::string& regexStr) :
+        boost::regex(regexStr), str_(regexStr) {
+    }
+
+    std::string str() const {
+        return str_;
+    }
+
+private:
+    std::string str_;
 };
 
 

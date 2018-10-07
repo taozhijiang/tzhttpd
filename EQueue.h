@@ -30,6 +30,13 @@ public:
         item_notify_.notify_one();
     }
 
+    template< typename InputIt >
+    void PUSH(InputIt first, InputIt last) {
+        std::lock_guard<std::mutex> lock(lock_);
+        items_.insert(items_.end(), first, last);
+        item_notify_.notify_all();
+    }
+
     void POP(T& t) {
         t = POP();
     }
@@ -43,6 +50,20 @@ public:
         T t = items_.front();
         items_.pop_front();
         return t;
+    }
+
+    size_t TRY_POP(std::vector<T>& vec) {
+        std::unique_lock<std::mutex> lock(lock_);
+
+        if (items_.empty()) {
+            return 0;
+        }
+
+        vec.clear();
+        vec.assign(items_.begin(), items_.end());
+        items_.clear();
+
+        return vec.size();
     }
 
     size_t POP(std::vector<T>& vec, size_t max_count, uint64_t msec) {
@@ -72,7 +93,6 @@ check:
     bool POP(T& t, uint64_t msec) {
         std::unique_lock<std::mutex> lock(lock_);
 
-        // if(!item_notify_.timed_wait(lock, timeout, std::bind(&EQueue::EMPTY, this))){
         while (items_.empty()) {
             if (!item_notify_.wait_for(lock, std::chrono::milliseconds(msec))){
                 goto check;

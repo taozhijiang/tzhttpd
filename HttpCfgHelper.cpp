@@ -44,18 +44,18 @@ bool HttpCfgHelper::init(const std::string& cfgfile) {
 int HttpCfgHelper::update_runtime_cfg() {
 
     if (cfgfile_.empty()) {
-        tzhttpd_log_err("cfg_file is empty, may not init HttpCfgHelper ? ...");
+        tzhttpd_log_err("cfg_file is empty, may not init HttpCfgHelper ???");
         return -1;
     }
 
     if (in_process_) {
-        tzhttpd_log_err("!!! already in apply configure process, please try it later!");
+        tzhttpd_log_err("!!! already in process, please try again later!");
         return 0;
     }
 
     auto cfg = load_cfg_file();
     if (!cfg) {
-        tzhttpd_log_err("load config file %s failed!", cfgfile_.c_str());
+        tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
         return false;
     }
 

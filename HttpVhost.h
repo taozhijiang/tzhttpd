@@ -33,19 +33,13 @@ private:
 
 public:
 
-    // register handler in default_vhost_
-    int register_http_get_handler(std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
-        return default_vhost_->register_http_get_handler(uri_regex, handler, built_in);
-    }
-
-    int register_http_post_handler(std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
-        return default_vhost_->register_http_post_handler(uri_regex, handler, built_in);
-    }
-
-
     // register handler in specified vhost
-    int register_http_get_handler(std::string vhost,
-                                  std::string uri_regex, const HttpGetHandler& handler, bool built_in) {
+    int register_http_get_handler(std::string vhost, std::string uri_regex, const HttpGetHandler& handler,
+                                  bool built_in) {
+        if (vhost.empty()) {
+            return default_vhost_->register_http_get_handler(uri_regex, handler, built_in);
+        }
+
         vhost = StrUtil::drop_host_port(vhost);
         auto iter = vhosts_.find(vhost);
         if (iter != vhosts_.end()) {
@@ -55,8 +49,12 @@ public:
         return -1;
     }
 
-    int register_http_post_handler(std::string vhost,
-                                   std::string uri_regex, const HttpPostHandler& handler, bool built_in) {
+    int register_http_post_handler(std::string vhost, std::string uri_regex, const HttpPostHandler& handler,
+                                   bool built_in) {
+        if (vhost.empty()) {
+            return default_vhost_->register_http_post_handler(uri_regex, handler, built_in);
+        }
+
         vhost = StrUtil::drop_host_port(vhost);
         auto iter = vhosts_.find(vhost);
         if (iter != vhosts_.end()) {
@@ -162,9 +160,9 @@ private:
 
     // impl in HttpServerManager.cpp
     //
-    // @/internal_manage?cmd=xxx&auth=d44bfc666db304b2f72b4918c8b46f78
+    // @/internal_manage?cmd=xxx
     int internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                         std::string& status_line, std::vector<std::string>& add_header);
+            std::string& status_line, std::vector<std::string>& add_header);
 
 };
 

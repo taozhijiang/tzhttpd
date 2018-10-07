@@ -6,6 +6,7 @@
  */
 
 #include "HttpVhost.h"
+#include "CryptoUtil.h"
 
 namespace tzhttpd {
 
@@ -64,17 +65,25 @@ bool HttpVhost::init(const libconfig::Config& cfg) {
         return false;
     }
 
-    tzhttpd_log_alert("Already configured(registered) vhost (except default) count: %d", static_cast<int>(vhosts_.size()));
+    tzhttpd_log_alert("Already configured(registered) vhost (except default) count: %d",
+                      static_cast<int>(vhosts_.size()));
     int i = 0;
     for (auto iter = vhosts_.cbegin(); iter != vhosts_.cend(); ++iter) {
         tzhttpd_log_alert("%d: %s", ++i, iter->first.c_str());
     }
 
     // only for default vhost, add manage interface
-    if (register_http_get_handler("^/internal_manage$",
+    std::set<std::string> control_auth_set{};
+    std::string control_auth_str;
+    ConfUtil::conf_value(cfg,"http.control_auth", control_auth_str);
+    if (!control_auth_str.empty()) {
+        control_auth_set.insert(CryptoUtil::base64_encode(control_auth_str));
+    }
+    if (default_vhost_->register_http_get_handler("^/internal_manage$",
                                   std::bind(&HttpVhost::internal_manage_http_get_handler, this,
                                             std::placeholders::_1, std::placeholders::_2,
-                                            std::placeholders::_3, std::placeholders::_4), true) != 0) {
+                                            std::placeholders::_3, std::placeholders::_4),
+                                  true) != 0) {
         tzhttpd_log_err("Http default vhost register manage page failed!");
         return false;
     }

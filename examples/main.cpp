@@ -1,3 +1,6 @@
+#include <unistd.h>
+#include <sstream>
+
 #include <syslog.h>
 #include <cstdio>
 #include <libconfig.h++>
@@ -19,11 +22,53 @@ int get_test_handler(const HttpParser& http_parser,
     return 0;
 }
 
+namespace http_handler {
+extern std::string http_server_version;
 }
+
+} // end namespace tzhttpd
+
+extern char * program_invocation_short_name;
+static void usage() {
+    std::stringstream ss;
+
+    ss << program_invocation_short_name << ":" << std::endl;
+    ss << "\t -c cfgFile  specify config file, default httpsrv.conf. " << std::endl;
+    ss << "\t -d          daemonize service." << std::endl;
+    ss << "\t -v          print version info." << std::endl;
+    ss << std::endl;
+
+    std::cout << ss.str();
+}
+
+char cfgFile[PATH_MAX] = "httpsrv.conf";
+bool daemonize = false;
 
 int main(int argc, char* argv[]) {
 
-    std::string cfgfile = "httpsrv.conf";
+    int opt_g = 0;
+    while( (opt_g = getopt(argc, argv, "c:dhv")) != -1 ) {
+        switch(opt_g)
+        {
+            case 'c':
+                memset(cfgFile, 0, sizeof(cfgFile));
+                strncpy(cfgFile, optarg, PATH_MAX);
+                break;
+            case 'd':
+                daemonize = true;
+                break;
+            case 'v':
+                std::cout << program_invocation_short_name << ": "
+                    << tzhttpd::http_handler::http_server_version << std::endl;
+                break;
+            case 'h':
+            default:
+                usage();
+                ::exit(EXIT_SUCCESS);
+        }
+    }
+
+
     libconfig::Config cfg;
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
 
@@ -31,7 +76,24 @@ int main(int argc, char* argv[]) {
     tzhttpd::set_checkpoint_log_store_func(syslog);
     tzhttpd::tzhttpd_log_init(7);
 
-    http_server_ptr.reset(new tzhttpd::HttpServer(cfgfile, "example_main"));
+    // daemonize should before any thread creation...
+    if (daemonize) {
+        std::cout << "We will daemonize this service..." << std::endl;
+        tzhttpd::tzhttpd_log_notice("We will daemonize this service...");
+
+        bool chdir = false; // leave the current working directory in case
+                            // the user has specified relative paths for
+                            // the config file, etc
+        bool close = true;  // close stdin, stdout, stderr
+        if (::daemon(!chdir, !close) != 0) {
+            tzhttpd::tzhttpd_log_err("Call to daemon() failed: %s", strerror(errno));
+            std::cout << "Call to daemon() failed: " << strerror(errno) << std::endl;
+            ::exit(EXIT_FAILURE);
+        }
+    }
+
+
+    http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
     if (!http_server_ptr || !http_server_ptr->init()) {
         fprintf(stderr, "Init HttpServer failed!");
         return false;

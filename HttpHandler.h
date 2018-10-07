@@ -13,9 +13,6 @@
 #include <xtra_rhel6.h>
 
 #include <libconfig.h++>
-
-#include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "StrUtil.h"
@@ -25,10 +22,12 @@
 #include "SlibLoader.h"
 
 #include "HttpCfgHelper.h"
+#include "HttpAuth.h"
 
 namespace tzhttpd {
 
 class HttpParser;
+class HttpHandler;
 
 typedef std::function<int (const HttpParser& http_parser, \
                            std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpGetHandler;
@@ -46,13 +45,18 @@ struct HttpHandlerObject {
     boost::atomic<bool>    working_;       //  启用，禁用等标记
 
     T handler_;
+    const HttpHandler&     vhost_;
 
-    explicit HttpHandlerObject(const std::string& path, const T& t,
-                               bool built_in = false, bool working = true):
+    HttpHandlerObject(const std::string& path, const T& t,
+                      const HttpHandler& vhost,
+                      bool built_in = false, bool working = true):
         path_(path),
         built_in_(built_in), success_cnt_(0), fail_cnt_(0), working_(working),
-        handler_(t) {
+        handler_(t),
+        vhost_(vhost) {
     }
+
+    bool check_basic_auth(const std::string& uri, const std::string auth_str) const;
 };
 
 typedef HttpHandlerObject<HttpGetHandler>  HttpGetHandlerObject;
@@ -62,22 +66,10 @@ typedef std::shared_ptr<HttpGetHandlerObject>  HttpGetHandlerObjectPtr;
 typedef std::shared_ptr<HttpPostHandlerObject> HttpPostHandlerObjectPtr;
 
 
-class UriRegex: public boost::regex {
-public:
-    explicit UriRegex(const std::string& regexStr) :
-        boost::regex(regexStr), str_(regexStr) {
-    }
-
-    std::string str() const {
-        return str_;
-    }
-
-private:
-    std::string str_;
-};
-
 
 class HttpHandler {
+
+    friend class HttpVhost;
 
 public:
 
@@ -85,14 +77,14 @@ public:
         vhost_name_({}) {
     }
 
-    explicit HttpHandler(std::string vhost, const std::string& redirect):
+    HttpHandler(std::string vhost, const std::string& redirect):
         vhost_name_({}), http_docu_root_({}),
         http_docu_index_({}), redirect_str_(redirect) {
         vhost_name_ = StrUtil::drop_host_port(vhost);
     }
 
-    explicit HttpHandler(std::string vhost,
-                         const std::string& docu_root, const std::vector<std::string>& docu_index):
+    HttpHandler(std::string vhost,
+                const std::string& docu_root, const std::vector<std::string>& docu_index):
         vhost_name_({}), http_docu_root_(docu_root),
         http_docu_index_(docu_index), redirect_str_({}) {
         vhost_name_ = StrUtil::drop_host_port(vhost);
@@ -116,18 +108,24 @@ public:
                 return false;
             }
 
-            http_redirect_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[redirect]",
-                                                   std::bind(&HttpHandler::http_redirect_handler, this,
-                                                             code, uri,
-                                                             std::placeholders::_1, dummy_post,
-                                                             std::placeholders::_2,
-                                                             std::placeholders::_3, std::placeholders::_4 ), true);
-            http_redirect_post_phandler_obj_ = std::make_shared<HttpPostHandlerObject>("[redirect]",
-                                                   std::bind(&HttpHandler::http_redirect_handler, this,
-                                                             code, uri,
-                                                             std::placeholders::_1, std::placeholders::_2,
-                                                             std::placeholders::_3, std::placeholders::_4,
-                                                             std::placeholders::_5 ), true);
+            http_redirect_get_phandler_obj_ =
+                std::make_shared<HttpGetHandlerObject>("[redirect]",
+                        std::bind(&HttpHandler::http_redirect_handler, this,
+                                 code, uri,
+                                 std::placeholders::_1, dummy_post,
+                                 std::placeholders::_2,
+                                 std::placeholders::_3, std::placeholders::_4 ),
+                        *this, true);
+
+            http_redirect_post_phandler_obj_ =
+                std::make_shared<HttpPostHandlerObject>("[redirect]",
+                        std::bind(&HttpHandler::http_redirect_handler, this,
+                                 code, uri,
+                                 std::placeholders::_1, std::placeholders::_2,
+                                 std::placeholders::_3, std::placeholders::_4,
+                                 std::placeholders::_5 ),
+                        *this, true);
+
             if (!http_redirect_get_phandler_obj_ || !http_redirect_post_phandler_obj_) {
                 tzhttpd_log_err("Create redirect handler for %s failed!", vhost_name_.c_str());
                 return false;
@@ -140,10 +138,12 @@ public:
         }
 
 
-        default_http_get_phandler_obj_ = std::make_shared<HttpGetHandlerObject>("[default]",
-                                               std::bind(&HttpHandler::default_http_get_handler, this,
-                                                         std::placeholders::_1, std::placeholders::_2,
-                                                         std::placeholders::_3, std::placeholders::_4 ), true);
+        default_http_get_phandler_obj_ =
+            std::make_shared<HttpGetHandlerObject>("[default]",
+                    std::bind(&HttpHandler::default_http_get_handler, this,
+                         std::placeholders::_1, std::placeholders::_2,
+                         std::placeholders::_3, std::placeholders::_4 ),
+                    *this, true);
         if (!default_http_get_phandler_obj_) {
             tzhttpd_log_err("Create default get handler for %s failed!", vhost_name_.c_str());
             return false;
@@ -185,6 +185,14 @@ public:
             }
         }
 
+        if (setting.exists("basic_auth")) {
+            http_auth_.reset(new HttpAuth());
+            if (!http_auth_ || !http_auth_->init(setting)) {
+                tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -221,16 +229,29 @@ public:
         }
 
         std::string uri = StrUtil::pure_uri_path(uri_r);
-        std::string key = "http.cgi_get_handlers";
-        std::map<std::string, std::string> path_map {};
-        // TODO
-//        parse_cfg(*cfg_ptr, key, path_map);
-        if (path_map.find(uri) == path_map.end()) {
+        std::map<std::string, HandlerCfg> path_map {};
+
+        // 找到当前vhost的配置
+        const libconfig::Setting &http_vhosts = cfg_ptr->lookup("http.vhost");
+        for(int i = 0; i < http_vhosts.getLength(); ++i) {
+
+            const libconfig::Setting& http_vhost = http_vhosts[i];
+            std::string server_name {};
+            ConfUtil::conf_value(http_vhost,"server_name", server_name);
+
+            if (server_name == get_vhost_name()) {
+                do_parse_handler(http_vhost, "cgi_get_handlers", path_map);
+                break;
+            }
+        }
+
+        auto handlerCfg = path_map.find(uri);
+        if (handlerCfg == path_map.end()) {
             tzhttpd_log_err("find get dl path error for: %s", uri.c_str());
             return -2;
         }
-        std::string dl_path = path_map.at(uri);
 
+        std::string dl_path = handlerCfg->second.dl_path_;
         if(do_unload_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_) != 0) {
             tzhttpd_log_err("unload get handler for %s failed!", uri.c_str());
             return -3;
@@ -257,20 +278,33 @@ public:
             return -1;
         }
 
+
         std::string uri = StrUtil::pure_uri_path(uri_r);
-        std::string key = "http.cgi_post_handlers";
-        std::map<std::string, std::string> path_map {};
-        // TODO
- //       parse_cfg(*cfg_ptr, key, path_map);
-        if (path_map.find(uri) == path_map.end()) {
-            tzhttpd_log_err("find post dl path error for: %s", uri.c_str());
+        std::map<std::string, HandlerCfg> path_map {};
+
+        // 找到当前vhost的配置
+        const libconfig::Setting &http_vhosts = cfg_ptr->lookup("http.vhost");
+        for(int i = 0; i < http_vhosts.getLength(); ++i) {
+
+            const libconfig::Setting& http_vhost = http_vhosts[i];
+            std::string server_name {};
+            ConfUtil::conf_value(http_vhost,"server_name", server_name);
+
+            if (server_name == get_vhost_name()) {
+                do_parse_handler(http_vhost, "cgi_post_handlers", path_map);
+                break;
+            }
+        }
+
+        auto handlerCfg = path_map.find(uri);
+        if (handlerCfg == path_map.end()) {
+            tzhttpd_log_err("find get dl path error for: %s", uri.c_str());
             return -2;
         }
 
-        std::string dl_path = path_map.at(uri);
-
-        if(do_unload_http_handler<HttpGetHandlerObjectPtr>(uri_r, on, get_handler_) != 0) {
-            tzhttpd_log_err("unload get handler for %s failed!", uri.c_str());
+        std::string dl_path = handlerCfg->second.dl_path_;
+        if(do_unload_http_handler<HttpPostHandlerObjectPtr>(uri_r, on, post_handler_) != 0) {
+            tzhttpd_log_err("unload post handler for %s failed!", uri.c_str());
             return -3;
         }
 
@@ -286,17 +320,22 @@ public:
         return 0;
     }
 
-
-    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler,
-                                  bool built_in, bool working = true);
-    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler,
-                                   bool built_in, bool working = true);
-
     // uri match
     int find_http_get_handler(std::string uri, HttpGetHandlerObjectPtr& phandler_obj);
     int find_http_post_handler(std::string uri, HttpPostHandlerObjectPtr& phandler_obj);
 
     int update_runtime_cfg(const libconfig::Setting& setting);
+
+    int register_http_get_handler(const std::string& uri_r, const HttpGetHandler& handler, bool built_in,
+                                  bool working = true);
+    int register_http_post_handler(const std::string& uri_r, const HttpPostHandler& handler, bool built_in,
+                                   bool working = true);
+
+    bool check_basic_auth(const std::string& uri, const std::string& auth_str) const {
+        if (!http_auth_)
+            return true;
+        return http_auth_->check_basic_auth(uri, auth_str);
+    }
 
 private:
     template<typename T>
@@ -307,6 +346,14 @@ private:
 
     template<typename Ptr, typename T>
     int do_unload_http_handler(const std::string& uri_r, bool on, T& handlers);
+
+    struct HandlerCfg {
+        std::string url_;
+        std::string dl_path_;
+    };
+
+    int do_parse_handler(const libconfig::Setting& setting, const std::string& key,
+                         std::map<std::string, HandlerCfg>& handlerCfg);
 
 private:
 
@@ -329,8 +376,6 @@ private:
     std::shared_ptr<HttpGetHandlerObject> http_redirect_get_phandler_obj_;
     std::shared_ptr<HttpPostHandlerObject> http_redirect_post_phandler_obj_;
 
-    int parse_cfg(const libconfig::Setting& setting, const std::string& key, std::map<std::string, std::string>& path_map);
-
 
     // 使用vector保存handler，保证是先注册handler具有高优先级
     boost::shared_mutex rwlock_;
@@ -339,6 +384,7 @@ private:
 
     std::map<std::string, std::string> cache_controls_;
 
+    std::unique_ptr<HttpAuth> http_auth_;
 };
 
 
@@ -436,6 +482,13 @@ int HttpHandler::do_unload_http_handler(const std::string& uri_r, bool on, T& ha
     }
 
     return 0;
+}
+
+
+
+template<typename T>
+bool HttpHandlerObject<T>::check_basic_auth(const std::string& uri, const std::string auth_str) const {
+    return vhost_.check_basic_auth(uri, auth_str);
 }
 
 } // end namespace tzhttpd

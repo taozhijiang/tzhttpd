@@ -151,6 +151,13 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             goto write_return;
         }
 
+        if (!phandler_obj->check_basic_auth(real_path_info,
+                                            http_parser_.find_request_header(http_proto::header_options::auth))) {
+            tzhttpd_log_err("basic_auth for %s failed ...", real_path_info.c_str());
+            fill_std_http_for_send(http_proto::StatusCode::client_error_unauthorized);
+            goto write_return;
+        }
+
         {
             std::string key = "GET_" + phandler_obj->path_;
             CountPerfByMs call_perf { key };
@@ -308,12 +315,20 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                 goto write_return;
             }
 
+            if (!phandler_obj->check_basic_auth(real_path_info,
+                                                http_parser_.find_request_header(http_proto::header_options::auth))) {
+                tzhttpd_log_err("basic_auth for %s failed ...", real_path_info.c_str());
+                fill_std_http_for_send(http_proto::StatusCode::client_error_unauthorized);
+                goto write_return;
+            }
+
             {
                 std::string key = "POST_" + phandler_obj->path_;
                 CountPerfByMs call_perf { key };
 
                 // just call it!
-                int call_code = phandler_obj->handler_(http_parser_, std::string(p_buffer_->data(), r_size_), response_body,
+                int call_code = phandler_obj->handler_(http_parser_,
+                                                       std::string(p_buffer_->data(), r_size_), response_body,
                                                        response_status, response_header); // call it!
                 if (call_code == 0) {
                     ++ phandler_obj->success_cnt_;

@@ -23,23 +23,17 @@ namespace tzhttpd {
 
 using namespace tzhttpd::http_proto;
 
-int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, std::string& response,
-                                                std::string& status_line, std::vector<std::string>& add_header) {
+int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser,
+                                                std::string& response,
+                                                std::string& status_line,
+                                                std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
-    if (params.EMPTY() || !params.EXIST("cmd") || !params.EXIST("auth")) {
+    if (params.EMPTY() || !params.EXIST("cmd")) {
         tzhttpd_log_err("manage page param check failed!");
         response = http_proto::content_bad_request;
         status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_bad_request);
-        return 0;
-    }
-
-    if (params.VALUE("auth") != "d44bfc666db304b2f72b4918c8b46f78") {
-        tzhttpd_log_err("auth check failed!");
-        response = http_proto::content_forbidden;
-        status_line = generate_response_status_line(http_parser.get_version(),
-                                                    StatusCode::client_error_forbidden);
+                StatusCode::client_error_bad_request);
         return 0;
     }
 
@@ -75,9 +69,9 @@ int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, s
     } else if (cmd == "update_handler") {
 
         //
-        // curl 'http://172.16.10.137:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // curl 'http://172.16.10.137:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
         // cp libgetdemo.so ../cgi-bin
-        // curl 'http://172.16.10.137:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on&auth=d44bfc666db304b2f72b4918c8b46f78'
+        // curl 'http://172.16.10.137:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
         // curl 'http://172.16.10.137:18430/cgi-bin/getdemo.cgi'
 
         // 更新 non-build_in uri
@@ -116,7 +110,7 @@ int HttpVhost::internal_manage_http_get_handler(const HttpParser& http_parser, s
         if (response.empty() || status_line.empty()) {
             response = http_proto::content_error;
             status_line = generate_response_status_line(http_parser.get_version(),
-                                                        StatusCode::server_error_internal_server_error);
+                    StatusCode::server_error_internal_server_error);
         }
     }
 
