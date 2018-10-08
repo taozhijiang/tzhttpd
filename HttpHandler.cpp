@@ -413,7 +413,7 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
             http_auth_.reset(new HttpAuth());
         }
 
-        if (!http_auth_ || !http_auth_->init(setting)) {
+        if (!http_auth_ || !http_auth_->init(setting, false)) {
             tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
             ret_code --;
         }

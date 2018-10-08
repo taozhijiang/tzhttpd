@@ -187,7 +187,7 @@ public:
 
         if (setting.exists("basic_auth")) {
             http_auth_.reset(new HttpAuth());
-            if (!http_auth_ || !http_auth_->init(setting)) {
+            if (!http_auth_ || !http_auth_->init(setting, true)) {
                 tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
                 return false;
             }

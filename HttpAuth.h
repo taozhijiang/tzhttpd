@@ -31,7 +31,7 @@ public:
         basic_auth_(new HttpAuthContain()) {
     }
 
-    bool init(const libconfig::Setting& setting){
+    bool init(const libconfig::Setting& setting, bool critical){
 
         if (!setting.exists("basic_auth")) {
             tzhttpd_log_err("configure does not contains basic_auth.");
@@ -62,8 +62,13 @@ public:
                 ConfUtil::conf_value(auth_acct, "passwd", auth_passwd);
 
                 if (auth_user.empty() || auth_passwd.empty()) {
-                    tzhttpd_log_err("skip err account item %s ....", auth_user.c_str());
-                    continue;
+                    if (critical) {
+                        tzhttpd_log_err("err account item %s ....", auth_user.c_str());
+                        return false;
+                    } else {
+                        tzhttpd_log_err("skip err account item %s ....", auth_user.c_str());
+                        continue;
+                    }
                 }
 
                 std::string auth_str = auth_user + ":" + auth_passwd;
@@ -74,8 +79,8 @@ public:
             }
 
             if (auth_set.empty()) {
-                tzhttpd_log_notice("empty ruleset for %s", auth_uri_regex.c_str());
-                continue;
+                tzhttpd_log_notice("empty ruleset for %s, we will allow all access",
+                                   auth_uri_regex.c_str());
             }
 
             UriRegex rgx {auth_uri_regex};
@@ -125,6 +130,13 @@ public:
         boost::smatch what;
         for (it = auth_rule->cbegin(); it != auth_rule->cend(); ++it) {
             if (boost::regex_match(pure_uri, what, it->first)) {
+
+                // empty auth, we will allow all access
+                if (it->second.empty()) {
+                    return true;
+                }
+
+                // normal rule check
                 if (it->second.find(auth_code) == it->second.end())
                     return false;
                 else
@@ -136,7 +148,7 @@ public:
     }
 
 private:
-    mutable std::mutex lock_;
+    std::mutex lock_;
     std::shared_ptr<HttpAuthContain> basic_auth_;
 };
 

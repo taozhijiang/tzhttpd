@@ -7,7 +7,7 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 3. Connection can be keep-alived, and automatically timed out and be removed.   
 4. Support loading handlers through .so library, this feature simulates legacy CGI deployment conveniently. This library try its best loading and updating handler with less impact for others. And more amazing thing is that you can just build one tzhttpd instance and copy it everywhere, and write your handlers and build them to individual so, add them to configure files, just like plugins.   
 5. Based on Boost library and C++0x standard, so can used in legacy but widely-deploied RHEL-6.x environment.   
-6. Support regex-based Http Basic Authorization support.
+6. Support regex-based Http Basic Authorization.   
 7. Not buggy, and has stood tests in a way.
 
 ### Possible usage
