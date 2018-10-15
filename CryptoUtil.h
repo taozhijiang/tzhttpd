@@ -20,6 +20,8 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
+#include <cryptopp/gzip.h>
+
 // 类静态函数可以直接将函数定义丢在头文件中
 
 namespace tzhttpd {
@@ -254,6 +256,76 @@ static std::string url_decode(const std::string& src) noexcept {
     }
 
     return result;
+}
+
+static int Gzip(const std::string& src, std::string& store) {
+
+    CryptoPP::Gzip zipper;
+
+    zipper.Put((byte*)src.data(), src.size());
+    zipper.MessageEnd();
+
+    CryptoPP::word64 avail = zipper.MaxRetrievable();
+    if(avail) {
+        store.resize(avail);
+        zipper.Get((byte*)&store[0], store.size());
+        return 0;
+    }
+
+    return -1;
+}
+
+
+
+static int Gunzip(const std::string& src, std::string& store) {
+
+    CryptoPP::Gunzip unzipper;
+
+    unzipper.Put((byte*)src.data(), src.size());
+    unzipper.MessageEnd();
+
+    CryptoPP::word64 avail = unzipper.MaxRetrievable();
+    if(avail) {
+        store.resize(avail);
+        unzipper.Get((byte*)&store[0], store.size());
+        return 0;
+    }
+
+    return -1;
+}
+
+static int Deflator(const std::string& src, std::string& store) {
+
+    CryptoPP::Deflator zipper;
+
+    zipper.Put((byte*)src.data(), src.size());
+    zipper.MessageEnd();
+
+    CryptoPP::word64 avail = zipper.MaxRetrievable();
+    if(avail) {
+        store.resize(avail);
+        zipper.Get((byte*)&store[0], store.size());
+        return 0;
+    }
+
+    return -1;
+}
+
+static int Inflator(const std::string& src, std::string& store) {
+
+    CryptoPP::Inflator unzipper;
+
+    unzipper.Put((byte*)src.data(), src.size());
+    unzipper.MessageEnd();
+
+    CryptoPP::word64 avail = unzipper.MaxRetrievable();
+    if(avail) {
+        store.resize(avail);
+        unzipper.Get((byte*)&store[0], store.size());
+        return 0;
+    }
+
+    return -1;
 }
 
 
