@@ -170,14 +170,20 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
                 ++ phandler_obj->fail_cnt_;
                 call_perf.set_error();
             }
+
+            if (response_status.empty()) {
+                if(call_code == 0) {
+                    tzhttpd_log_notice("response_status empty, call_code == 0, default success.");
+                    fill_std_http_for_send(http_proto::StatusCode::success_ok);
+                } else {
+                    tzhttpd_log_notice("response_status empty, call_code == %d, default error.", call_code);
+                    fill_std_http_for_send(http_proto::StatusCode::server_error_internal_server_error);
+                }
+            } else {
+                fill_http_for_send(response_body, response_status, response_header);
+            }
         }
 
-        if (response_body.empty() || response_status.empty()) {
-            tzhttpd_log_err("caller not generate response body!");  // default status OK
-            fill_std_http_for_send(http_proto::StatusCode::success_ok);
-        } else {
-            fill_http_for_send(response_body, response_status, response_header);
-        }
 
         goto write_return;
 
@@ -336,14 +342,21 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                     ++ phandler_obj->fail_cnt_;
                     call_perf.set_error();
                 }
+
+                if (response_status.empty()) {
+                    if(call_code == 0) {
+                        tzhttpd_log_notice("response_status empty, call_code == 0, default success.");
+                        fill_std_http_for_send(http_proto::StatusCode::success_ok);
+                    } else {
+                        tzhttpd_log_notice("response_status empty, call_code == %d, default error.", call_code);
+                        fill_std_http_for_send(http_proto::StatusCode::server_error_internal_server_error);
+                    }
+                } else {
+                    fill_http_for_send(response_body, response_status, response_header);
+                }
+
             }
 
-            if (response_body.empty() || response_status.empty()) {
-                tzhttpd_log_err("caller not generate response body!");
-                fill_std_http_for_send(http_proto::StatusCode::success_ok);
-            } else {
-                fill_http_for_send(response_body, response_status, response_header);
-            }
         } else {
             tzhttpd_log_err("real_path_info %s found, but handler empty!", real_path_info.c_str());
             fill_std_http_for_send(http_proto::StatusCode::client_error_bad_request);

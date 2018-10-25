@@ -187,10 +187,29 @@ public:
 
         if (setting.exists("basic_auth")) {
             http_auth_.reset(new HttpAuth());
-            if (!http_auth_ || !http_auth_->init(setting)) {
+            if (!http_auth_ || !http_auth_->init(setting, true)) {
                 tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
                 return false;
             }
+        }
+
+        if (setting.exists("compress_control")) {
+
+            std::string suffix {};
+            ConfUtil::conf_value(setting, "compress_control", suffix);
+
+            std::vector<std::string> suffixes {};
+            boost::split(suffixes, suffix, boost::is_any_of(";"));
+            for (auto iter = suffixes.begin(); iter != suffixes.cend(); ++ iter){
+                std::string tmp = boost::trim_copy(*iter);
+                if (tmp.empty())
+                    continue;
+
+                compress_controls_.insert(tmp);
+            }
+
+            tzhttpd_log_debug("total %d compress ctrl for vhost %s",
+                              static_cast<int>(compress_controls_.size()), vhost_name_.c_str());
         }
 
         return true;
@@ -383,6 +402,8 @@ private:
     std::vector<std::pair<UriRegex, HttpGetHandlerObjectPtr>>  get_handler_;
 
     std::map<std::string, std::string> cache_controls_;
+
+    std::set<std::string> compress_controls_;
 
     std::unique_ptr<HttpAuth> http_auth_;
 };

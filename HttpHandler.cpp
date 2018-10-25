@@ -19,13 +19,15 @@
 #include "HttpHandler.h"
 #include "HttpServer.h"
 
+#include "CryptoUtil.h"
+
 #include "Log.h"
 
 namespace tzhttpd {
 namespace http_handler {
 
 // init only once at startup, these are the default value
-std::string              http_server_version = "1.3.3";
+std::string              http_server_version = "1.3.4";
 } // end namespace http_handler
 
 
@@ -137,6 +139,7 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
     if (OK && !did_file_full_path.empty()) {
 
         boost::to_lower(did_file_full_path);
+
         // 取出扩展名
         std::string::size_type pos = did_file_full_path.rfind(".");
         std::string suffix {};
@@ -161,6 +164,45 @@ int HttpHandler::default_http_get_handler(const HttpParser& http_parser, std::st
             add_header.push_back(content_type);
             tzhttpd_log_debug("Adding content_type header for %s(%s) -> %s",
                               did_file_full_path.c_str(), suffix.c_str(), content_type.c_str());
+        }
+
+        // compress type
+        // content already in response, compress it if possible
+        const auto cz_iter = compress_controls_.find(suffix);
+        if (cz_iter != compress_controls_.cend()) {
+            std::string encoding = http_parser.find_request_header(http_proto::header_options::accept_encoding);
+            if (!encoding.empty()) {
+                tzhttpd_log_debug("Accept Encoding: %s", encoding.c_str());
+                if (encoding.find("deflate") != std::string::npos) {
+
+                    std::string compressed {};
+
+                    if (CryptoUtil::Deflator(response, compressed) == 0) {
+                        tzhttpd_log_debug("compress %s size from %d to %d", did_file_full_path.c_str(),
+                                          static_cast<int>(response.size()), static_cast<int>(compressed.size()));
+                        response.swap(compressed);
+                        add_header.push_back("Content-Encoding: deflate");
+                    } else {
+                        tzhttpd_log_err("cryptopp deflate encoding failed.");
+                    }
+
+                } else if (encoding.find("gzip") != std::string::npos) {
+
+                    std::string compressed {};
+
+                    if (CryptoUtil::Gzip(response, compressed) == 0) {
+                        tzhttpd_log_debug("compress %s size from %d to %d", did_file_full_path.c_str(),
+                                          static_cast<int>(response.size()), static_cast<int>(compressed.size()));
+                        response.swap(compressed);
+                        add_header.push_back("Content-Encoding: gzip");
+                    } else {
+                        tzhttpd_log_err("cryptopp gzip encoding failed.");
+                    }
+
+                } else {
+                    tzhttpd_log_err("unregistered compress type: %s", encoding.c_str());
+                }
+            }
         }
     }
 
@@ -380,7 +422,6 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
         register_http_get_handler(iter->first, getter, false);
     }
 
-
     key = "cgi_post_handlers";
     path_map.clear();
     ret_code += do_parse_handler(setting, key, path_map);
@@ -409,11 +450,13 @@ int HttpHandler::update_runtime_cfg(const libconfig::Setting& setting) {
 
     // for http auth dynamic load
     if (setting.exists("basic_auth")) {
+
         if (!http_auth_) {
             http_auth_.reset(new HttpAuth());
         }
 
-        if (!http_auth_ || !http_auth_->init(setting)) {
+        // 更新配置
+        if (!http_auth_ || !http_auth_->init(setting, false)) {
             tzhttpd_log_err("init basic_auth for vhost %s failed.", vhost_name_.c_str());
             ret_code --;
         }
