@@ -262,16 +262,22 @@ static int Gzip(const std::string& src, std::string& store) {
 
     CryptoPP::Gzip zipper;
 
-    zipper.Put((byte*)src.data(), src.size());
-    zipper.MessageEnd();
+    try {
+        zipper.Put((byte*)src.data(), src.size());
+        zipper.MessageEnd();
 
-    CryptoPP::word64 avail = zipper.MaxRetrievable();
-    if(avail) {
-        store.resize(avail);
-        zipper.Get((byte*)&store[0], store.size());
-        return 0;
-    }
-
+        CryptoPP::word64 avail = zipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            zipper.Get((byte*)&store[0], store.size());
+            return 0;
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Gzip exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Gzip exception: unknown" << std::endl;
+	}
+    
     return -1;
 }
 
@@ -281,15 +287,21 @@ static int Gunzip(const std::string& src, std::string& store) {
 
     CryptoPP::Gunzip unzipper;
 
-    unzipper.Put((byte*)src.data(), src.size());
-    unzipper.MessageEnd();
+    try {
+        unzipper.Put((byte*)src.data(), src.size());
+        unzipper.MessageEnd();
 
-    CryptoPP::word64 avail = unzipper.MaxRetrievable();
-    if(avail) {
-        store.resize(avail);
-        unzipper.Get((byte*)&store[0], store.size());
-        return 0;
-    }
+        CryptoPP::word64 avail = unzipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            unzipper.Get((byte*)&store[0], store.size());
+            return 0;
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Gunzip exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Gunzip exception: unknown" << std::endl;
+	}
 
     return -1;
 }
@@ -298,16 +310,22 @@ static int Deflator(const std::string& src, std::string& store) {
 
     CryptoPP::Deflator zipper;
 
-    zipper.Put((byte*)src.data(), src.size());
-    zipper.MessageEnd();
+    try {
+        zipper.Put((byte*)src.data(), src.size());
+        zipper.MessageEnd();
 
-    CryptoPP::word64 avail = zipper.MaxRetrievable();
-    if(avail) {
-        store.resize(avail);
-        zipper.Get((byte*)&store[0], store.size());
-        return 0;
-    }
-
+        CryptoPP::word64 avail = zipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            zipper.Get((byte*)&store[0], store.size());
+            return 0;
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Deflator exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Deflator exception: unknown" << std::endl;
+	}
+    
     return -1;
 }
 
@@ -315,22 +333,123 @@ static int Inflator(const std::string& src, std::string& store) {
 
     CryptoPP::Inflator unzipper;
 
-    unzipper.Put((byte*)src.data(), src.size());
-    unzipper.MessageEnd();
+    try {
+        unzipper.Put((byte*)src.data(), src.size());
+        unzipper.MessageEnd();
 
-    CryptoPP::word64 avail = unzipper.MaxRetrievable();
-    if(avail) {
-        store.resize(avail);
-        unzipper.Get((byte*)&store[0], store.size());
-        return 0;
-    }
-
+        CryptoPP::word64 avail = unzipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            unzipper.Get((byte*)&store[0], store.size());
+            return 0;
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Inflator exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Inflator exception: unknown" << std::endl;
+	}
+    
     return -1;
 }
 
 
-};
+// better usage
 
+
+static std::string Gzip(const std::string& src) {
+
+    CryptoPP::Gzip zipper;
+    std::string store;
+
+    try {
+        zipper.Put((byte*)src.data(), src.size());
+        zipper.MessageEnd();
+
+        CryptoPP::word64 avail = zipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            zipper.Get((byte*)&store[0], store.size());
+        }    
+    } catch (std::exception& e) {
+		std::cerr << "Gzip exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Gzip exception: unknown" << std::endl;
+	}
+    
+    return store;
+}
+
+static std::string Gunzip(const std::string& src) {
+
+    CryptoPP::Gunzip unzipper;
+    std::string store;
+    
+    try {
+        unzipper.Put((byte*)src.data(), src.size());
+        unzipper.MessageEnd();
+
+        CryptoPP::word64 avail = unzipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            unzipper.Get((byte*)&store[0], store.size());
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Gunzip exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Gunzip exception: unknown" << std::endl;
+	}
+
+    return store;
+}
+
+static std::string Deflator(const std::string& src) {
+
+    CryptoPP::Deflator zipper;
+    std::string store;
+
+    try {
+        zipper.Put((byte*)src.data(), src.size());
+        zipper.MessageEnd();
+
+        CryptoPP::word64 avail = zipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            zipper.Get((byte*)&store[0], store.size());
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Deflator exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Deflator exception: unknown" << std::endl;
+	}
+
+    return store;
+}
+
+static std::string Inflator(const std::string& src) {
+
+    CryptoPP::Inflator unzipper;
+    std::string store;
+    
+    try {
+        unzipper.Put((byte*)src.data(), src.size());
+        unzipper.MessageEnd();
+
+        CryptoPP::word64 avail = unzipper.MaxRetrievable();
+        if(avail) {
+            store.resize(avail);
+            unzipper.Get((byte*)&store[0], store.size());
+        }
+    } catch (std::exception& e) {
+		std::cerr << "Inflator exception: " << e.what() << std::endl;
+	} catch (...) {
+		std::cerr << "Inflator exception: unknown" << std::endl;
+	}
+
+    return store;
+}
+
+
+};
 
 } // end namespace tzhttpd
 
