@@ -20,6 +20,7 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
+#include <zlib.h>
 #include <cryptopp/gzip.h>
 
 // 类静态函数可以直接将函数定义丢在头文件中
@@ -444,6 +445,46 @@ static std::string Inflator(const std::string& src) {
 	} catch (...) {
 		std::cerr << "Inflator exception: unknown" << std::endl;
 	}
+
+    return store;
+}
+
+
+
+static std::string CDeflator(const std::string& src) {
+    std::string store;
+
+    char ext[4096*16] {};
+    uLong srcSize = src.size();
+    //uLong dstSize = compressBound(srcSize);
+    uLong dstSize = sizeof(ext);
+
+    // Deflate
+    // Upon exit, destLen is the actual size of the compressed data
+    int ret = compress((Bytef *)ext, &dstSize, (const Bytef *)src.c_str(), srcSize);
+    if (ret != Z_OK) {
+        std::cerr << "compress error: " << ret << std::endl;
+    } else {
+        store = std::string(ext, dstSize);
+    }
+    return store;
+}
+
+
+static std::string CInflator(const std::string& src) {
+    std::string store;
+
+    char ext[4096*16] {};
+    uLong srcSize = src.size();
+    uLong dstSize = sizeof(ext);
+
+    // Inflate
+    int ret = uncompress((Bytef *)ext, &dstSize, (const Bytef *)src.c_str(), srcSize);
+    if (ret != Z_OK) {
+        std::cerr << "uncompress error: " << ret << std::endl;
+    } else {
+        store = std::string(ext, dstSize);
+    }
 
     return store;
 }
