@@ -66,7 +66,7 @@ private:
     bool ops_cancel() {
         std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
         sock_cancel();
-        set_conn_stat(ConnStat::kConnError);
+        set_conn_stat(ConnStat::kError);
         was_cancelled_ = true;
         return was_cancelled_;
     }
@@ -101,6 +101,9 @@ private:
     // 用于读取HTTP的头部使用
     boost::asio::streambuf request_;   // client request_ read
 
+    IOBound recv_bound_;
+    IOBound send_bound_;
+
     bool was_cancelled_;
     std::mutex ops_cancel_mutex_;
     std::unique_ptr<boost::asio::deadline_timer> ops_cancel_timer_;
@@ -121,19 +124,6 @@ private:
     // Strand to ensure the connection's handlers are not called concurrently. ???
     std::shared_ptr<io_service::strand> strand_;
 
-private:
-    // 读写的有效负载记录
-    size_t r_size_; // 读取开始写的位置
-
-    size_t w_size_; // 有效负载的末尾
-    size_t w_pos_;  // 写可能会一次不能完全发送，这里保存已写的位置
-
-    std::shared_ptr<std::vector<char> > p_buffer_;
-    std::shared_ptr<std::vector<char> > p_write_;
-
-    bool send_buff_empty() {
-        return (w_size_ == 0 || (w_pos_ >= w_size_) );
-    }
 };
 
 } // end namespace tzhttpd

@@ -33,17 +33,7 @@ TCPConnAsync::TCPConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
     strand_(std::make_shared<io_service::strand>(server.io_service_)) {
 
     set_tcp_nodelay(true);
-
-    r_size_ = 0;
-    w_size_ = 0;
-    w_pos_  = 0;
-
     set_tcp_nonblocking(true);
-
-    // 可以被后续resize增加
-    p_buffer_ = std::make_shared<std::vector<char> >(16*1024, 0);
-    p_write_  = std::make_shared<std::vector<char> >(16*1024, 0);
-
 }
 
 TCPConnAsync::~TCPConnAsync() {
@@ -53,14 +43,12 @@ TCPConnAsync::~TCPConnAsync() {
 
 void TCPConnAsync::start() override {
 
-    set_conn_stat(ConnStat::kConnWorking);
-    r_size_ = w_size_ = w_pos_ = 0;
-
+    set_conn_stat(ConnStat::kWorking);
     do_read_head();
 }
 
 void TCPConnAsync::stop() {
-    set_conn_stat(ConnStat::kConnPending);
+    set_conn_stat(ConnStat::kPending);
 }
 
 // Wrapping the handler with strand.wrap. This will return a new handler, that will dispatch through the strand.
@@ -68,7 +56,7 @@ void TCPConnAsync::stop() {
 
 void TCPConnAsync::do_read_head() {
 
-    if (get_conn_stat() != ConnStat::kConnWorking) {
+    if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
         return;
     }
@@ -80,7 +68,7 @@ void TCPConnAsync::do_read_head() {
     tzhttpd_log_debug("strand read read_until ... in thread %#lx", (long)pthread_self());
 
     set_ops_cancel_timeout();
-    async_read_until(*sock_ptr_, request_,
+    async_read_until(*socket_, request_,
                         http_proto::header_crlfcrlf_str,
                              strand_->wrap(
                                  std::bind(&TCPConnAsync::read_head_handler,
@@ -103,7 +91,7 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     SAFE_ASSERT(bytes_transferred > 0);
 
     std::string head_str (boost::asio::buffers_begin(request_.data()),
-                            boost::asio::buffers_begin(request_.data()) + request_.size());
+                          boost::asio::buffers_begin(request_.data()) + request_.size());
 
     request_.consume(bytes_transferred); // skip the already head
 
@@ -192,30 +180,24 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         // HTTP POST handler
 
         size_t len = ::atoi(http_parser_.find_request_header(http_proto::header_options::content_length).c_str());
-        r_size_ = 0;
+        recv_bound_.length_hint_ = len;  // 登记需要读取的长度
         size_t additional_size = request_.size(); // net additional body size
 
         SAFE_ASSERT( additional_size <= len );
-        if (len + 1 > p_buffer_->size()) {
-            tzhttpd_log_info( "relarge receive buffer size to: %d", static_cast<int>(len + 256));
-            p_buffer_->resize(len + 256);
-        }
 
         // first async_read_until may read more additional data, if so
         // then move additional data possible
         if( additional_size ) {
 
             std::string additional (boost::asio::buffers_begin(request_.data()),
-                      boost::asio::buffers_begin(request_.data()) + additional_size);
-
-            memcpy(p_buffer_->data(), additional.c_str(), additional_size + 1);
-            r_size_ = additional_size;
-            request_.consume(additional_size); // skip the head part
+                                    boost::asio::buffers_begin(request_.data()) + additional_size);
+            recv_bound_.buffer_.append_internal(additional);
+            request_.consume(additional_size);
         }
 
         // normally, we will return these 2 cases
         if (additional_size < len) {
-            // need to read more data here, write to r_size_
+            // need to read more data here,
 
             // if cancel, abort following ops
             if (was_ops_cancelled()) {
@@ -242,7 +224,6 @@ void TCPConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 error_return:
     fill_std_http_for_send(http_proto::StatusCode::server_error_internal_server_error);
     request_.consume(request_.size());
-    r_size_ = 0;
 
 write_return:
     do_write();
@@ -258,7 +239,7 @@ write_return:
 
 void TCPConnAsync::do_read_body() {
 
-    if (get_conn_stat() != ConnStat::kConnWorking) {
+    if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
         return;
     }
@@ -267,13 +248,18 @@ void TCPConnAsync::do_read_body() {
         return;
     }
 
-    size_t len = ::atoi(http_parser_.find_request_header(http_proto::header_options::content_length).c_str());
+    if (recv_bound_.length_hint_ == 0) {
+        recv_bound_.length_hint_ = ::atoi(http_parser_.find_request_header(http_proto::header_options::content_length).c_str());
+    }
 
     tzhttpd_log_debug("strand read async_read exactly... in thread %#lx", (long)pthread_self());
 
+    size_t to_read = std::min(static_cast<size_t>(recv_bound_.length_hint_ - recv_bound_.buffer_.get_length()),
+                              static_cast<size_t>(kFixedIoBufferSize));
+
     set_ops_cancel_timeout();
-    async_read(*sock_ptr_, buffer(p_buffer_->data() + r_size_, len - r_size_),
-                    boost::asio::transfer_at_least(len - r_size_),
+    async_read(*socket_, buffer(recv_bound_.io_block_, to_read),
+                    boost::asio::transfer_at_least(to_read),
                              strand_->wrap(
                                  std::bind(&TCPConnAsync::read_body_handler,
                                      shared_from_this(),
@@ -293,9 +279,12 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
         return;
     }
 
-    size_t len = ::atoi(http_parser_.find_request_header(http_proto::header_options::content_length).c_str());
-    r_size_ += bytes_transferred;
-    if (r_size_ < len) {
+    SAFE_ASSERT(bytes_transferred > 0);
+
+    std::string additional(recv_bound_.io_block_, bytes_transferred);
+    recv_bound_.buffer_.append_internal(additional);
+
+    if (recv_bound_.buffer_.get_length() < recv_bound_.length_hint_) {
         // need to read more, do again!
         do_read_body();
         return;
@@ -333,8 +322,10 @@ void TCPConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
                 CountPerfByMs call_perf { key };
 
                 // just call it!
+                std::string post_body;
+                recv_bound_.buffer_.consume(post_body, recv_bound_.length_hint_);
                 int call_code = phandler_obj->handler_(http_parser_,
-                                                       std::string(p_buffer_->data(), r_size_), response_body,
+                                                       post_body, response_body,
                                                        response_status, response_header); // call it!
                 if (call_code == 0) {
                     ++ phandler_obj->success_cnt_;
@@ -381,19 +372,25 @@ write_return:
 
 void TCPConnAsync::do_write() override {
 
-    if (get_conn_stat() != ConnStat::kConnWorking) {
+    if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
         return;
     }
 
-    SAFE_ASSERT(w_size_);
-    SAFE_ASSERT(w_pos_ < w_size_);
+    if(send_bound_.buffer_.get_length() == 0)
+        return;
+
+    SAFE_ASSERT(send_bound_.buffer_.get_length() > 0);
 
     tzhttpd_log_debug("strand write async_write exactly... in thread thread %#lx", (long)pthread_self());
 
+    size_t to_write = std::min(static_cast<size_t>(send_bound_.buffer_.get_length()),
+                               static_cast<size_t>(kFixedIoBufferSize));
+
+    send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
     set_ops_cancel_timeout();
-    async_write(*sock_ptr_, buffer(p_write_->data() + w_pos_, w_size_ - w_pos_),
-                    boost::asio::transfer_at_least(w_size_ - w_pos_),
+    async_write(*socket_, buffer(send_bound_.io_block_, to_write),
+                    boost::asio::transfer_exactly(to_write),
                               strand_->wrap(
                                  std::bind(&TCPConnAsync::write_handler,
                                      shared_from_this(),
@@ -415,38 +412,18 @@ void TCPConnAsync::write_handler(const boost::system::error_code& ec, size_t byt
 
     SAFE_ASSERT(bytes_transferred > 0);
 
-    w_pos_ += bytes_transferred;
+    //
+    // 再次触发写，如果为空就直接返回
+    // 函数中会检查，如果内容为空，就直接返回不执行写操作
 
-    if (w_pos_ < w_size_) {
-
-        if (was_ops_cancelled()) {
-            handle_socket_ec(ec);
-            return;
-        }
-
-        tzhttpd_log_debug("need additional write operation: %lu ~ %lu", w_pos_, w_size_);
-        do_write();
-
-    } else {
-
-        // reset
-        w_pos_ = w_size_ = 0;
-
-    }
-
+    do_write();
 }
 
 
 void TCPConnAsync::fill_http_for_send(const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
 
     string content = http_proto::http_response_generate(str, status_line, keep_continue(), additional_header);
-    if (content.size() + 1 > p_write_->size())
-        p_write_->resize(content.size() + 1);
-
-    ::memcpy(p_write_->data(), content.c_str(), content.size() + 1); // copy '\0' but not transform it
-
-    w_size_ = content.size();
-    w_pos_  = 0;
+    send_bound_.buffer_.append_internal(content);
 
     std::string str_method = "UNKNOWN";
     auto method = http_parser_.get_method();
@@ -467,13 +444,8 @@ void TCPConnAsync::fill_std_http_for_send(enum http_proto::StatusCode code) {
     string http_ver = http_parser_.get_version();
     std::string status_line = generate_response_status_line(http_ver, code);
     string content = http_proto::http_std_response_generate(http_ver, status_line, keep_continue());
-    if (content.size() + 1 > p_write_->size())
-        p_write_->resize(content.size() + 1);
 
-    ::memcpy(p_write_->data(), content.c_str(), content.size() + 1); // copy '\0' but not transform it
-
-    w_size_ = content.size();
-    w_pos_  = 0;
+    send_bound_.buffer_.append_internal(content);
 
     std::string str_method = "UNKNOWN";
     auto method = http_parser_.get_method();
@@ -513,7 +485,7 @@ bool TCPConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
     if (close_socket || was_ops_cancelled()) {
         revoke_ops_cancel_timeout();
         ops_cancel();
-        sock_shutdown_and_close(ShutdownType::kShutdownBoth);
+        sock_shutdown_and_close(ShutdownType::kBoth);
     }
 
     return close_socket;
@@ -573,7 +545,7 @@ void TCPConnAsync::ops_cancel_timeout_call(const boost::system::error_code& ec) 
     if (ec == 0){
         tzhttpd_log_info("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
         ops_cancel();
-        sock_shutdown_and_close(ShutdownType::kShutdownBoth);
+        sock_shutdown_and_close(ShutdownType::kBoth);
     } else if ( ec == boost::asio::error::operation_aborted) {
         // normal cancel
     } else {
