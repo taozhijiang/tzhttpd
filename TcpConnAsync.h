@@ -19,20 +19,20 @@ using namespace boost::gregorian;
 
 namespace tzhttpd {
 
-class TCPConnAsync;
-typedef std::shared_ptr<TCPConnAsync> NetConnPtr;
-typedef std::weak_ptr<TCPConnAsync>   NetConnWeakPtr;
-
+class TcpConnAsync;
+class HttpReqInstance;
 
 class HttpServer;
-class TCPConnAsync: public ConnIf, public boost::noncopyable,
-                    public std::enable_shared_from_this<TCPConnAsync> {
+class TcpConnAsync: public ConnIf, public boost::noncopyable,
+                    public std::enable_shared_from_this<TcpConnAsync> {
+
+    friend class HttpReqInstance;
 
 public:
 
     /// Construct a connection with the given socket.
-    TCPConnAsync(std::shared_ptr<ip::tcp::socket> p_socket, HttpServer& server);
-    virtual ~TCPConnAsync();
+    TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket, HttpServer& server);
+    virtual ~TcpConnAsync();
 
     virtual void start();
     void stop();
@@ -111,7 +111,7 @@ private:
 private:
 
     HttpServer& http_server_;
-    HttpParser http_parser_;
+    std::shared_ptr<HttpParser> http_parser_;
 
     // Of course, the handlers may still execute concurrently with other handlers that
     // were not dispatched through an boost::asio::strand, or were dispatched through

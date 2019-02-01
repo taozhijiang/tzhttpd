@@ -11,6 +11,7 @@
 // 不同于map的key value，使用vector保持推入的顺序
 
 #include <vector>
+#include <memory>
 #include <mutex>
 
 #include <utility>
@@ -28,7 +29,7 @@ public:
 
 public:
     KVVec():
-        lock_(), items_() {
+        lock_(new std::mutex()), items_() {
     }
 
     ~KVVec() {
@@ -46,17 +47,17 @@ public:
     }
 
     void PUSH_BACK(const K& k, const V& v) {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         items_.push_back({k, v}); // make_pair can not use - const ref
     }
 
     void PUSH_BACK(const Entry& entry) {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         items_.push_back(entry);
     }
 
     bool EXIST(const K& k) const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         for (size_t idx = 0; idx < items_.size(); ++idx) {
             if (items_[idx].first == k) {
                 return true;
@@ -66,7 +67,7 @@ public:
     }
 
     bool FIND(const K& k, V& v) const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         for (size_t idx = 0; idx < items_.size(); ++idx) {
             if (items_[idx].first == k) {
                 v = items_[idx].second;
@@ -77,7 +78,7 @@ public:
     }
 
     bool FIND(const K& k, Entry& entry) const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         for (size_t idx = 0; idx < items_.size(); ++idx) {
             if (items_[idx].first == k) {
                 entry = items_[idx];
@@ -88,7 +89,7 @@ public:
     }
 
     V VALUE(const K& k) const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
 
         V v {}; // default value
         for (size_t idx = 0; idx < items_.size(); ++idx) {
@@ -100,27 +101,27 @@ public:
     }
 
     size_t SIZE() const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         return items_.size();
     }
 
     bool EMPTY() const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         return items_.empty();
     }
 
     void CLEAR() {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
         items_.clear();
     }
 
     std::mutex& LOCK() {
-        return lock_;
+        return *lock_;
     }
 
     // 简单的json序列化，暂时不引入json库
     std::string SERIALIZE() const {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(*lock_);
 
         std::stringstream ss;
         ss << "{";
@@ -137,7 +138,7 @@ public:
     }
 
 private:
-    mutable std::mutex lock_;
+    std::unique_ptr<std::mutex>  lock_;
     std::vector<std::pair<K, V> > items_;
 };
 

@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
         return false;
     }
 
-    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler, true);
+    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

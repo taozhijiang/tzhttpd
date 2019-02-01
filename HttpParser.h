@@ -30,12 +30,6 @@ namespace tzhttpd {
 
 typedef KVVec<std::string, std::string> UriParamContainer;
 
-enum HTTP_METHOD {
-    GET = 1,
-    POST = 2,
-    UNKNOWN = 99,
-};
-
 class HttpParser: private boost::noncopyable {
 public:
     HttpParser():

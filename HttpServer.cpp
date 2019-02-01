@@ -15,13 +15,13 @@
 #include <boost/atomic/atomic.hpp>
 
 #include "HttpCfgHelper.h"
-#include "TCPConnAsync.h"
+
+#include "TcpConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
+#include "Dispatcher.h"
 
-#include "StrUtil.h"
 #include "SslSetup.h"
-#include "Log.h"
 
 namespace tzhttpd {
 
@@ -93,17 +93,8 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     if (!server_version.empty()) {
         std::call_once(http_version_once, init_http_version, server_version);
     }
-
     // other http parameters
     int value1, value2;
-    ConfUtil::conf_value(cfg, "http.conn_time_out", value1, 300);
-    ConfUtil::conf_value(cfg, "http.conn_time_out_linger", value2, 10);
-    if (value1 < 0 || value2 < 0 || value1 < value2) {
-        tzhttpd_log_err("invalid http conn_time_out %d & linger configure value %d, using default.", value1, value2);
-        return false;
-    }
-    conn_time_out_ = value1;
-    conn_time_out_linger_ = value2;
 
     ConfUtil::conf_value(cfg, "http.ops_cancel_time_out", value1);
     if (value1 < 0){
@@ -152,9 +143,7 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
     instance_name_(instance_name),
     io_service_(),
     acceptor_(),
-    timed_checker_(),
     conf_({}),
-    conns_alive_("TcpConnAsync"),
     io_service_threads_() {
 
     HttpCfgHelper::instance().init(cfgfile);
@@ -205,15 +194,9 @@ bool HttpServer::init() {
     tzhttpd_log_alert("create listen endpoint for %s:%d",
                       conf_.bind_addr_.c_str(), conf_.listen_port_);
 
-    tzhttpd_log_debug("socket/session conn time_out: %ds, linger: %ds",
-                      conf_.conn_time_out_.load(), conf_.conn_time_out_linger_.load());
-    conns_alive_.init(std::bind(&HttpServer::conn_destroy, this, std::placeholders::_1),
-                      conf_.conn_time_out_, conf_.conn_time_out_linger_);
-
     tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s",
                       conf_.ops_cancel_time_out_.load(),
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
-
     if (conf_.http_service_speed_) {
         conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
                                               boost::posix_time::millisec(5000))); // 5sec
@@ -235,29 +218,17 @@ bool HttpServer::init() {
         return false;
     }
 
-    timed_checker_.reset(new boost::asio::deadline_timer (io_service_,
-                                              boost::posix_time::millisec(5000))); // 5sec
-    if (!timed_checker_) {
-        tzhttpd_log_err("Create timed_checker_ failed!");
-        return false;
-    }
-    timed_checker_->async_wait(
-        std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
 
-    if (HttpCfgHelper::instance().register_cfg_callback(
-            std::bind(&HttpServer::update_runtime_cfg, shared_from_this(), std::placeholders::_1 )) != 0) {
-        tzhttpd_log_err("HttpServer register cfg callback failed!");
-        return false;
-    }
-
-    // vhost_manager_ initialize
-    if (!vhost_manager_.init(cfg)) {
-        tzhttpd_log_err("HttpVhost initialize failed!");
+    if (!Dispatcher::instance().init()) {
+        tzhttpd_log_err("Init HttpDispatcher failed.");
         return false;
     }
 
     return true;
 }
+
+
+#if 0
 
 int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
 
@@ -323,25 +294,10 @@ int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
         }
     }
 
-    // reload cgi-handlers
-    int ret_code = vhost_manager_.update_runtime_cfg(cfg);
-    if (ret_code != 0) {
-        tzhttpd_log_err("register cgi-handler return %d", ret_code);
-    }
-
     tzhttpd_log_alert("HttpServer::update_runtime_cfg called return %d ...", ret_code);
     return ret_code;
 }
-
-void HttpServer::timed_checker_handler(const boost::system::error_code& ec) {
-
-    conns_alive_.clean_up();
-
-    // 再次启动定时器
-    timed_checker_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
-    timed_checker_->async_wait(
-        std::bind(&HttpServer::timed_checker_handler, shared_from_this(), std::placeholders::_1));
-}
+#endif
 
 
 // main task loop
@@ -351,13 +307,13 @@ void HttpServer::io_service_run(ThreadObjPtr ptr) {
 
     while (true) {
 
-        if (unlikely(ptr->status_ == ThreadStatus::kThreadTerminating)) {
+        if (unlikely(ptr->status_ == ThreadStatus::kTerminating)) {
             tzhttpd_log_err("thread %#lx is about to terminating...", (long)pthread_self());
             break;
         }
 
         // 线程启动
-        if (unlikely(ptr->status_ == ThreadStatus::kThreadSuspend)) {
+        if (unlikely(ptr->status_ == ThreadStatus::kSuspend)) {
             ::usleep(1*1000*1000);
             continue;
         }
@@ -371,7 +327,7 @@ void HttpServer::io_service_run(ThreadObjPtr ptr) {
         }
     }
 
-    ptr->status_ = ThreadStatus::kThreadDead;
+    ptr->status_ = ThreadStatus::kDead;
     tzhttpd_log_info("HttpServer io_service thread %#lx is about to terminate ... ", (long)pthread_self());
 
     return;
@@ -387,6 +343,15 @@ void HttpServer::service() {
     acceptor_->listen(conf_.backlog_size_ > 0 ? conf_.backlog_size_ : socket_base::max_connections);
 
     do_accept();
+}
+
+
+int HttpServer::register_http_get_handler(const std::string& hostname, const HttpGetHandler& handler) {
+    return Dispatcher::instance().register_http_get_handler(hostname, handler);
+}
+
+int HttpServer::register_http_post_handler(const std::string& hostname, const HttpPostHandler& handler) {
+    return Dispatcher::instance().register_http_post_handler(hostname, handler);
 }
 
 void HttpServer::do_accept() {
@@ -433,8 +398,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
             break;
         }
 
-        ConnTypePtr new_conn = std::make_shared<ConnType>(sock_ptr, *this);
-        conn_add(new_conn);
+        std::shared_ptr<ConnType> new_conn = std::make_shared<ConnType>(sock_ptr, *this);
 
         new_conn->start();
 
@@ -445,20 +409,19 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 }
 
 
-int HttpServer::conn_destroy(ConnTypePtr p_conn) {
-    p_conn->sock_shutdown_and_close(ShutdownType::kBoth);
-    return 0;
-}
-
-
 int HttpServer::io_service_stop_graceful() {
-    tzhttpd_log_err("About to stop io_service... ");
+
+    tzhttpd_log_err("about to stop io_service... ");
+
     io_service_.stop();
     io_service_threads_.graceful_stop_threads();
     return 0;
 }
 
 int HttpServer::io_service_join() {
+
+    tzhttpd_log_err("about to join io_service... ");
+
     io_service_threads_.join_threads();
     return 0;
 }
