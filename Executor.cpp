@@ -1,9 +1,30 @@
 #include <xtra_rhel6.h>
 
 #include "HttpReqInstance.h"
+#include "HttpExecutor.h"
 #include "Executor.h"
 
 namespace tzhttpd {
+
+
+bool Executor::init() {
+
+    if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
+        conf_ = http_executor->get_executor_conf();
+    }
+
+    if (conf_.exec_thread_number_ <= 0 || conf_.exec_thread_number_ > 100) {
+        tzhttpd_log_err("invalid exec_thread_pool_size setting: %d", conf_.exec_thread_number_);
+        return false;
+    }
+    if (!executor_threads_.init_threads(
+        std::bind(&Executor::executor_service_run, this, std::placeholders::_1), conf_.exec_thread_number_)) {
+        tzhttpd_log_err("executor_service_run init task for %s failed!", instance_name().c_str());
+        return false;
+    }
+
+    return true;
+}
 
 
 void Executor::executor_service_run(ThreadObjPtr ptr) {

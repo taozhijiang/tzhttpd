@@ -18,6 +18,7 @@
 
 #include "StrUtil.h"
 
+#include "Executor.h"
 #include "HttpProto.h"
 #include "ServiceIf.h"
 #include "HttpHandler.h"
@@ -31,6 +32,7 @@ class HttpExecutor: public ServiceIf {
 public:
 
     explicit HttpExecutor(const std::string& hostname):
+        conf_(),
         hostname_(hostname),
         http_docu_root_(),
         http_docu_index_(),
@@ -53,13 +55,29 @@ public:
         return hostname_;
     }
 
+    ExecutorConf get_executor_conf() {
+        return conf_;
+    }
+
+
     // override
     int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler);
     int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler);
 
+    bool exist_get_handler(const std::string& uri_regex);
+    bool exist_post_handler(const std::string& uri_regex);
+
 private:
 
-    bool handle_vhost_conf(const libconfig::Setting& setting);
+    struct CgiHandlerCfg {
+        std::string url_;
+        std::string dl_path_;
+    };
+    bool parse_http_cgis(const libconfig::Setting& setting, const std::string& key,
+                         std::map<std::string, CgiHandlerCfg>& handlerCfg);
+
+    bool load_http_cgis(const libconfig::Setting& setting);
+    bool handle_virtual_host_conf(const libconfig::Setting& setting);
 
     // 路由选择算法
     int do_find_handler(const enum HTTP_METHOD& method,
@@ -68,6 +86,9 @@ private:
 
 
 private:
+
+    ExecutorConf conf_;
+
     std::string hostname_;
     std::string http_docu_root_;
     std::vector<std::string> http_docu_index_;

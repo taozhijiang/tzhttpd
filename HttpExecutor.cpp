@@ -18,6 +18,10 @@
 #include "HttpExecutor.h"
 #include "HttpReqInstance.h"
 
+#include "CgiHelper.h"
+#include "CgiWrapper.h"
+#include "SlibLoader.h"
+
 #include "CryptoUtil.h"
 
 #include "Log.h"
@@ -231,7 +235,7 @@ bool HttpExecutor::init() override {
 
         // 发现是匹配的，则找到对应虚拟主机的配置文件了
         if (server_name == hostname_) {
-            if (!handle_vhost_conf(vhost)) {
+            if (!handle_virtual_host_conf(vhost)) {
                 tzhttpd_log_err("handle detail conf for %s failed.", server_name.c_str());
                 return false;
             }
@@ -245,16 +249,116 @@ bool HttpExecutor::init() override {
     return true;
 }
 
-bool HttpExecutor::handle_vhost_conf(const libconfig::Setting& setting) {
+bool HttpExecutor::parse_http_cgis(const libconfig::Setting& setting, const std::string& key,
+                                    std::map<std::string, CgiHandlerCfg>& handlerCfg) {
+
+    if (!setting.exists(key)) {
+        tzhttpd_log_notice("vhost:%s handlers for %s not found!",
+                           hostname_.c_str(), key.c_str());
+        return true;
+    }
+
+    handlerCfg.clear();
+    const libconfig::Setting &http_cgi_handlers = setting[key];
+
+    for(int i = 0; i < http_cgi_handlers.getLength(); ++i) {
+
+        const libconfig::Setting& handler = http_cgi_handlers[i];
+        std::string uri_path {};
+        std::string dl_path {};
+
+        ConfUtil::conf_value(handler, "uri", uri_path);
+        ConfUtil::conf_value(handler, "dl_path", dl_path);
+
+        if(uri_path.empty() || dl_path.empty()) {
+            tzhttpd_log_err("vhost:%s skip err configure item %s:%s...",
+                            hostname_.c_str(), uri_path.c_str(), dl_path.c_str());
+            continue;
+        }
+
+        tzhttpd_log_debug("vhost:%s detect handler uri:%s, dl_path:%s",
+                          hostname_.c_str(), uri_path.c_str(), dl_path.c_str());
+
+        CgiHandlerCfg cfg {};
+        cfg.url_ = uri_path;
+        cfg.dl_path_ = dl_path;
+
+        handlerCfg[uri_path] = cfg;
+    }
+
+    return true;
+}
+
+
+
+bool HttpExecutor::load_http_cgis(const libconfig::Setting& setting) {
+
+    std::string key;
+    std::map<std::string, CgiHandlerCfg> cgimap {};
+
+    key = "cgi_get_handlers";
+    parse_http_cgis(setting, key, cgimap);
+
+    for (auto iter = cgimap.cbegin(); iter != cgimap.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
+        if (exist_post_handler(iter->first)) {
+            tzhttpd_log_alert("[vhost:%s] HttpPost for %s already exists, skip it.",
+                              hostname_.c_str(), iter->first.c_str());
+            continue;
+        }
+
+        http_handler::CgiGetWrapper getter(iter->second.dl_path_);
+        if (!getter.init()) {
+            tzhttpd_log_err("[vhost:%s] init get for %s @ %s failed, skip it!",
+                            hostname_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
+            continue;
+        }
+
+        register_get_handler(iter->first, getter);
+    }
+
+    key = "cgi_post_handlers";
+    parse_http_cgis(setting, key, cgimap);
+
+    for (auto iter = cgimap.cbegin(); iter != cgimap.cend(); ++ iter) {
+
+        // we will not override handler directly, consider using
+        // /internal_manage manipulate
+        if (exist_post_handler(iter->first)) {
+            tzhttpd_log_alert("[vhost:%s] HttpPost for %s already exists, skip it.",
+                              hostname_.c_str(), iter->first.c_str());
+            continue;
+        }
+
+        http_handler::CgiPostWrapper poster(iter->second.dl_path_);
+        if (!poster.init()) {
+            tzhttpd_log_err("[vhost:%s] init post for %s @ %s failed, skip it!",
+                            hostname_.c_str(), iter->first.c_str(),
+                            iter->second.dl_path_.c_str());
+            continue;
+        }
+
+        register_post_handler(iter->first, poster);
+    }
+
+    return true;
+}
+
+bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
 
     std::string server_name;
     std::string redirect_str;
     std::string docu_root_str;
     std::string docu_index_str;
-    ConfUtil::conf_value(setting,"server_name", server_name);
-    ConfUtil::conf_value(setting,"redirect", redirect_str);
-    ConfUtil::conf_value(setting,"docu_root", docu_root_str);
-    ConfUtil::conf_value(setting,"docu_index", docu_index_str);
+    ConfUtil::conf_value(setting, "server_name", server_name);
+    ConfUtil::conf_value(setting, "redirect", redirect_str);
+    ConfUtil::conf_value(setting, "docu_root", docu_root_str);
+    ConfUtil::conf_value(setting, "docu_index", docu_index_str);
+
+    ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_.exec_thread_number_);
 
 
     if (!redirect_str.empty()) {
@@ -339,6 +443,10 @@ bool HttpExecutor::handle_vhost_conf(const libconfig::Setting& setting) {
     }
 
 
+    // Cgi配置处理
+    load_http_cgis(setting);
+
+
     // 默认的Get Handler，主要用于静态web服务器使用
 
     // 注册默认的 static filesystem handler
@@ -417,6 +525,37 @@ bool HttpExecutor::handle_vhost_conf(const libconfig::Setting& setting) {
     }
 
     return true;
+}
+
+bool HttpExecutor::exist_get_handler(const std::string& uri_regex) {
+
+    std::string uri = StrUtil::pure_uri_path(uri_regex);
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
+    for (it = handlers_.begin(); it != handlers_.end(); ++it) {
+        if (it->first.str() == uri && it->second->http_get_handler_) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool HttpExecutor::exist_post_handler(const std::string& uri_regex) {
+
+    std::string uri = StrUtil::pure_uri_path(uri_regex);
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
+    for (it = handlers_.begin(); it != handlers_.end(); ++it) {
+        if (it->first.str() == uri && it->second->http_post_handler_) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 
@@ -513,7 +652,7 @@ int HttpExecutor::do_find_handler(const enum HTTP_METHOD& method,
                 handler = it->second;
                 return 0;
             } else {
-                tzhttpd_log_err("uri: %s matched, but no suitable handler for method:",
+                tzhttpd_log_err("uri: %s matched, but no suitable handler for method: %s",
                                 uri.c_str(), HTTP_METHOD_STRING(method).c_str());
                 return -1;
             }
@@ -570,7 +709,8 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
 
     SAFE_ASSERT(handler_object);
 
-    if (http_req_instance->method_ == HTTP_METHOD::GET) {
+    if (http_req_instance->method_ == HTTP_METHOD::GET)
+    {
         HttpGetHandler handler = handler_object->http_get_handler_;
         if (!handler) {
             http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
@@ -596,6 +736,40 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         } else {
             http_req_instance->http_response(response_str, status_str, headers);
         }
+    }
+    else if (http_req_instance->method_ == HTTP_METHOD::POST)
+    {
+        HttpPostHandler handler = handler_object->http_post_handler_;
+        if (!handler) {
+            http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+            return;
+        }
+
+        std::string response_str;
+        std::string status_str;
+        std::vector<std::string> headers;
+        int code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
+                           response_str, status_str, headers);
+        if (code == 0) {
+            handler_object->success_count_ ++;
+        } else {
+            handler_object->fail_count_ ++;
+        }
+
+        // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
+        if (status_str.empty()) {
+            if (code == 0)
+                http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
+            else
+                http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+        } else {
+            http_req_instance->http_response(response_str, status_str, headers);
+        }
+    }
+    else
+    {
+        tzhttpd_log_err("what? %s", HTTP_METHOD_STRING(http_req_instance->method_).c_str());
+        http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
     }
 
 }

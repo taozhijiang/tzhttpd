@@ -7,10 +7,17 @@
 #include "EQueue.h"
 #include "ServiceIf.h"
 
+#include "ConfHelper.h"
 #include "ThreadPool.h"
 
 namespace tzhttpd {
 
+// 简短的结构体，用来从HttpExecutor传递配置信息
+// 因为主机相关的信息是在HttpExecutor中解析的
+
+struct ExecutorConf {
+    int exec_thread_number_;
+};
 
 class Executor: public ServiceIf {
 
@@ -37,17 +44,7 @@ public:
         return service_impl_->register_post_handler(uri_regex, handler);
     }
 
-
-    bool init() {
-
-        if (!executor_threads_.init_threads(
-            std::bind(&Executor::executor_service_run, this, std::placeholders::_1), 5)) {
-            tzhttpd_log_err("executor_service_run init task for %s failed!", instance_name().c_str());
-            return false;
-        }
-
-        return true;
-    }
+    bool init();
 
 private:
     // point to HttpExecutor, forward some request
@@ -56,6 +53,8 @@ private:
 
 
 private:
+    ExecutorConf conf_;
+
     ThreadPool executor_threads_;
     void executor_service_run(ThreadObjPtr ptr);  // main task loop
 
