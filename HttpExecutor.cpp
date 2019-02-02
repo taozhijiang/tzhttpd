@@ -13,6 +13,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 
+#include "ConfHelper.h"
 #include "HttpParser.h"
 #include "HttpExecutor.h"
 #include "HttpReqInstance.h"
@@ -134,7 +135,6 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
             break;
     }
 
-#if 0
     // do handler helper
     if (OK && !did_file_full_path.empty()) {
 
@@ -206,17 +206,297 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
         }
     }
 
-#endif
-
     return 0;
 }
 
+
+bool HttpExecutor::init() override {
+
+    auto conf_ptr = ConfHelper::instance().get_conf();
+
+    const libconfig::Setting &http_vhosts = conf_ptr->lookup("http.vhosts");
+
+    for(int i = 0; i < http_vhosts.getLength(); ++i) {
+
+        const libconfig::Setting& vhost = http_vhosts[i];
+
+        std::string server_name;
+        ConfUtil::conf_value(vhost, "server_name", server_name);
+        if ( server_name.empty() ) {
+            tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
+            continue;
+        }
+
+        tzhttpd_log_debug("server_name: %s", server_name.c_str());
+
+        // 发现是匹配的，则找到对应虚拟主机的配置文件了
+        if (server_name == hostname_) {
+            if (!handle_vhost_conf(vhost)) {
+                tzhttpd_log_err("handle detail conf for %s failed.", server_name.c_str());
+                return false;
+            }
+
+            tzhttpd_log_debug("handle detail conf for virtual host %s success!", server_name.c_str());
+            // OK
+            break;
+        }
+    }
+
+    return true;
+}
+
+bool HttpExecutor::handle_vhost_conf(const libconfig::Setting& setting) {
+
+    std::string server_name;
+    std::string redirect_str;
+    std::string docu_root_str;
+    std::string docu_index_str;
+    ConfUtil::conf_value(setting,"server_name", server_name);
+    ConfUtil::conf_value(setting,"redirect", redirect_str);
+    ConfUtil::conf_value(setting,"docu_root", docu_root_str);
+    ConfUtil::conf_value(setting,"docu_index", docu_index_str);
+
+
+    if (!redirect_str.empty()) {
+
+        redirect_str_ = redirect_str;
+
+        auto pos = redirect_str_.find('~');
+        if (pos == std::string::npos) {
+            tzhttpd_log_err("error redirect config: %s", redirect_str_.c_str());
+            return false;
+        }
+
+        std::string code = boost::trim_copy(redirect_str_.substr(0, pos));
+        std::string uri  = boost::trim_copy(redirect_str_.substr(pos+1));
+
+        if (code != "301" && code != "302") {
+            tzhttpd_log_err("error redirect config: %s", redirect_str_.c_str());
+            return false;
+        }
+
+        HttpGetHandler get_func =
+                std::bind(&HttpExecutor::http_redirect_handler, this,
+                          code, uri,
+                          std::placeholders::_1, EMPTY_STRING,
+                          std::placeholders::_2,
+                          std::placeholders::_3, std::placeholders::_4 );
+        HttpPostHandler post_func =
+                std::bind(&HttpExecutor::http_redirect_handler, this,
+                          code, uri,
+                          std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3, std::placeholders::_4,
+                          std::placeholders::_5 );
+
+
+        redirect_handler_.reset(new HttpHandlerObject("[redirect]", get_func, post_func, true, true));
+        if (!redirect_handler_ || !redirect_handler_->http_get_handler_ || !redirect_handler_->http_post_handler_) {
+            tzhttpd_log_err("Create redirect handler for %s failed!", hostname_.c_str());
+            return false;
+        }
+
+        // configured redirect, pass following configure
+        tzhttpd_log_alert("redirect %s configure ok for host %s",
+                          redirect_str_.c_str(), hostname_.c_str());
+
+        // redirect 虚拟主机只需要这个配置就可以了
+        return true;
+
+
+    } else if (!docu_root_str.empty() && !docu_index_str.empty()) {
+
+
+        std::vector<std::string> docu_index{};
+        {
+            std::vector<std::string> vec {};
+            boost::split(vec, docu_index_str, boost::is_any_of(";"));
+            for (auto iter = vec.begin(); iter != vec.cend(); ++ iter){
+                std::string tmp = boost::trim_copy(*iter);
+                if (tmp.empty())
+                    continue;
+
+                docu_index.push_back(tmp);
+            }
+            if (docu_index.empty()) { // not fatal
+                tzhttpd_log_err("empty valid docu_index found, previous: %s", docu_index_str.c_str());
+            }
+        }
+
+
+        http_docu_root_ = docu_root_str;
+        http_docu_index_ = docu_index;
+
+        tzhttpd_log_debug("docu_root: %s, index items: %lu",
+                          http_docu_root_.c_str(),  http_docu_index_.size());
+
+        // fall throught following configure
+
+    } else {
+
+        tzhttpd_log_err("required at lease document setting or redirect setting for %s.", hostname_.c_str());
+        return false;
+
+    }
+
+
+    // 默认的Get Handler，主要用于静态web服务器使用
+
+    // 注册默认的 static filesystem handler
+    HttpGetHandler func = std::bind(&HttpExecutor::default_get_handler, this,
+                          std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3, std::placeholders::_4);
+    default_get_handler_.reset(new HttpHandlerObject(EMPTY_STRING, func, true, true));
+    if (!default_get_handler_) {
+        tzhttpd_log_err("init default http get handler failed.");
+        return false;
+    }
+
+
+    if (setting.exists("cache_control")) {
+        const libconfig::Setting &http_cache_control = setting["cache_control"];
+        for(int i = 0; i < http_cache_control.getLength(); ++i) {
+            const libconfig::Setting& ctrl_item = http_cache_control[i];
+            std::string suffix {};
+            std::string ctrl_head {};
+
+            ConfUtil::conf_value(ctrl_item, "suffix", suffix);
+            ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+            if(suffix.empty() || ctrl_head.empty()) {
+                tzhttpd_log_err("skip err cache ctrl configure item ...");
+                continue;
+            }
+
+            // parse
+            {
+                std::vector<std::string> suffixes {};
+                boost::split(suffixes, suffix, boost::is_any_of(";"));
+                for (auto iter = suffixes.begin(); iter != suffixes.cend(); ++ iter){
+                    std::string tmp = boost::trim_copy(*iter);
+                    if (tmp.empty())
+                        continue;
+
+                    cache_controls_[tmp] = ctrl_head;
+                }
+            }
+        }
+
+        // total display
+        tzhttpd_log_debug("total %d cache ctrl for vhost %s",
+                          static_cast<int>(cache_controls_.size()), hostname_.c_str());
+        for (auto iter = cache_controls_.begin(); iter != cache_controls_.end(); ++iter) {
+            tzhttpd_log_debug("%s => %s", iter->first.c_str(), iter->second.c_str());
+        }
+    }
+
+    // basic_auth
+    if (setting.exists("basic_auth")) {
+        http_auth_.reset(new BasicAuth());
+        if (!http_auth_ || !http_auth_->init(setting, true)) {
+            tzhttpd_log_err("init basic_auth for vhost %s failed.", hostname_.c_str());
+            return false;
+        }
+    }
+
+    if (setting.exists("compress_control")) {
+
+        std::string suffix {};
+        ConfUtil::conf_value(setting, "compress_control", suffix);
+
+        std::vector<std::string> suffixes {};
+        boost::split(suffixes, suffix, boost::is_any_of(";"));
+        for (auto iter = suffixes.begin(); iter != suffixes.cend(); ++ iter){
+            std::string tmp = boost::trim_copy(*iter);
+            if (tmp.empty())
+                continue;
+
+            compress_controls_.insert(tmp);
+        }
+
+        tzhttpd_log_debug("total %d compress ctrl for vhost %s",
+                          static_cast<int>(compress_controls_.size()), hostname_.c_str());
+    }
+
+    return true;
+}
+
+
+int HttpExecutor::register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
+
+    std::string uri = StrUtil::pure_uri_path(uri_regex);
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
+    for (it = handlers_.begin(); it != handlers_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            tzhttpd_log_debug("hostname:%s GetHandler for %s(%s) already exists, update it!",
+                              hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+            it->second->update_get_handler(handler);
+            return 0;
+        }
+    }
+
+    tzhttpd_log_debug("hostname:%s GetHandler for %s(%s) does not exists, create it!",
+                      hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+    UriRegex rgx {uri};
+    auto phandler_obj = std::make_shared<HttpHandlerObject>(uri, handler, true, true);
+    if (!phandler_obj) {
+        tzhttpd_log_err("hostname:%s Create Handler object for %s(%s) failed.",
+                        hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+        return -1;
+    }
+
+    handlers_.push_back({ rgx, phandler_obj });
+
+    tzhttpd_log_notice("hostname:%s register_http_get_handler for %s(%s) OK!",
+                      hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+    return 0;
+}
+
+
+int HttpExecutor::register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
+
+    std::string uri = StrUtil::pure_uri_path(uri_regex);
+    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+
+    std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
+    for (it = handlers_.begin(); it != handlers_.end(); ++it) {
+        if (it->first.str() == uri ) {
+            tzhttpd_log_debug("hostname:%s PostHandler for %s(%s) already exists, update it!",
+                              hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+            it->second->update_post_handler(handler);
+            return 0;
+        }
+    }
+
+    tzhttpd_log_debug("hostname:%s PostHandler for %s(%s) does not exists, create it!",
+                      hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+    UriRegex rgx {uri};
+    auto phandler_obj = std::make_shared<HttpHandlerObject>(uri, handler, true, true);
+    if (!phandler_obj) {
+        tzhttpd_log_err("hostname:%s Create Handler object for %s(%s) failed.",
+                        hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+        return -1;
+    }
+
+    handlers_.push_back({ rgx, phandler_obj });
+
+    tzhttpd_log_notice("hostname:%s register_http_post_handler for %s(%s) OK!",
+                       hostname_.c_str(), uri.c_str(), uri_regex.c_str());
+    return 0;
+}
 
 
 
 int HttpExecutor::do_find_handler(const enum HTTP_METHOD& method,
                                   const std::string& uri,
                                   HttpHandlerObjectPtr& handler) {
+
+    if (redirect_handler_) {
+        tzhttpd_log_debug("redirect handler found with %s, will do redirect.",
+                          redirect_str_.c_str());
+        handler = redirect_handler_;
+        return 0;
+    }
 
     std::string n_uri = StrUtil::pure_uri_path(uri);
 

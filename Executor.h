@@ -29,20 +29,20 @@ public:
         return service_impl_->instance_name();
     }
 
-    int register_get_handler(const HttpGetHandler& handler) override {
-        return service_impl_->register_get_handler(handler);
+    int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
+        return service_impl_->register_get_handler(uri_regex, handler);
     }
 
-    int register_post_handler(const HttpPostHandler& handler) override {
-        return service_impl_->register_post_handler(handler);
+    int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
+        return service_impl_->register_post_handler(uri_regex, handler);
     }
 
 
     bool init() {
 
         if (!executor_threads_.init_threads(
-            std::bind(&Executor::executor_service_run, this, std::placeholders::_1), 15)) {
-            tzhttpd_log_err("executor_service_run init task failed!");
+            std::bind(&Executor::executor_service_run, this, std::placeholders::_1), 5)) {
+            tzhttpd_log_err("executor_service_run init task for %s failed!", instance_name().c_str());
             return false;
         }
 
@@ -62,19 +62,23 @@ private:
 public:
 
     int executor_start() {
+
+        tzhttpd_log_notice("about to start executor for %s ... ", instance_name().c_str());
         executor_threads_.start_threads();
         return 0;
     }
 
     int executor_stop_graceful() {
 
-        tzhttpd_log_err("about to stop executor... ");
+        tzhttpd_log_notice("about to stop executor for %s ... ", instance_name().c_str());
         executor_threads_.graceful_stop_threads();
 
         return 0;
     }
 
     int executor_join() {
+
+        tzhttpd_log_notice("about to join executor for %s ... ", instance_name().c_str());
         executor_threads_.join_threads();
         return 0;
     }

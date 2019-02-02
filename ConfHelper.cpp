@@ -5,46 +5,49 @@
  *
  */
 
-#include "HttpCfgHelper.h"
-#include "Log.h"
+#include "ConfHelper.h"
 
 namespace tzhttpd {
 
-HttpCfgHelper& HttpCfgHelper::instance() {
-    static HttpCfgHelper helper;
+ConfHelper& ConfHelper::instance() {
+    static ConfHelper helper;
     return helper;
 }
 
-bool HttpCfgHelper::init(const std::string& cfgfile) {
+bool ConfHelper::init(std::string cfgfile) {
 
-    cfg_ptr_.reset( new libconfig::Config() );
-    if (!cfg_ptr_) {
+    cfgfile_ = cfgfile;
+
+    conf_ptr_.reset( new libconfig::Config() );
+    if (!conf_ptr_) {
+        tzhttpd_log_err("create libconfig failed.");
         return false;
     }
 
     // try load and explain the cfg_file first.
     try {
-        cfg_ptr_->readFile(cfgfile.c_str());
+        conf_ptr_->readFile(cfgfile.c_str());
     } catch(libconfig::FileIOException &fioex) {
         fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
         tzhttpd_log_err( "I/O error while reading file: %s.", cfgfile.c_str());
-        cfg_ptr_.reset();
-        return false;
+        conf_ptr_.reset();
     } catch(libconfig::ParseException &pex) {
         fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
         tzhttpd_log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
-        cfg_ptr_.reset();
+        conf_ptr_.reset();
+    }
+
+    if (!conf_ptr_) {
         return false;
     }
 
-    cfgfile_ = cfgfile;
     return true;
 }
 
-int HttpCfgHelper::update_runtime_cfg() {
+int ConfHelper::update_runtime_conf() {
 
     if (cfgfile_.empty()) {
-        tzhttpd_log_err("cfg_file is empty, may not init HttpCfgHelper ???");
+        tzhttpd_log_err("param cfg_file is not set, may not init HttpConfHelper ???");
         return -1;
     }
 
@@ -53,29 +56,31 @@ int HttpCfgHelper::update_runtime_cfg() {
         return 0;
     }
 
-    auto cfg = load_cfg_file();
-    if (!cfg) {
+    auto conf = load_conf_file();
+    if (!conf) {
+        in_process_ = false;
         tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
         return false;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
 
-    std::swap(cfg, cfg_ptr_);
-    cfg_update_time_ = ::time(NULL);
+    // 重新读取配置并且解析成功之后，才更新这个指针
+    std::swap(conf, conf_ptr_);
+    conf_update_time_ = ::time(NULL);
 
     int ret = 0;
     for (auto it = calls_.begin(); it != calls_.end(); ++it) {
-        ret += (*it)(*cfg_ptr_); // call it!
+        ret += (*it)(*conf_ptr_); // call it!
     }
 
-    tzhttpd_log_alert("ConfigHelper::update_cfg total callback return: %d", ret);
+    tzhttpd_log_alert("ConfHelper::update_cfg total callback return: %d", ret);
     in_process_ = false;
 
     return ret;
 }
 
-int HttpCfgHelper::register_cfg_callback(CfgUpdateCallable func) {
+int ConfHelper::register_conf_callback(ConfUpdateCallable func) {
 
     if (!func){
         return -1;

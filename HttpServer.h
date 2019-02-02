@@ -27,6 +27,8 @@
 #include "EQueue.h"
 #include "ThreadPool.h"
 
+#include "ConfHelper.h"
+
 #include "HttpParser.h"
 #include "HttpHandler.h"
 
@@ -43,7 +45,7 @@ class HttpConf {
     friend class HttpServer;
 
 private:
-    bool load_config(const libconfig::Config& cfg);
+    bool load_config(std::shared_ptr<libconfig::Config> conf_ptr);
 
 private:
     std::string bind_addr_;
@@ -117,8 +119,12 @@ public:
 
     void service();
 
-    int register_http_get_handler(const std::string& hostname, const HttpGetHandler& handler);
-    int register_http_post_handler(const std::string& hostname, const HttpPostHandler& handler);
+    int register_http_vhost(const std::string& hostname);
+
+    int register_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
+                                  const std::string hostname = "");
+    int register_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
+                                   const std::string hostname = "");
 
 private:
     const std::string instance_name_;
@@ -128,6 +134,7 @@ private:
     ip::tcp::endpoint ep_;
     std::unique_ptr<ip::tcp::acceptor> acceptor_;
 
+    const std::string cfgfile_;
     HttpConf conf_;
 
     void do_accept();

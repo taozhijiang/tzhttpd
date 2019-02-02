@@ -24,8 +24,8 @@ public:
     virtual std::string instance_name() = 0;
 
     //
-    virtual int register_get_handler(const HttpGetHandler& handler) = 0;
-    virtual int register_post_handler(const HttpPostHandler& handler) = 0;
+    virtual int register_get_handler(const std::string& uri, const HttpGetHandler& handler) = 0;
+    virtual int register_post_handler(const std::string& uri, const HttpPostHandler& handler) = 0;
 };
 
 } // end tzhttpd

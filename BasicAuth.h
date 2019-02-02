@@ -5,8 +5,8 @@
  *
  */
 
-#ifndef __TZHTTPD_HTTP_AUTH_H__
-#define __TZHTTPD_HTTP_AUTH_H__
+#ifndef __TZHTTPD_BASIC_AUTH_H__
+#define __TZHTTPD_BASIC_AUTH_H__
 
 #include <xtra_rhel6.h>
 
@@ -22,37 +22,37 @@ namespace tzhttpd {
 
 // 每个VHost持有一个，主要用户Http BasicAuth鉴权
 
-typedef std::vector<std::pair<UriRegex, std::set<std::string>>> HttpAuthContain;
+typedef std::vector<std::pair<UriRegex, std::set<std::string>>> BasicAuthContain;
 
-class HttpAuth {
+class BasicAuth {
 
 public:
-    HttpAuth():
-        basic_auth_(new HttpAuthContain()) {
+    BasicAuth ():
+        basic_auths_(new BasicAuthContain()) {
     }
 
-    bool init(const libconfig::Setting& setting, bool critical){
+    bool init(const libconfig::Setting& setting, bool strict = false){
 
         if (!setting.exists("basic_auth")) {
-            tzhttpd_log_err("configure does not contains basic_auth.");
-            return false;
+            tzhttpd_log_err("does not contains basic_auth.");
+            return true;
         }
 
-        std::shared_ptr<HttpAuthContain> basic_auth_load(new HttpAuthContain());
+        std::shared_ptr<BasicAuthContain> basic_auths_load(new BasicAuthContain());
 
         const libconfig::Setting& basic_auth = setting["basic_auth"];
         for(int i = 0; i < basic_auth.getLength(); ++i) {
-            const libconfig::Setting& basic_auth_item = basic_auth[i];
-            if (!basic_auth_item.exists("uri") || !basic_auth_item.exists("auth")) {
+            const libconfig::Setting& basic_auths_item = basic_auth[i];
+            if (!basic_auths_item.exists("uri") || !basic_auths_item.exists("auth")) {
                 tzhttpd_log_err("skip err basic_auth item ....");
                 continue;
             }
             std::string auth_uri_regex;
-            ConfUtil::conf_value(basic_auth_item, "uri", auth_uri_regex);
+            ConfUtil::conf_value(basic_auths_item, "uri", auth_uri_regex);
             auth_uri_regex = StrUtil::pure_uri_path(auth_uri_regex);
 
             std::set<std::string> auth_set{};
-            const libconfig::Setting& auth = basic_auth_item["auth"];
+            const libconfig::Setting& auth = basic_auths_item["auth"];
             for (int j = 0; j < auth.getLength(); ++j) {
                 const libconfig::Setting& auth_acct = auth[j];
                 std::string auth_user;
@@ -62,7 +62,7 @@ public:
                 ConfUtil::conf_value(auth_acct, "passwd", auth_passwd);
 
                 if (auth_user.empty() || auth_passwd.empty()) {
-                    if (critical) {
+                    if (strict) {
                         tzhttpd_log_err("err account item %s ....", auth_user.c_str());
                         return false;
                     } else {
@@ -75,26 +75,26 @@ public:
                 std::string auth_base = CryptoUtil::base64_encode(auth_str);
 
                 auth_set.insert(auth_base);
-                tzhttpd_log_debug("detected auth for user %s ", auth_user.c_str());
+                tzhttpd_log_debug("detected valid auth for user %s ", auth_user.c_str());
             }
 
             if (auth_set.empty()) {
                 tzhttpd_log_notice("empty ruleset for %s, we will allow all access",
-                                   auth_uri_regex.c_str());
+                                    auth_uri_regex.c_str());
             }
 
             UriRegex rgx {auth_uri_regex};
-            basic_auth_load->push_back({rgx, auth_set});
+            basic_auths_load->push_back({rgx, auth_set});
             tzhttpd_log_debug("success add %d auth items for %s.",
                               static_cast<int>(auth_set.size()), auth_uri_regex.c_str());
         }
 
         tzhttpd_log_debug("total auth rules count: %d",
-                          static_cast<int>(basic_auth_load->size()));
+                          static_cast<int>(basic_auths_load->size()));
 
         {
             std::lock_guard<std::mutex> lock(lock_);
-            basic_auth_.swap(basic_auth_load);
+            basic_auths_.swap(basic_auths_load);
         }
 
         return true;
@@ -102,7 +102,7 @@ public:
 
 
 public:
-    bool check_basic_auth(const std::string& uri, const std::string& auth_str){
+    bool check_auth(const std::string& uri, const std::string& auth_str){
 
         std::string auth_code {};
 
@@ -117,10 +117,10 @@ public:
 
         std::string pure_uri = StrUtil::pure_uri_path(uri);
 
-        std::shared_ptr<HttpAuthContain> auth_rule {};
+        std::shared_ptr<BasicAuthContain> auth_rule {};
         {
             std::lock_guard<std::mutex> lock(lock_);
-            auth_rule = basic_auth_;
+            auth_rule = basic_auths_;
         }
 
         // 在配置文件中按照优先级的顺序向下检索，如果发现请求URI匹配了正则表达式
@@ -149,11 +149,11 @@ public:
 
 private:
     std::mutex lock_;
-    std::shared_ptr<HttpAuthContain> basic_auth_;
+    std::shared_ptr<BasicAuthContain> basic_auths_;
 };
 
 
 } // end namespace tzhttpd
 
 
-#endif //__TZHTTPD_HTTP_AUTH_H__
+#endif //__TZHTTPD_BASIC_AUTH_H__

@@ -30,21 +30,30 @@ public:
 
         initialized_ = true;
 
-        // 注册默认的vhosts
+        // 注册默认default vhost
         SAFE_ASSERT(!default_service_);
-        auto default_http_executor = std::make_shared<HttpExecutor>("default");
-        if (!default_http_executor || !default_http_executor->init()) {
+
+        // 创建 default virtual host
+        // http impl
+        auto default_http_impl = std::make_shared<HttpExecutor>("[default]");
+        if (!default_http_impl|| !default_http_impl->init()) {
+            tzhttpd_log_err("create default http_impl failed.");
             return false;
         }
 
-        default_service_.reset(new Executor(default_http_executor));
+        // http executor
+        default_service_.reset(new Executor(default_http_impl));
         Executor* executor = dynamic_cast<Executor *>(default_service_.get());
+
         SAFE_ASSERT(executor);
-        if (!executor->init()) {
+        if (!executor || !executor->init()) {
+            tzhttpd_log_err("init default virtual host executor failed.");
             return false;
         }
+
         executor->executor_start();
-        tzhttpd_log_debug("start default executor: %s",  executor->instance_name().c_str());
+        tzhttpd_log_debug("start default virtual host executor: %s success",  executor->instance_name().c_str());
+        //
 
 
         for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
@@ -52,7 +61,7 @@ public:
             SAFE_ASSERT(executor);
 
             executor->executor_start();
-            tzhttpd_log_debug("start executor: %s",  executor->instance_name().c_str());
+            tzhttpd_log_debug("start virtual host executor for %s success",  executor->instance_name().c_str());
         }
 
         return true;
@@ -68,7 +77,7 @@ public:
         }
 
         if (!service) {
-            tzhttpd_log_debug("find http service_impl for %s failed, using default.",
+            tzhttpd_log_debug("find http service_impl (virtualhost) for %s failed, using default.",
                               http_req_instance->hostname_.c_str());
             service = default_service_;
         }
@@ -81,20 +90,26 @@ public:
     }
 
     // 注册虚拟主机
-    int register_virtual_host(const std::string& hostname, std::shared_ptr<ServiceIf> service);
+    int register_virtual_host(const std::string& hostname);
 
     // 外部注册http handler的接口
-    int register_http_get_handler(const std::string& hostname, const HttpGetHandler& handler);
-    int register_http_post_handler(const std::string& hostname, const HttpPostHandler& handler);
+    int register_http_get_handler(const std::string& hostname, const std::string& uri_regex,
+                                  const HttpGetHandler& handler);
+    int register_http_post_handler(const std::string& hostname, const std::string& uri_regex,
+                                   const HttpPostHandler& handler);
 
 private:
 
-    int register_get_handler(const HttpGetHandler& handler) override {
-        return 0;
+    int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
+        SAFE_ASSERT(false);
+        tzhttpd_log_err("YOU SHOULD NOT CALL THIS FUNC...");
+        return -1;
     }
 
-    int register_post_handler(const HttpPostHandler& handler) override {
-        return 0;
+    int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
+        SAFE_ASSERT(false);
+        tzhttpd_log_err("YOU SHOULD NOT CALL THIS FUNC...");
+        return -1;
     }
 
     Dispatcher():

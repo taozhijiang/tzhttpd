@@ -43,7 +43,6 @@ struct HttpHandlerObject {
     boost::atomic<bool>    working_;        //  启用，禁用等标记
 
 
-    const enum HTTP_METHOD http_method_;    // 当前存储的METHOD
     HttpGetHandler         http_get_handler_;
     HttpPostHandler        http_post_handler_;
 
@@ -53,7 +52,6 @@ struct HttpHandlerObject {
         path_(path),
         success_count_(0), fail_count_(0),
         built_in_(built_in), working_(working),
-        http_method_(HTTP_METHOD::GET),
         http_get_handler_(get_handler) {
     }
 
@@ -63,8 +61,26 @@ struct HttpHandlerObject {
         path_(path),
         success_count_(0), fail_count_(0),
         built_in_(built_in), working_(working),
-        http_method_(HTTP_METHOD::POST),
         http_post_handler_(post_handler) {
+    }
+
+    HttpHandlerObject(const std::string& path,
+                      const HttpGetHandler& get_handler,
+                      const HttpPostHandler& post_handler,
+                      bool built_in = false, bool working = true):
+        path_(path),
+        success_count_(0), fail_count_(0),
+        built_in_(built_in), working_(working),
+        http_get_handler_(get_handler),
+        http_post_handler_(post_handler) {
+    }
+
+    void update_get_handler(const HttpGetHandler& get_handler) {
+        http_get_handler_ = get_handler;
+    }
+
+    void update_post_handler(const HttpPostHandler& post_handler) {
+        http_post_handler_ = post_handler;
     }
 
     bool check_basic_auth(const std::string& uri, const std::string auth_str) const;

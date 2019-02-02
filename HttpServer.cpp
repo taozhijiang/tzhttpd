@@ -14,8 +14,6 @@
 #include <boost/format.hpp>
 #include <boost/atomic/atomic.hpp>
 
-#include "HttpCfgHelper.h"
-
 #include "TcpConnAsync.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
@@ -42,7 +40,9 @@ void init_http_version(const std::string& server_version) {
 }
 
 
-bool HttpConf::load_config(const libconfig::Config& cfg) {
+bool HttpConf::load_config(std::shared_ptr<libconfig::Config> conf_ptr) {
+
+    const auto& cfg = *conf_ptr;
 
     int listen_port = 0;
     ConfUtil::conf_value(cfg, "http.bind_addr", bind_addr_);
@@ -81,7 +81,7 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
         return false;
     }
 
-    ConfUtil::conf_value(cfg, "http.thread_pool_size", io_thread_number_);
+    ConfUtil::conf_value(cfg, "http.io_thread_pool_size", io_thread_number_);
     if (io_thread_number_ < 0) {
         tzhttpd_log_err( "invalid http.io_thread_number %d", io_thread_number_);
         return false;
@@ -113,7 +113,7 @@ bool HttpConf::load_config(const libconfig::Config& cfg) {
     http_service_enabled_ = value_b;
     http_service_speed_ = value1;
 
-    tzhttpd_log_debug("HttpConf parse cfgfile %s OK!", HttpCfgHelper::instance().get_cfgfile().c_str());
+    tzhttpd_log_debug("HttpConf parse conf OK!");
 
     return true;
 }
@@ -141,13 +141,15 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
 HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_name) :
     instance_name_(instance_name),
+    cfgfile_(cfgfile),
     io_service_(),
     acceptor_(),
     conf_({}),
     io_service_threads_() {
 
-    HttpCfgHelper::instance().init(cfgfile);
-
+   bool ret = ConfHelper::instance().init(cfgfile_);
+   if (!ret)
+       fprintf(stderr, "init conf failed.\n");
 }
 
 bool HttpServer::init() {
@@ -167,26 +169,17 @@ bool HttpServer::init() {
         return false;
     }
 
-    libconfig::Config cfg;
-
-    std::string cfgfile = HttpCfgHelper::instance().get_cfgfile();
-    try {
-        cfg.readFile(cfgfile.c_str());
-    } catch(libconfig::FileIOException &fioex) {
-        fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
-        tzhttpd_log_err( "I/O error while reading file: %s.", cfgfile.c_str());
-        return false;
-    } catch(libconfig::ParseException &pex) {
-        fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
-        tzhttpd_log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
+    if(!ConfHelper::instance().init(cfgfile_)) {
+        tzhttpd_log_err("init ConfHelper (%s) failed, critical !!!!", cfgfile_.c_str());
         return false;
     }
+    auto conf_ptr = ConfHelper::instance().get_conf();
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
 
-    if (!conf_.load_config(cfg)) {
-        tzhttpd_log_err("Load cfg failed!");
+    if (!conf_.load_config(conf_ptr)) {
+        tzhttpd_log_err("Load http conf failed!");
         return false;
     }
 
@@ -345,13 +338,18 @@ void HttpServer::service() {
     do_accept();
 }
 
-
-int HttpServer::register_http_get_handler(const std::string& hostname, const HttpGetHandler& handler) {
-    return Dispatcher::instance().register_http_get_handler(hostname, handler);
+int HttpServer::register_http_vhost(const std::string& hostname) {
+    return Dispatcher::instance().register_virtual_host(hostname);
 }
 
-int HttpServer::register_http_post_handler(const std::string& hostname, const HttpPostHandler& handler) {
-    return Dispatcher::instance().register_http_post_handler(hostname, handler);
+int HttpServer::register_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
+                                          const std::string hostname) {
+    return Dispatcher::instance().register_http_get_handler(hostname, uri_regex, handler);
+}
+
+int HttpServer::register_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
+                                           const std::string hostname) {
+    return Dispatcher::instance().register_http_post_handler(hostname, uri_regex, handler);
 }
 
 void HttpServer::do_accept() {
