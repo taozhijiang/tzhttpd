@@ -20,6 +20,7 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
+#include <zlib.h>
 #include <cryptopp/gzip.h>
 
 // 类静态函数可以直接将函数定义丢在头文件中
@@ -31,7 +32,7 @@ namespace tzhttpd {
 struct CryptoUtil {
 
 
-static std::string base64_encode(const std::string &ascii) {
+static std::string base64_encode(const std::string &ascii, bool newline = false) {
 
     std::string base64;
 
@@ -39,7 +40,9 @@ static std::string base64_encode(const std::string &ascii) {
     BUF_MEM *bptr = BUF_MEM_new();
 
     b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    if (!newline) {
+        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    }
     bio = BIO_new(BIO_s_mem());
     BIO_push(b64, bio);
     BIO_set_mem_buf(b64, bptr, BIO_CLOSE);
@@ -64,7 +67,7 @@ static std::string base64_encode(const std::string &ascii) {
     return base64;
 }
 
-static std::string base64_decode(const std::string &base64) noexcept {
+static std::string base64_decode(const std::string &base64, bool newline = false) noexcept {
 
     std::string ascii;
 
@@ -73,7 +76,9 @@ static std::string base64_decode(const std::string &base64) noexcept {
     BIO *b64, *bio;
 
     b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    if (!newline) {
+        BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    }
     // TODO: Remove in 2020
 #if OPENSSL_VERSION_NUMBER <= 0x1000115fL
     bio = BIO_new_mem_buf((char *)&base64[0], static_cast<int>(base64.size()));
@@ -444,6 +449,46 @@ static std::string Inflator(const std::string& src) {
 	} catch (...) {
 		std::cerr << "Inflator exception: unknown" << std::endl;
 	}
+
+    return store;
+}
+
+
+
+static std::string CDeflator(const std::string& src) {
+    std::string store;
+
+    char ext[4096*16] {};
+    uLong srcSize = src.size();
+    //uLong dstSize = compressBound(srcSize);
+    uLong dstSize = sizeof(ext);
+
+    // Deflate
+    // Upon exit, destLen is the actual size of the compressed data
+    int ret = compress((Bytef *)ext, &dstSize, (const Bytef *)src.c_str(), srcSize);
+    if (ret != Z_OK) {
+        std::cerr << "compress error: " << ret << std::endl;
+    } else {
+        store = std::string(ext, dstSize);
+    }
+    return store;
+}
+
+
+static std::string CInflator(const std::string& src) {
+    std::string store;
+
+    char ext[4096*16] {};
+    uLong srcSize = src.size();
+    uLong dstSize = sizeof(ext);
+
+    // Inflate
+    int ret = uncompress((Bytef *)ext, &dstSize, (const Bytef *)src.c_str(), srcSize);
+    if (ret != Z_OK) {
+        std::cerr << "uncompress error: " << ret << std::endl;
+    } else {
+        store = std::string(ext, dstSize);
+    }
 
     return store;
 }

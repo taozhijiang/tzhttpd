@@ -58,4 +58,4 @@ typedef int (*module_exit_t)();
 } // end extern "C"
 #endif
 
-#endif // __TZHTTPD_SO_HELPER_H__
+#endif // __TZHTTPD_CGI_HELPER_H__

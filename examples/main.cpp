@@ -94,12 +94,21 @@ int main(int argc, char* argv[]) {
 
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
-    if (!http_server_ptr || !http_server_ptr->init()) {
-        fprintf(stderr, "Init HttpServer failed!");
+    if (!http_server_ptr ) {
+        fprintf(stderr, "create HttpServer failed!");
         return false;
     }
 
-    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler, true);
+    http_server_ptr->register_http_vhost("example2.com");
+    http_server_ptr->register_http_vhost("www.example2.com");
+    http_server_ptr->register_http_vhost("www.example3.com");
+
+    if(!http_server_ptr->init()){
+        fprintf(stderr, "init HttpServer failed!");
+        return false;
+    }
+
+    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();
