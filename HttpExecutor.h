@@ -79,11 +79,11 @@ private:
     bool load_http_cgis(const libconfig::Setting& setting);
     bool handle_virtual_host_conf(const libconfig::Setting& setting);
 
+
     // 路由选择算法
     int do_find_handler(const enum HTTP_METHOD& method,
                         const std::string& uri,
                         HttpHandlerObjectPtr& handler);
-
 
 private:
 
@@ -121,6 +121,7 @@ private:
     std::set<std::string> compress_controls_;
 
     std::unique_ptr<BasicAuth> http_auth_;
+    bool pass_basic_auth(const std::string& uri, const std::string auth_str);
 };
 
 } // tzhttpd

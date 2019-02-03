@@ -82,8 +82,6 @@ struct HttpHandlerObject {
     void update_post_handler(const HttpPostHandler& post_handler) {
         http_post_handler_ = post_handler;
     }
-
-    bool check_basic_auth(const std::string& uri, const std::string auth_str) const;
 };
 
 typedef std::shared_ptr<HttpHandlerObject>  HttpHandlerObjectPtr;

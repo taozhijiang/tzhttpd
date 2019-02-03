@@ -530,7 +530,7 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
 bool HttpExecutor::exist_get_handler(const std::string& uri_regex) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
-    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
     for (it = handlers_.begin(); it != handlers_.end(); ++it) {
@@ -546,7 +546,7 @@ bool HttpExecutor::exist_get_handler(const std::string& uri_regex) {
 bool HttpExecutor::exist_post_handler(const std::string& uri_regex) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
-    boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
+    boost::shared_lock<boost::shared_mutex> rlock(rwlock_);
 
     std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>>::iterator it;
     for (it = handlers_.begin(); it != handlers_.end(); ++it) {
@@ -624,6 +624,13 @@ int HttpExecutor::register_post_handler(const std::string& uri_regex, const Http
     return 0;
 }
 
+bool HttpExecutor::pass_basic_auth(const std::string& uri, const std::string auth_str) {
+    if (!http_auth_) {
+        return true;
+    }
+
+    return http_auth_->check_auth(uri, auth_str);
+}
 
 
 int HttpExecutor::do_find_handler(const enum HTTP_METHOD& method,
@@ -708,6 +715,14 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
     }
 
     SAFE_ASSERT(handler_object);
+
+    // AUTH CHECK
+    if(!pass_basic_auth(http_req_instance->uri_,
+                        http_req_instance->http_parser_->find_request_header(http_proto::header_options::auth))) {
+         tzhttpd_log_err("basic_auth for %s failed ...", http_req_instance->uri_.c_str());
+         http_req_instance->http_std_response(http_proto::StatusCode::client_error_unauthorized);
+         return;
+    }
 
     if (http_req_instance->method_ == HTTP_METHOD::GET)
     {

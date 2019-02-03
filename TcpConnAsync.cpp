@@ -232,10 +232,12 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
         return;
     }
 
-    SAFE_ASSERT(bytes_transferred > 0);
-
-    std::string additional(recv_bound_.io_block_, bytes_transferred);
-    recv_bound_.buffer_.append_internal(additional);
+    // 如果在读取HTTP头部的同时就将数据也读取出来了，这时候实际的
+    // bytes_transferred == 0
+    if (bytes_transferred > 0) {
+        std::string additional(recv_bound_.io_block_, bytes_transferred);
+        recv_bound_.buffer_.append_internal(additional);
+    }
 
     if (recv_bound_.buffer_.get_length() < recv_bound_.length_hint_) {
         // need to read more, do again!
