@@ -8,9 +8,7 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-using namespace boost::posix_time;
-using namespace boost::gregorian;
+#include <xtra_asio.h>
 
 #include <boost/noncopyable.hpp>
 
@@ -106,7 +104,7 @@ private:
 
     bool was_cancelled_;
     std::mutex ops_cancel_mutex_;
-    std::unique_ptr<boost::asio::deadline_timer> ops_cancel_timer_;
+    std::unique_ptr<steady_timer> ops_cancel_timer_;
 
 private:
 

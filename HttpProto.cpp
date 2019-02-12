@@ -5,9 +5,9 @@
  *
  */
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-using namespace boost::posix_time;
-using namespace boost::gregorian;
+
+#include <ctime>
+#include <boost/chrono.hpp>
 
 #include <sstream>
 #include "HttpProto.h"
@@ -39,7 +39,10 @@ string http_response_generate(const string& content, const string& stat_str,
     headers[0].name = "Server";
     headers[0].value = "tzhttpd server/" + http_handler::http_server_version;
     headers[1].name = "Date";
-    headers[1].value = to_simple_string(second_clock::universal_time()) + " GMT";
+
+    std::time_t now = boost::chrono::system_clock::to_time_t(boost::chrono::system_clock::now());
+    headers[1].value = std::string(std::ctime(&now));
+//    headers[1].value = to_simple_string(second_clock::universal_time()) + " GMT";
     headers[2].name = "Content-Length";
     headers[2].value = std::to_string(static_cast<long long unsigned>(content.size()));
 

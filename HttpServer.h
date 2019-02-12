@@ -56,7 +56,7 @@ private:
     int io_thread_number_;
 
     // 加载、更新配置的时候保护竞争状态
-    std::mutex          lock_;
+    std::mutex             lock_;
     boost::atomic<int>     conn_time_out_;
     boost::atomic<int>     conn_time_out_linger_;
 
@@ -99,7 +99,7 @@ private:
         http_service_token_ = http_service_speed_.load();
     }
 
-    std::shared_ptr<boost::asio::deadline_timer> timed_feed_token_;
+    std::shared_ptr<steady_timer> timed_feed_token_;
     void timed_feed_token_handler(const boost::system::error_code& ec);
 
 };  // end class HttpConf

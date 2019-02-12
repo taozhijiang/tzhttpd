@@ -422,8 +422,8 @@ void TcpConnAsync::set_ops_cancel_timeout() {
         return;
     }
 
-    ops_cancel_timer_.reset( new boost::asio::deadline_timer (http_server_.io_service_,
-                                      boost::posix_time::seconds(http_server_.ops_cancel_time_out())) );
+    ops_cancel_timer_.reset( new steady_timer (http_server_.io_service_,
+                                      boost::chrono::seconds(http_server_.ops_cancel_time_out())) );
     SAFE_ASSERT(http_server_.ops_cancel_time_out());
     ops_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
                                            std::placeholders::_1));

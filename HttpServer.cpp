@@ -130,7 +130,7 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
     feed_http_service_token();
 
     // 再次启动定时器
-    timed_feed_token_->expires_from_now(boost::posix_time::millisec(5000)); // 5sec
+    timed_feed_token_->expires_from_now(boost::chrono::seconds(1)); // 1sec
     timed_feed_token_->async_wait(
         std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
 }
@@ -191,8 +191,8 @@ bool HttpServer::init() {
                       conf_.ops_cancel_time_out_.load(),
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
     if (conf_.http_service_speed_) {
-        conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
-                                              boost::posix_time::millisec(5000))); // 5sec
+        conf_.timed_feed_token_.reset(new boost::asio::steady_timer (io_service_,
+                                              boost::chrono::seconds(1))); // 1sec
         if (!conf_.timed_feed_token_) {
             tzhttpd_log_err("Create timed_feed_token_ failed!");
             return false;
@@ -220,77 +220,6 @@ bool HttpServer::init() {
     return true;
 }
 
-
-#if 0
-
-int HttpServer::update_runtime_cfg(const libconfig::Config& cfg) {
-
-    tzhttpd_log_debug("HttpServer::update_runtime_cfg called ...");
-
-    HttpConf conf {};
-    if (!conf.load_config(cfg)) {
-        tzhttpd_log_err("Load cfg failed!");
-        return -1;
-    }
-
-    // protect cfg race conditon
-    std::lock_guard<std::mutex> lock(conf_.lock_);
-
-    tzhttpd_log_alert("Exchange safe_ip_ .");
-    std::swap(conf.safe_ip_, conf_.safe_ip_);
-
-    if (conf.ops_cancel_time_out_ != conf_.ops_cancel_time_out_) {
-        tzhttpd_log_alert("=> update socket/session conn cancel time_out: from %d to %d",
-                          conf_.ops_cancel_time_out_.load(), conf.ops_cancel_time_out_.load());
-        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
-    }
-
-    // 注意，一旦关闭消费，所有的URI请求都会被拒绝掉，除了internal_manage管理页面可用
-    if (conf.http_service_enabled_ != conf_.http_service_enabled_) {
-        tzhttpd_log_alert("=> update http_service_enabled: from %d to %d",
-                          conf_.http_service_enabled_.load(), conf.http_service_enabled_.load());
-        conf_.http_service_enabled_ = conf.http_service_enabled_.load();
-    }
-
-    if (conf.http_service_speed_ != conf_.http_service_speed_ ) {
-
-        tzhttpd_log_alert("=> update http_service_speed: from %ld to %ld",
-                          conf_.http_service_speed_.load(), conf.http_service_speed_.load());
-        conf_.http_service_speed_ = conf.http_service_speed_.load();
-
-        if (conf.http_service_speed_) { // 首次启用
-            if (! conf_.timed_feed_token_) {
-                conf_.timed_feed_token_.reset(new boost::asio::deadline_timer (io_service_,
-                                                      boost::posix_time::millisec(5000))); // 5sec
-                if (!conf_.timed_feed_token_) {
-                    tzhttpd_log_err("create timed_feed_token_ failed!");
-                    return -2;
-                }
-
-                conf_.timed_feed_token_->async_wait(
-                    std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
-            }
-        } else { // 禁用功能
-
-            // 禁用在handler中删除定时器就可以了，直接这里删会导致CoreDump
-        }
-    }
-
-    // 当前不支持缩减线程
-    if (conf.io_thread_number_ > conf_.io_thread_number_) {
-        tzhttpd_log_alert("=> resize io_thread_num from %d to %d",
-                          conf_.io_thread_number_, conf.io_thread_number_);
-        conf_.io_thread_number_ = conf.io_thread_number_;
-        if (io_service_threads_.resize_threads(conf_.io_thread_number_) != 0) {
-            tzhttpd_log_err("resize io_thread_num may failed!");
-            return -3;
-        }
-    }
-
-    tzhttpd_log_alert("HttpServer::update_runtime_cfg called return %d ...", ret_code);
-    return ret_code;
-}
-#endif
 
 
 // main task loop

@@ -9,6 +9,7 @@
 #define __TZHTTPD_HTTP_PROTO_H__
 
 #include <map>
+#include <vector>
 #include <string>
 
 namespace tzhttpd {
