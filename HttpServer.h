@@ -57,10 +57,9 @@ private:
 
     // 加载、更新配置的时候保护竞争状态
     std::mutex             lock_;
-    boost::atomic<int>     conn_time_out_;
-    boost::atomic<int>     conn_time_out_linger_;
 
-    boost::atomic<int>     ops_cancel_time_out_;    // sec 会话超时自动取消ops
+    boost::atomic<int>     session_cancel_time_out_;    // session间隔会话时长
+    boost::atomic<int>     ops_cancel_time_out_;        // ops操作超时时长
 
     boost::atomic<bool>    http_service_enabled_;   // 服务开关
     boost::atomic<int64_t> http_service_speed_;
@@ -144,6 +143,10 @@ public:
 
     int ops_cancel_time_out() const {
         return conf_.ops_cancel_time_out_;
+    }
+
+    int session_cancel_time_out() const {
+        return conf_.session_cancel_time_out_;
     }
 
 public:

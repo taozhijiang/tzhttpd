@@ -103,6 +103,13 @@ bool HttpConf::load_config(std::shared_ptr<libconfig::Config> conf_ptr) {
     }
     ops_cancel_time_out_ = value1;
 
+    ConfUtil::conf_value(cfg, "http.session_cancel_time_out", value1);
+    if (value1 < 0){
+        tzhttpd_log_err("invalid http session_cancel_time_out value.");
+        return false;
+    }
+    session_cancel_time_out_ = value1;
+
     bool value_b;
     ConfUtil::conf_value(cfg, "http.service_enable", value_b, true);
     ConfUtil::conf_value(cfg, "http.service_speed", value1);
@@ -132,7 +139,7 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
     // 再次启动定时器
     timed_feed_token_->expires_from_now(boost::chrono::seconds(1)); // 1sec
     timed_feed_token_->async_wait(
-        std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
+                std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
 }
 
 
@@ -191,15 +198,15 @@ bool HttpServer::init() {
                       conf_.ops_cancel_time_out_.load(),
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
     if (conf_.http_service_speed_) {
-        conf_.timed_feed_token_.reset(new boost::asio::steady_timer (io_service_,
-                                              boost::chrono::seconds(1))); // 1sec
+        conf_.timed_feed_token_.reset(new steady_timer (io_service_)); // 1sec
         if (!conf_.timed_feed_token_) {
             tzhttpd_log_err("Create timed_feed_token_ failed!");
             return false;
         }
 
+        conf_.timed_feed_token_->expires_from_now(boost::chrono::seconds(1));
         conf_.timed_feed_token_->async_wait(
-            std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
+                    std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
     tzhttpd_log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
                       conf_.http_service_speed_.load());
@@ -285,8 +292,8 @@ void HttpServer::do_accept() {
 
     SocketPtr sock_ptr(new ip::tcp::socket(io_service_));
     acceptor_->async_accept(*sock_ptr,
-                           std::bind(&HttpServer::accept_handler, this,
-                                       std::placeholders::_1, sock_ptr));
+                            std::bind(&HttpServer::accept_handler, this,
+                                      std::placeholders::_1, sock_ptr));
 }
 
 void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr sock_ptr) {
