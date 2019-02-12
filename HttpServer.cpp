@@ -15,9 +15,12 @@
 #include <boost/atomic/atomic.hpp>
 
 #include "TcpConnAsync.h"
+
+#include "HttpProto.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
 #include "Dispatcher.h"
+#include "Status.h"
 
 #include "SslSetup.h"
 
@@ -159,7 +162,23 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
        fprintf(stderr, "init conf failed.\n");
 }
 
+
+int system_status_handler(const HttpParser& http_parser,
+                          std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+
+    std::string result;
+    Status::instance().collect_status(result);
+
+    response = result;
+    status_line = http_proto::generate_response_status_line(http_parser.get_version(), http_proto::StatusCode::success_ok);
+
+    return 0;
+}
+
 bool HttpServer::init() {
+
+    (void)Status::instance();
+    (void)Dispatcher::instance();
 
     // incase not forget
     ::signal(SIGPIPE, SIG_IGN);
@@ -218,12 +237,21 @@ bool HttpServer::init() {
         return false;
     }
 
-
     if (!Dispatcher::instance().init()) {
         tzhttpd_log_err("Init HttpDispatcher failed.");
         return false;
     }
 
+
+    // 系统状态展示相关的初始化
+    Status::instance().register_status_callback("http_server",
+                                                std::bind(&HttpServer::module_status, shared_from_this(),
+                                                          std::placeholders::_1, std::placeholders::_2));
+
+    if (register_http_get_handler("^/internal/status$", system_status_handler) != 0) {
+        tzhttpd_log_err("register system status module failed, treat as fatal.");
+        return false;
+    }
     return true;
 }
 
@@ -360,5 +388,26 @@ int HttpServer::io_service_join() {
     return 0;
 }
 
+
+int HttpServer::module_status(std::string& strKey, std::string& strValue) {
+
+    strKey = "http_server";
+
+    std::stringstream ss;
+
+    ss << "\t" << "instance_name: " << instance_name_ << std::endl;
+    ss << "\t" << "service_addr: " << conf_.bind_addr_ << "@" << conf_.listen_port_ << std::endl;
+    ss << "\t" << "backlog_size: " << conf_.backlog_size_ << std::endl;
+    ss << "\t" << "io_thread_pool_size: " << conf_.io_thread_number_ << std::endl;
+    ss << "\t" << std::endl;
+
+    ss << "\t" << "http_service_enabled: " << (conf_.http_service_enabled_  ? "true" : "false") << std::endl;
+    ss << "\t" << "http_service_speed(tps): " << conf_.http_service_speed_ << std::endl;
+    ss << "\t" << "session_cancel_time_out: " << conf_.session_cancel_time_out_ << std::endl;
+    ss << "\t" << "ops_cancel_time_out: " << conf_.ops_cancel_time_out_ << std::endl;
+
+    strValue = ss.str();
+    return 0;
+}
 
 } // end namespace tzhttpd

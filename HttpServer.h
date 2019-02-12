@@ -154,6 +154,9 @@ public:
     void io_service_run(ThreadObjPtr ptr);  // main task loop
     int io_service_stop_graceful();
     int io_service_join();
+
+public:
+    int module_status(std::string& strKey, std::string& strValue);
 };
 
 
