@@ -153,6 +153,8 @@ public:
             return false;
         }
 
+         tzhttpd_log_alert("Joined Task Success ...");
+
         // release this thread object
         pool_size_ --;
         workers_.erase(worker);
@@ -232,7 +234,7 @@ private:
             }
         } while (0);
 
-        tzhttpd_log_alert("current ThreadPool size: %d", pool_size_);
+        tzhttpd_log_alert("Current ThreadPool size: %d", pool_size_);
         return ((currsize - workers_.size()) >= num) ? 0 : -1;
     }
 

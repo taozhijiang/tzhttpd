@@ -353,12 +353,15 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
     std::string redirect_str;
     std::string docu_root_str;
     std::string docu_index_str;
+
     ConfUtil::conf_value(setting, "server_name", server_name);
     ConfUtil::conf_value(setting, "redirect", redirect_str);
     ConfUtil::conf_value(setting, "docu_root", docu_root_str);
     ConfUtil::conf_value(setting, "docu_index", docu_index_str);
 
     ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_.exec_thread_number_);
+    ConfUtil::conf_value(setting, "exec_thread_pool_size_hard", conf_.exec_thread_number_hard_);
+    ConfUtil::conf_value(setting, "exec_thread_pool_step_queue_size", conf_.exec_thread_step_queue_size_);
 
 
     if (!redirect_str.empty()) {

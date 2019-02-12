@@ -1,6 +1,7 @@
 #ifndef __TZHTTPD_EXECUTOR_H__
 #define __TZHTTPD_EXECUTOR_H__
 
+#include <xtra_asio.h>
 #include <xtra_rhel6.h>
 
 #include "Log.h"
@@ -17,6 +18,8 @@ namespace tzhttpd {
 
 struct ExecutorConf {
     int exec_thread_number_;
+    int exec_thread_number_hard_;  // 允许最大的线程数目
+    int exec_thread_step_queue_size_;
 };
 
 class Executor: public ServiceIf {
@@ -25,7 +28,9 @@ public:
 
     explicit Executor(std::shared_ptr<ServiceIf> service_impl):
         service_impl_(service_impl),
-        http_req_queue_() {
+        http_req_queue_(),
+        conf_({}),
+        threads_adjust_timer_() {
     }
 
     void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
@@ -81,6 +86,11 @@ public:
         executor_threads_.join_threads();
         return 0;
     }
+
+private:
+    // 根据http_req_queue_自动伸缩线程负载
+    std::unique_ptr<steady_timer> threads_adjust_timer_;
+    void executor_threads_adjust();
 
 };
 

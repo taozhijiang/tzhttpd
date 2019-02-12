@@ -1,10 +1,54 @@
 #include "Dispatcher.h"
+#include "HttpExecutor.h"
 
 namespace tzhttpd {
 
 Dispatcher& Dispatcher::instance() {
     static Dispatcher dispatcher;
     return dispatcher;
+}
+
+bool Dispatcher::init() {
+
+    initialized_ = true;
+
+    // 注册默认default vhost
+    SAFE_ASSERT(!default_service_);
+
+    // 创建io_service工作线程
+    io_service_thread_ = boost::thread(std::bind(&Dispatcher::io_service_run, this));
+
+    // 创建 default virtual host
+    // http impl
+    auto default_http_impl = std::make_shared<HttpExecutor>("[default]");
+    if (!default_http_impl|| !default_http_impl->init()) {
+        tzhttpd_log_err("create default http_impl failed.");
+        return false;
+    }
+
+    // http executor
+    default_service_.reset(new Executor(default_http_impl));
+    Executor* executor = dynamic_cast<Executor *>(default_service_.get());
+
+    SAFE_ASSERT(executor);
+    if (!executor || !executor->init()) {
+        tzhttpd_log_err("init default virtual host executor failed.");
+        return false;
+    }
+
+    executor->executor_start();
+    tzhttpd_log_debug("start default virtual host executor: %s success",  executor->instance_name().c_str());
+    //
+
+    for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
+        Executor* executor = dynamic_cast<Executor *>(iter->second.get());
+        SAFE_ASSERT(executor);
+
+        executor->executor_start();
+        tzhttpd_log_debug("start virtual host executor for %s success",  executor->instance_name().c_str());
+    }
+
+    return true;
 }
 
 
