@@ -793,5 +793,54 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
 }
 
 
+int HttpExecutor::module_status(std::string& strKey, std::string& strValue) {
+
+    std::stringstream ss;
+
+    ss << "\t" << "virtual_hostname: " << hostname_ << std::endl;
+
+    if (!redirect_str_.empty()) {
+        ss << "\t" << "30x redirect: " << redirect_str_ << std::endl;
+        strValue = ss.str();
+        return 0;
+    }
+
+    ss << "\t" << "document_root: " << http_docu_root_ << std::endl;
+    ss << "\t" << "document_index: ";
+    for (auto iter = http_docu_index_.begin(); iter != http_docu_index_.end(); ++iter) {
+        ss << *iter << ", ";
+    }
+    ss << std::endl;
+
+    ss << "\t" << "register_handler: " << std::endl;
+    for (auto iter = handlers_.begin(); iter != handlers_.end(); ++iter) {
+        auto handlerObj = iter->second;
+        ss << "\t\t" << "path: " << handlerObj->path_ ;
+        ss         << "method: " << ( handlerObj->http_get_handler_ ? "GET " : "");
+        ss                       << ( handlerObj->http_post_handler_ ? "POST " : "");
+        ss << std::endl;
+    }
+
+    ss << "\t" << std::endl;
+    if (!cache_controls_.empty()) {
+        ss << "\t" << "cache_control: " << std::endl;
+        for (auto iter = cache_controls_.begin(); iter != cache_controls_.end(); ++iter) {
+            ss << "\t\t" << iter->first << " : "  << iter->second << std::endl;
+        }
+    }
+
+    if (!compress_controls_.empty()) {
+        ss << "\t" << "compress_control: ";
+        for (auto iter = compress_controls_.begin(); iter != compress_controls_.end(); ++iter) {
+            ss << *iter << ", ";
+        }
+        ss << std::endl;
+    }
+
+    strValue = ss.str();
+    return 0;
+}
+
+
 } // end namespace tzhttpd
 

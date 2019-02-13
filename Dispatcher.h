@@ -48,6 +48,11 @@ public:
         return "HttpDispatcher";
     }
 
+    // 不会使用
+    int module_status(std::string& strKey, std::string& strValue) override {
+        return -1;
+    }
+
     // 注册虚拟主机
     int register_virtual_host(const std::string& hostname);
 

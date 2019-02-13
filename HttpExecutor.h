@@ -64,6 +64,8 @@ public:
     int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler);
     int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler);
 
+    int module_status(std::string& strKey, std::string& strValue);
+
     bool exist_get_handler(const std::string& uri_regex);
     bool exist_post_handler(const std::string& uri_regex);
 

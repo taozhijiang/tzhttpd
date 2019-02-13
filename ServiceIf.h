@@ -26,6 +26,9 @@ public:
     //
     virtual int register_get_handler(const std::string& uri, const HttpGetHandler& handler) = 0;
     virtual int register_post_handler(const std::string& uri, const HttpPostHandler& handler) = 0;
+
+    // 收集模块的状态信息
+    virtual int module_status(std::string& strKey, std::string& strValue) = 0;
 };
 
 } // end tzhttpd

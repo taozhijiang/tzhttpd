@@ -45,11 +45,11 @@ int Status::collect_status(std::string& output) {
 
     std::stringstream ss;
 
-    ss << "  *** SYSTEM STATUS ***  " << std::endl;
+    ss << "  *** SYSTEM RUNTIME STATUS ***  " << std::endl << std::endl;
     for (auto iter = results.begin(); iter != results.end(); ++iter) {
         ss << "[" << iter->first << "]" << std::endl;
         ss << iter->second << std::endl;
-        ss << " ----------------------- " << std::endl;
+        ss << " ------------------------------- " << std::endl;
         ss << std::endl;
     }
 

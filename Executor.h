@@ -22,7 +22,8 @@ struct ExecutorConf {
     int exec_thread_step_queue_size_;
 };
 
-class Executor: public ServiceIf {
+class Executor: public ServiceIf,
+                public std::enable_shared_from_this<Executor> {
 
 public:
 
@@ -50,6 +51,7 @@ public:
     }
 
     bool init();
+    int module_status(std::string& strKey, std::string& strValue);
 
 private:
     // point to HttpExecutor, forward some request

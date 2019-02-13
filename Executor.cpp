@@ -3,6 +3,7 @@
 #include "HttpExecutor.h"
 
 #include "Executor.h"
+#include "Status.h"
 
 namespace tzhttpd {
 
@@ -53,6 +54,11 @@ bool Executor::init() {
         threads_adjust_timer_->async_wait(
                     std::bind(&Executor::executor_threads_adjust, this));
     }
+
+    Status::instance().register_status_callback("Executor" + instance_name(),
+                                                std::bind(&Executor::module_status, shared_from_this(),
+                                                          std::placeholders::_1, std::placeholders::_2));
+
 
     return true;
 }
@@ -114,8 +120,34 @@ void Executor::executor_threads_adjust() {
 
     threads_adjust_timer_->expires_from_now(boost::chrono::seconds(1));
     threads_adjust_timer_->async_wait(
-            std::bind(&Executor::executor_threads_adjust, this));
+            std::bind(&Executor::executor_threads_adjust, shared_from_this()));
 
+}
+
+int Executor::module_status(std::string& strKey, std::string& strValue) {
+
+    strKey = "[executor_" + instance_name() + "]";
+
+    std::stringstream ss;
+
+    ss << "\t" << "instance_name: " << instance_name() << std::endl;
+    ss << "\t" << "exec_thread_number: " << conf_.exec_thread_number_ << std::endl;
+    ss << "\t" << "exec_thread_number_hard(maxium): " << conf_.exec_thread_number_hard_ << std::endl;
+    ss << "\t" << "exec_thread_step_queue_size: " << conf_.exec_thread_step_queue_size_ << std::endl;
+
+    ss << "\t" << std::endl;
+
+    ss << "\t" << "current_thread_number: " << executor_threads_.get_pool_size() << std::endl;
+    ss << "\t" << "current_queue_size: " << http_req_queue_.SIZE() << std::endl;
+
+    std::string subKey;
+    std::string subValue;
+    service_impl_->module_status(subKey, subValue);
+
+    // collect
+    strValue = ss.str() + subValue;
+
+    return 0;
 }
 
 

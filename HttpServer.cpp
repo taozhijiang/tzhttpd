@@ -175,6 +175,8 @@ int system_status_handler(const HttpParser& http_parser,
     return 0;
 }
 
+bool system_manage_page_init(HttpServer& server);
+
 bool HttpServer::init() {
 
     (void)Status::instance();
@@ -248,10 +250,11 @@ bool HttpServer::init() {
                                                 std::bind(&HttpServer::module_status, shared_from_this(),
                                                           std::placeholders::_1, std::placeholders::_2));
 
-    if (register_http_get_handler("^/internal/status$", system_status_handler) != 0) {
-        tzhttpd_log_err("register system status module failed, treat as fatal.");
+    if (!system_manage_page_init(*this)) {
+        tzhttpd_log_err("init system manage page failed, treat as fatal.");
         return false;
     }
+
     return true;
 }
 
@@ -399,6 +402,12 @@ int HttpServer::module_status(std::string& strKey, std::string& strValue) {
     ss << "\t" << "service_addr: " << conf_.bind_addr_ << "@" << conf_.listen_port_ << std::endl;
     ss << "\t" << "backlog_size: " << conf_.backlog_size_ << std::endl;
     ss << "\t" << "io_thread_pool_size: " << conf_.io_thread_number_ << std::endl;
+    ss << "\t" << "safe_ips: " ;
+    for (auto iter = conf_.safe_ip_.begin(); iter != conf_.safe_ip_.end(); ++iter) {
+        ss << *iter << ", ";
+    }
+    ss << std::endl;
+
     ss << "\t" << std::endl;
 
     ss << "\t" << "http_service_enabled: " << (conf_.http_service_enabled_  ? "true" : "false") << std::endl;
