@@ -1,5 +1,7 @@
-#include "Dispatcher.h"
+#include "ConfHelper.h"
 #include "HttpExecutor.h"
+
+#include "Dispatcher.h"
 
 namespace tzhttpd {
 
@@ -48,6 +50,12 @@ bool Dispatcher::init() {
         tzhttpd_log_debug("start virtual host executor for %s success",  executor->instance_name().c_str());
     }
 
+    // 注册配置动态更新接口
+    ConfHelper::instance().register_conf_callback(
+            std::bind(&Dispatcher::update_runtime_conf, this,
+                      std::placeholders::_1));
+
+
     return true;
 }
 
@@ -65,6 +73,7 @@ int Dispatcher::register_virtual_host(const std::string& hostname) {
     }
 
     // http impl
+    // 此处加载HTTP的相关配置
     auto default_http_impl = std::make_shared<HttpExecutor>(hostname);
     if (!default_http_impl || !default_http_impl->init()) {
         tzhttpd_log_err("create http_impl for %s failed.", hostname.c_str());
@@ -116,6 +125,35 @@ int Dispatcher::register_http_post_handler(const std::string& hostname, const st
     }
 
     return service->register_post_handler(uri_regex, handler);
+}
+
+// 依次调用触发进行默认、其他虚拟主机的配置更新
+int Dispatcher::update_runtime_conf(const libconfig::Config& conf) {
+
+    int ret = 0;
+
+    Executor* executor = dynamic_cast<Executor *>(default_service_.get());
+    SAFE_ASSERT(executor);
+    if (executor) {
+        ret += executor->update_runtime_conf(conf);
+    } else {
+        tzhttpd_log_err("dynamic_cast default_service_ failed.");
+        ret += -1000;
+    }
+
+    for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
+        Executor* executor = dynamic_cast<Executor *>(iter->second.get());
+        SAFE_ASSERT(executor);
+
+        if (executor) {
+            ret += executor->update_runtime_conf(conf);
+        } else {
+            tzhttpd_log_err("dynamic_cast execute_service failed.");
+            ret += -1000;
+        }
+    }
+
+    return ret;
 }
 
 

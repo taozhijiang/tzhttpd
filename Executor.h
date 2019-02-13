@@ -51,6 +51,8 @@ public:
     }
 
     bool init();
+    int update_runtime_conf(const libconfig::Config& conf);
+
     int module_status(std::string& strKey, std::string& strValue);
 
 private:
@@ -60,6 +62,7 @@ private:
 
 
 private:
+    std::mutex lock_;
     ExecutorConf conf_;
 
     ThreadPool executor_threads_;

@@ -50,8 +50,12 @@ public:
 
     // 不会使用
     int module_status(std::string& strKey, std::string& strValue) override {
+        SAFE_ASSERT(false);
+        tzhttpd_log_err("YOU SHOULD NOT CALL THIS FUNC...");
         return -1;
     }
+
+    int update_runtime_conf(const libconfig::Config& conf);
 
     // 注册虚拟主机
     int register_virtual_host(const std::string& hostname);

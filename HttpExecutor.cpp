@@ -842,5 +842,37 @@ int HttpExecutor::module_status(std::string& strKey, std::string& strValue) {
 }
 
 
+// 做一些可选的配置动态更新
+// 1. thread_pool的动态更新
+// 2. cgis
+// 3. basic_auth
+// 4. compress_control
+// 5. cache_control
+
+int HttpExecutor::update_runtime_conf(const libconfig::Config& conf) {
+
+    const libconfig::Setting &http_vhosts = conf.lookup("http.vhosts");
+
+    for(int i = 0; i < http_vhosts.getLength(); ++i) {
+
+        const libconfig::Setting& vhost = http_vhosts[i];
+
+        std::string server_name;
+        ConfUtil::conf_value(vhost, "server_name", server_name);
+
+        // 发现是匹配的，则找到对应虚拟主机的配置文件了
+        if (server_name == hostname_) {
+            // TODO
+
+            tzhttpd_log_debug("found host for %s", hostname_.c_str());
+
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
+
 } // end namespace tzhttpd
 

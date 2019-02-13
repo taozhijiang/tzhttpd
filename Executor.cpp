@@ -10,6 +10,8 @@ namespace tzhttpd {
 
 bool Executor::init() {
 
+    std::lock_guard<std::mutex> lock(lock_);
+
     if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
         conf_ = http_executor->get_executor_conf();
     }
@@ -49,15 +51,17 @@ bool Executor::init() {
         }
 
         tzhttpd_log_debug("we will support thread adjust for %s, with param %d:%d",
-                          instance_name().c_str(), conf_.exec_thread_number_hard_,  conf_.exec_thread_step_queue_size_);
+                          instance_name().c_str(),
+                          conf_.exec_thread_number_hard_, conf_.exec_thread_step_queue_size_);
         threads_adjust_timer_->expires_from_now(boost::chrono::seconds(1));
         threads_adjust_timer_->async_wait(
                     std::bind(&Executor::executor_threads_adjust, this));
     }
 
-    Status::instance().register_status_callback("Executor" + instance_name(),
-                                                std::bind(&Executor::module_status, shared_from_this(),
-                                                          std::placeholders::_1, std::placeholders::_2));
+    Status::instance().register_status_callback(
+                "Executor" + instance_name(),
+                std::bind(&Executor::module_status, shared_from_this(),
+                          std::placeholders::_1, std::placeholders::_2));
 
 
     return true;
@@ -101,18 +105,24 @@ void Executor::executor_service_run(ThreadObjPtr ptr) {
 
 void Executor::executor_threads_adjust() {
 
-    SAFE_ASSERT(conf_.exec_thread_step_queue_size_ > 0);
+    ExecutorConf conf {};
+
+    {
+        std::lock_guard<std::mutex> lock(lock_);
+        conf = conf_;
+    }
+
+    SAFE_ASSERT(conf.exec_thread_step_queue_size_ > 0);
 
     // 进行检查，看是否需要伸缩线程池
-    int expect_thread = conf_.exec_thread_number_;
+    int expect_thread = conf.exec_thread_number_;
 
     int queueSize = http_req_queue_.SIZE();
-    tzhttpd_log_notice("current queue size for virtual host %s: %d", instance_name().c_str(), queueSize);
-    if (queueSize > conf_.exec_thread_step_queue_size_) {
-        expect_thread = queueSize / conf_.exec_thread_step_queue_size_;
+    if (queueSize > conf.exec_thread_step_queue_size_) {
+        expect_thread = queueSize / conf.exec_thread_step_queue_size_;
     }
-    if (expect_thread > conf_.exec_thread_number_hard_) {
-        expect_thread = conf_.exec_thread_number_hard_;
+    if (expect_thread > conf.exec_thread_number_hard_) {
+        expect_thread = conf.exec_thread_number_hard_;
     }
 
     executor_threads_.resize_threads(expect_thread);
@@ -150,5 +160,17 @@ int Executor::module_status(std::string& strKey, std::string& strValue) {
     return 0;
 }
 
+
+int Executor::update_runtime_conf(const libconfig::Config& conf) {
+
+    int ret = service_impl_->update_runtime_conf(conf);
+    if (ret == 0) {
+        if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
+            std::lock_guard<std::mutex> lock(lock_);
+            conf_ = http_executor->get_executor_conf();
+        }
+    }
+    return ret;
+}
 
 } // end tzhttpd

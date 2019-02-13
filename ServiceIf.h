@@ -1,6 +1,7 @@
 #ifndef __TZHTTPD_SERVICE_IF_H__
 #define __TZHTTPD_SERVICE_IF_H__
 
+#include <libconfig.h++>
 #include <boost/noncopyable.hpp>
 
 #include <string>
@@ -29,6 +30,7 @@ public:
 
     // 收集模块的状态信息
     virtual int module_status(std::string& strKey, std::string& strValue) = 0;
+    virtual int update_runtime_conf(const libconfig::Config& cfg) = 0;
 };
 
 } // end tzhttpd

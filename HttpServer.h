@@ -45,7 +45,8 @@ class HttpConf {
     friend class HttpServer;
 
 private:
-    bool load_config(std::shared_ptr<libconfig::Config> conf_ptr);
+    bool load_conf(std::shared_ptr<libconfig::Config> conf_ptr);
+    bool load_conf(const libconfig::Config& conf);
 
 private:
     std::string bind_addr_;
@@ -73,10 +74,13 @@ private:
 
     bool get_http_service_token() {
 
-        // if (!http_service_enabled_) {
-        //    tzhttpd_log_alert("http_service not enabled ...");
-        //    return false;
-        // }
+        // 注意：
+        // 如果关闭这个选项，则整个服务都不可用了(包括管理页面)
+        // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
+        if (!http_service_enabled_) {
+            tzhttpd_log_alert("http_service not enabled ...");
+            return false;
+        }
 
         if (http_service_speed_ == 0) // 没有限流
             return true;
@@ -156,6 +160,7 @@ public:
     int io_service_join();
 
 public:
+    int update_runtime_conf(const libconfig::Config& conf);
     int module_status(std::string& strKey, std::string& strValue);
 };
 
