@@ -37,6 +37,7 @@ bool ConfHelper::init(std::string cfgfile) {
         conf_ptr_.reset();
     }
 
+    // when init, parse conf failed was critical.
     if (!conf_ptr_) {
         return false;
     }
@@ -74,7 +75,7 @@ int ConfHelper::update_runtime_conf() {
         ret += (*it)(*conf_ptr_); // call it!
     }
 
-    tzhttpd_log_alert("ConfHelper::update_cfg total callback return: %d", ret);
+    tzhttpd_log_alert("ConfHelper::update_runtime_conf total callback return: %d", ret);
     in_process_ = false;
 
     return ret;

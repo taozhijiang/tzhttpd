@@ -99,16 +99,16 @@ int main(int argc, char* argv[]) {
         return false;
     }
 
-    http_server_ptr->register_http_vhost("example2.com");
-    http_server_ptr->register_http_vhost("www.example2.com");
-    http_server_ptr->register_http_vhost("www.example3.com");
+    http_server_ptr->add_http_vhost("example2.com");
+    http_server_ptr->add_http_vhost("www.example2.com");
+    http_server_ptr->add_http_vhost("www.example3.com");
 
     if(!http_server_ptr->init()){
         fprintf(stderr, "init HttpServer failed!");
         return false;
     }
 
-    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
+    http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

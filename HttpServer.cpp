@@ -226,7 +226,6 @@ bool HttpServer::init() {
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
-
     if (!conf_.load_conf(conf_ptr)) {
         tzhttpd_log_err("Load http conf failed!");
         return false;
@@ -236,9 +235,10 @@ bool HttpServer::init() {
     tzhttpd_log_alert("create listen endpoint for %s:%d",
                       conf_.bind_addr_.c_str(), conf_.listen_port_);
 
-    tzhttpd_log_debug("socket/session conn cancel time_out: %d, enabled: %s",
+    tzhttpd_log_debug("socket/session conn cancel time_out: %d secs, enabled: %s",
                       conf_.ops_cancel_time_out_.load(),
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
+
     if (conf_.http_service_speed_) {
         conf_.timed_feed_token_.reset(new steady_timer (io_service_)); // 1sec
         if (!conf_.timed_feed_token_) {
@@ -250,7 +250,7 @@ bool HttpServer::init() {
         conf_.timed_feed_token_->async_wait(
                     std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
-    tzhttpd_log_debug("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
+    tzhttpd_log_debug("http service enabled: %s, speed: %ld tps", conf_.http_service_enabled_ ? "true" : "false",
                       conf_.http_service_speed_.load());
 
     if (!io_service_threads_.init_threads(
@@ -335,18 +335,18 @@ void HttpServer::service() {
     do_accept();
 }
 
-int HttpServer::register_http_vhost(const std::string& hostname) {
-    return Dispatcher::instance().register_virtual_host(hostname);
+int HttpServer::add_http_vhost(const std::string& hostname) {
+    return Dispatcher::instance().add_virtual_host(hostname);
 }
 
-int HttpServer::register_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
+int HttpServer::add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
                                           const std::string hostname) {
-    return Dispatcher::instance().register_http_get_handler(hostname, uri_regex, handler);
+    return Dispatcher::instance().add_http_get_handler(hostname, uri_regex, handler);
 }
 
-int HttpServer::register_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
+int HttpServer::add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
                                            const std::string hostname) {
-    return Dispatcher::instance().register_http_post_handler(hostname, uri_regex, handler);
+    return Dispatcher::instance().add_http_post_handler(hostname, uri_regex, handler);
 }
 
 void HttpServer::do_accept() {
@@ -458,9 +458,6 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
         return -1;
     }
 
-    // protect cfg race conditon
-    std::lock_guard<std::mutex> lock(conf_.lock_);
-
     if (conf_.session_cancel_time_out_ != conf.session_cancel_time_out_) {
         tzhttpd_log_notice("update session_cancel_time_out from %d to %d",
                            conf_.session_cancel_time_out_.load(), conf.session_cancel_time_out_.load());
@@ -473,8 +470,14 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
     }
 
+
     tzhttpd_log_notice("swap safe_ips...");
-    conf_.safe_ip_.swap(conf.safe_ip_);
+
+    {
+        // protect cfg race conditon
+        std::lock_guard<std::mutex> lock(conf_.lock_);
+        conf_.safe_ip_.swap(conf.safe_ip_);
+    }
 
     if (conf_.http_service_speed_ != conf.http_service_speed_) {
         tzhttpd_log_notice("update http_service_speed from %ld to %ld",
@@ -483,6 +486,8 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
 
         // 检查定时器是否存在
         if (conf_.http_service_speed_) {
+
+            // 直接重置定时器，无论有没有
             conf_.timed_feed_token_.reset(new steady_timer(io_service_)); // 1sec
             if (!conf_.timed_feed_token_) {
                 tzhttpd_log_err("Create timed_feed_token_ failed!");
@@ -495,9 +500,11 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
         }
         else // speed == 0
         {
-            boost::system::error_code ignore_ec;
-            conf_.timed_feed_token_->cancel(ignore_ec);
-            conf_.timed_feed_token_.reset();
+            if (conf_.timed_feed_token_) {
+                boost::system::error_code ignore_ec;
+                conf_.timed_feed_token_->cancel(ignore_ec);
+                conf_.timed_feed_token_.reset();
+            }
         }
     }
 

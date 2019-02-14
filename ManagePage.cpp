@@ -17,7 +17,7 @@ static int system_status_handler(const HttpParser& http_parser,
 
 bool system_manage_page_init(HttpServer& server) {
 
-    if (server.register_http_get_handler("^/internal/status$", system_status_handler) != 0) {
+    if (server.add_http_get_handler("^/internal/status$", system_status_handler) != 0) {
         tzhttpd_log_err("register system status module failed, treat as fatal.");
         return false;
     }

@@ -37,12 +37,13 @@ public:
     // conf file path
     bool init(std::string cfgfile);
 
+    // 配置更新的调用入口函数
     int  update_runtime_conf();
     int  register_conf_callback(ConfUpdateCallable func);
 
     std::shared_ptr<libconfig::Config> get_conf() {
 
-        // try update first
+        // try update new conf first
         load_conf_file();
 
         std::lock_guard<std::mutex> lock(lock_);
@@ -56,13 +57,13 @@ public:
 
         if (conf_update_time_ < ::time(NULL) - 10*60 ) { // 超过10min，重新读取配置文件
 
-            tzhttpd_log_debug("reloading config file, last update time was %ld",
-                              conf_update_time_);
+            tzhttpd_log_debug("reloading config file, last update interval was %ld secs",
+                              ::time(NULL) - conf_update_time_);
 
             auto conf = load_conf_file();
             if (!conf) {
                 tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
-                tzhttpd_log_err("try return staged value.");
+                tzhttpd_log_err("try return old staged value.");
             } else {
                 std::lock_guard<std::mutex> lock(lock_);
                 std::swap(conf, conf_ptr_);
@@ -81,7 +82,7 @@ private:
 
         std::shared_ptr<libconfig::Config> conf = std::make_shared<libconfig::Config>();
         if (!conf) {
-            tzhttpd_log_err("new libconfig::Config failed!");
+            tzhttpd_log_err("create libconfig::Config instance failed!");
             return conf; // nullptr
         }
 
@@ -99,7 +100,9 @@ private:
     }
 
     ConfHelper():
-        cfgfile_(), conf_ptr_(), in_process_(false) {
+        cfgfile_(), 
+        conf_ptr_(), 
+        in_process_(false) {
     }
 
     ~ConfHelper(){}

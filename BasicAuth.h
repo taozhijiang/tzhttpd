@@ -20,21 +20,22 @@
 
 namespace tzhttpd {
 
-// 每个VHost持有一个，主要用户Http BasicAuth鉴权
+// 每个Virtual Host持有一个这个认证结构，主要用户Http BasicAuth鉴权
 
 typedef std::vector<std::pair<UriRegex, std::set<std::string>>> BasicAuthContain;
 
 class BasicAuth {
 
 public:
-    BasicAuth ():
+    BasicAuth():
         basic_auths_(new BasicAuthContain()) {
     }
 
+    // strict == true，如果遇到错误的配置将会报错终止解析
     bool init(const libconfig::Setting& setting, bool strict = false){
 
         if (!setting.exists("basic_auth")) {
-            tzhttpd_log_err("does not contains basic_auth.");
+            tzhttpd_log_err("conf does not contains basic_auth part.");
             return true;
         }
 
@@ -44,7 +45,7 @@ public:
         for(int i = 0; i < basic_auth.getLength(); ++i) {
             const libconfig::Setting& basic_auths_item = basic_auth[i];
             if (!basic_auths_item.exists("uri") || !basic_auths_item.exists("auth")) {
-                tzhttpd_log_err("skip err basic_auth item ....");
+                tzhttpd_log_err("required uri and auth not found.");
                 continue;
             }
             std::string auth_uri_regex;
@@ -54,6 +55,7 @@ public:
             std::set<std::string> auth_set{};
             const libconfig::Setting& auth = basic_auths_item["auth"];
             for (int j = 0; j < auth.getLength(); ++j) {
+
                 const libconfig::Setting& auth_acct = auth[j];
                 std::string auth_user;
                 std::string auth_passwd;
@@ -63,10 +65,10 @@ public:
 
                 if (auth_user.empty() || auth_passwd.empty()) {
                     if (strict) {
-                        tzhttpd_log_err("err account item %s ....", auth_user.c_str());
+                        tzhttpd_log_err("basic_auth err account item %s, strict error return.", auth_user.c_str());
                         return false;
                     } else {
-                        tzhttpd_log_err("skip err account item %s ....", auth_user.c_str());
+                        tzhttpd_log_err("basic_auth skip err account item %s, skip this.", auth_user.c_str());
                         continue;
                     }
                 }
@@ -75,21 +77,21 @@ public:
                 std::string auth_base = CryptoUtil::base64_encode(auth_str);
 
                 auth_set.insert(auth_base);
-                tzhttpd_log_debug("detected valid auth for user %s ", auth_user.c_str());
+                tzhttpd_log_debug("basic_auth detected valid item for user %s ", auth_user.c_str());
             }
 
             if (auth_set.empty()) {
-                tzhttpd_log_notice("empty ruleset for %s, we will allow all access",
+                tzhttpd_log_notice("empty ruleset for %s, we will allow all access for this uri.",
                                     auth_uri_regex.c_str());
             }
 
             UriRegex rgx {auth_uri_regex};
             basic_auths_load->push_back({rgx, auth_set});
-            tzhttpd_log_debug("success add %d auth items for %s.",
+            tzhttpd_log_debug("success add %d auth items for uri %s.",
                               static_cast<int>(auth_set.size()), auth_uri_regex.c_str());
         }
 
-        tzhttpd_log_debug("total auth rules count: %d",
+        tzhttpd_log_debug("total valid auth rules count: %d detected.",
                           static_cast<int>(basic_auths_load->size()));
 
         {
@@ -137,10 +139,14 @@ public:
                 }
 
                 // normal rule check
-                if (it->second.find(auth_code) == it->second.end())
+                if (it->second.find(auth_code) == it->second.end()) {
+                    tzhttpd_log_err("reject access to %s with auth_str: %s", uri.c_str(), auth_str.c_str());
                     return false;
+                }
                 else
+                {
                     return true;
+                }
             }
         }
 

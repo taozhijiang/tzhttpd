@@ -10,7 +10,7 @@ namespace tzhttpd {
 
 bool Executor::init() {
 
-    std::lock_guard<std::mutex> lock(lock_);
+    std::lock_guard<std::mutex> lock(conf_lock_);
 
     if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
         conf_ = http_executor->get_executor_conf();
@@ -108,7 +108,7 @@ void Executor::executor_threads_adjust() {
     ExecutorConf conf {};
 
     {
-        std::lock_guard<std::mutex> lock(lock_);
+        std::lock_guard<std::mutex> lock(conf_lock_);
         conf = conf_;
     }
 
@@ -164,9 +164,14 @@ int Executor::module_status(std::string& strKey, std::string& strValue) {
 int Executor::update_runtime_conf(const libconfig::Config& conf) {
 
     int ret = service_impl_->update_runtime_conf(conf);
+
+    // 如果返回0，表示配置文件已经正确解析了，同时ExecutorConf也重新初始化了
     if (ret == 0) {
         if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
-            std::lock_guard<std::mutex> lock(lock_);
+
+            tzhttpd_log_notice("update ExecutorConf for host %s", instance_name().c_str());
+
+            std::lock_guard<std::mutex> lock(conf_lock_);
             conf_ = http_executor->get_executor_conf();
         }
     }

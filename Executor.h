@@ -30,6 +30,7 @@ public:
     explicit Executor(std::shared_ptr<ServiceIf> service_impl):
         service_impl_(service_impl),
         http_req_queue_(),
+        conf_lock_(),
         conf_({}),
         threads_adjust_timer_() {
     }
@@ -42,12 +43,20 @@ public:
         return service_impl_->instance_name();
     }
 
-    int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
-        return service_impl_->register_get_handler(uri_regex, handler);
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
+        return service_impl_->add_get_handler(uri_regex, handler);
     }
 
-    int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
-        return service_impl_->register_post_handler(uri_regex, handler);
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
+        return service_impl_->add_post_handler(uri_regex, handler);
+    }
+
+    bool exist_get_handler(const std::string& uri_regex) override {
+        return service_impl_->exist_get_handler(uri_regex);
+    }
+
+    bool exist_post_handler(const std::string& uri_regex) override {
+        return service_impl_->exist_post_handler(uri_regex);
     }
 
     bool init();
@@ -62,7 +71,9 @@ private:
 
 
 private:
-    std::mutex lock_;
+    // 这个锁保护conf_使用的，因为使用频率不是很高，所以所有访问
+    // conf_的都使用这个锁也不会造成问题
+    std::mutex   conf_lock_;
     ExecutorConf conf_;
 
     ThreadPool executor_threads_;
@@ -72,14 +83,14 @@ public:
 
     int executor_start() {
 
-        tzhttpd_log_notice("about to start executor for %s ... ", instance_name().c_str());
+        tzhttpd_log_notice("about to start executor for host %s ... ", instance_name().c_str());
         executor_threads_.start_threads();
         return 0;
     }
 
     int executor_stop_graceful() {
 
-        tzhttpd_log_notice("about to stop executor for %s ... ", instance_name().c_str());
+        tzhttpd_log_notice("about to stop executor for host %s ... ", instance_name().c_str());
         executor_threads_.graceful_stop_threads();
 
         return 0;
@@ -87,7 +98,7 @@ public:
 
     int executor_join() {
 
-        tzhttpd_log_notice("about to join executor for %s ... ", instance_name().c_str());
+        tzhttpd_log_notice("about to join executor for host %s ... ", instance_name().c_str());
         executor_threads_.join_threads();
         return 0;
     }

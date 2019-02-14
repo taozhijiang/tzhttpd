@@ -27,6 +27,7 @@
 #include "EQueue.h"
 #include "ThreadPool.h"
 
+#include "Status.h"
 #include "ConfHelper.h"
 
 #include "HttpParser.h"
@@ -57,6 +58,7 @@ private:
     int io_thread_number_;
 
     // 加载、更新配置的时候保护竞争状态
+    // 这里保护主要是非atomic的原子结构
     std::mutex             lock_;
 
     boost::atomic<int>     session_cancel_time_out_;    // session间隔会话时长
@@ -77,11 +79,14 @@ private:
         // 注意：
         // 如果关闭这个选项，则整个服务都不可用了(包括管理页面)
         // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
+
         if (!http_service_enabled_) {
             tzhttpd_log_alert("http_service not enabled ...");
             return false;
         }
 
+
+        // 下面就不使用锁来保证严格的一致性了，因为非关键参数，过多的锁会影响性能
         if (http_service_speed_ == 0) // 没有限流
             return true;
 
@@ -116,18 +121,24 @@ class HttpServer : public boost::noncopyable,
 
 public:
 
+    // PUBLIC API CALL HERE
+
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     bool init();
 
     void service();
 
-    int register_http_vhost(const std::string& hostname);
+    int add_http_vhost(const std::string& hostname);
 
-    int register_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
+    int add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
                                   const std::string hostname = "");
-    int register_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
+    int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
                                    const std::string hostname = "");
+
+    int register_module_status(const std::string& strKey, StatusCallable func) {
+        return Status::instance().register_status_callback(strKey, func);
+    }
 
 private:
     const std::string instance_name_;
