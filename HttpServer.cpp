@@ -179,25 +179,6 @@ int system_status_handler(const HttpParser& http_parser,
 
 bool system_manage_page_init(HttpServer& server);
 
-
-static void interrupted_callback(int signal){
-
-    tzhttpd_log_notice("signal %d received ...", signal);
-    switch(signal) {
-        case SIGHUP:
-            {
-                tzhttpd_log_notice("reconf this service ... ");
-                int ret = ConfHelper::instance().update_runtime_conf();
-                tzhttpd_log_notice("reconf this service done, result: %d ", ret);
-            }
-            break;
-
-        default:
-            tzhttpd_log_err("Unhandled signal: %d", signal);
-            break;
-    }
-}
-
 bool HttpServer::init() {
 
     (void)Status::instance();
@@ -274,16 +255,12 @@ bool HttpServer::init() {
     Status::instance().register_status_callback(
             "http_server",
             std::bind(&HttpServer::module_status, shared_from_this(),
-                      std::placeholders::_1, std::placeholders::_2));
+                      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     if (!system_manage_page_init(*this)) {
         tzhttpd_log_err("init system manage page failed, treat as fatal.");
         return false;
     }
-
-    // 信号处理
-    ::signal(SIGPIPE, SIG_IGN);
-    ::signal(SIGHUP, interrupted_callback);
 
     return true;
 }
@@ -340,14 +317,15 @@ int HttpServer::add_http_vhost(const std::string& hostname) {
 }
 
 int HttpServer::add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
-                                          const std::string hostname) {
-    return Dispatcher::instance().add_http_get_handler(hostname, uri_regex, handler);
+                                     const std::string hostname, bool built_in) {
+    return Dispatcher::instance().add_http_get_handler(hostname, uri_regex, handler, built_in);
 }
 
 int HttpServer::add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
-                                           const std::string hostname) {
-    return Dispatcher::instance().add_http_post_handler(hostname, uri_regex, handler);
+                                      const std::string hostname, bool built_in) {
+    return Dispatcher::instance().add_http_post_handler(hostname, uri_regex, handler, built_in);
 }
+
 
 void HttpServer::do_accept() {
 
@@ -422,8 +400,9 @@ int HttpServer::io_service_join() {
 }
 
 
-int HttpServer::module_status(std::string& strKey, std::string& strValue) {
+int HttpServer::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
 
+    strModule = "tzhttpd";
     strKey = "http_server";
 
     std::stringstream ss;

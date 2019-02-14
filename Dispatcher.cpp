@@ -93,9 +93,9 @@ int Dispatcher::add_virtual_host(const std::string& hostname) {
 
 
 int Dispatcher::add_http_get_handler(const std::string& hostname, const std::string& uri_regex,
-                                          const HttpGetHandler& handler) {
+                                     const HttpGetHandler& handler, bool built_in) {
 
-    std::shared_ptr<ServiceIf> service;
+    std::shared_ptr<Executor> service;
     auto it = services_.find(hostname);
     if (it != services_.end()) {
         service = it->second;
@@ -106,13 +106,13 @@ int Dispatcher::add_http_get_handler(const std::string& hostname, const std::str
         service = default_service_;
     }
 
-    return service->add_get_handler(uri_regex, handler);
+    return service->add_get_handler(uri_regex, handler, built_in);
 }
 
 int Dispatcher::add_http_post_handler(const std::string& hostname, const std::string& uri_regex,
-                                           const HttpPostHandler& handler) {
+                                      const HttpPostHandler& handler, bool built_in) {
 
-    std::shared_ptr<ServiceIf> service;
+    std::shared_ptr<Executor> service;
     auto it = services_.find(hostname);
     if (it != services_.end()) {
         service = it->second;
@@ -123,8 +123,25 @@ int Dispatcher::add_http_post_handler(const std::string& hostname, const std::st
         service = default_service_;
     }
 
-    return service->add_post_handler(uri_regex, handler);
+    return service->add_post_handler(uri_regex, handler, built_in);
 }
+
+int Dispatcher::drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method) {
+
+    std::shared_ptr<Executor> service;
+    auto it = services_.find(hostname);
+    if (it != services_.end()) {
+        service = it->second;
+    }
+
+    if (!service) {
+        tzhttpd_log_notice("hostname %s not found, add handler to host [default]", hostname.c_str());
+        service = default_service_;
+    }
+
+    return service->drop_handler(uri_regex, method);
+}
+
 
 // 依次调用触发进行默认、其他虚拟主机的配置更新
 int Dispatcher::update_runtime_conf(const libconfig::Config& conf) {

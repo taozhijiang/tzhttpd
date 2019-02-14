@@ -32,12 +32,15 @@ int Status::collect_status(std::string& output) {
 
     std::map<std::string, std::string> results;
     for (auto iter = calls_.begin(); iter != calls_.end(); ++iter) {
+
+        std::string strModule;
         std::string strKey;
         std::string strValue;
 
-        int ret = iter->second(strKey, strValue);
+        int ret = iter->second(strModule, strKey, strValue);
         if (ret == 0) {
-            results[strKey] = strValue;
+            std::string real = strModule + ":" + strKey;
+            results[real] = strValue;
         } else {
             tzhttpd_log_err("call collect_status of %s failed with: %d",  iter->first.c_str(), ret);
         }

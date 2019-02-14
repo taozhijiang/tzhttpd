@@ -43,26 +43,28 @@ public:
         return service_impl_->instance_name();
     }
 
-    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
-        return service_impl_->add_get_handler(uri_regex, handler);
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override {
+        return service_impl_->add_get_handler(uri_regex, handler, built_in);
     }
 
-    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
-        return service_impl_->add_post_handler(uri_regex, handler);
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override {
+        return service_impl_->add_post_handler(uri_regex, handler, built_in);
     }
 
-    bool exist_get_handler(const std::string& uri_regex) override {
-        return service_impl_->exist_get_handler(uri_regex);
+    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method) override {
+        return service_impl_->exist_handler(uri_regex, method);
     }
 
-    bool exist_post_handler(const std::string& uri_regex) override {
-        return service_impl_->exist_post_handler(uri_regex);
+    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method) override {
+        return service_impl_->drop_handler(uri_regex, method);
     }
+
+
 
     bool init();
     int update_runtime_conf(const libconfig::Config& conf);
 
-    int module_status(std::string& strKey, std::string& strValue);
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 
 private:
     // point to HttpExecutor, forward some request

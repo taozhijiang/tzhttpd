@@ -85,7 +85,6 @@ private:
             return false;
         }
 
-
         // 下面就不使用锁来保证严格的一致性了，因为非关键参数，过多的锁会影响性能
         if (http_service_speed_ == 0) // 没有限流
             return true;
@@ -132,12 +131,16 @@ public:
     int add_http_vhost(const std::string& hostname);
 
     int add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
-                                  const std::string hostname = "");
+                             const std::string hostname = "", bool built_in = false);
     int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
-                                   const std::string hostname = "");
+                              const std::string hostname = "", bool built_in = false);
 
     int register_module_status(const std::string& strKey, StatusCallable func) {
         return Status::instance().register_status_callback(strKey, func);
+    }
+
+    int update_http_runtime_conf() {
+        return ConfHelper::instance().update_runtime_conf();
     }
 
 private:
@@ -172,7 +175,7 @@ public:
 
 public:
     int update_runtime_conf(const libconfig::Config& conf);
-    int module_status(std::string& strKey, std::string& strValue);
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 };
 
 

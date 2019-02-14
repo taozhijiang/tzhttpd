@@ -57,14 +57,18 @@ public:
 
 
     // override
-    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler);
-    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler);
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in);
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in);
 
-    bool exist_get_handler(const std::string& uri_regex);
-    bool exist_post_handler(const std::string& uri_regex);
+    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method);
+
+    // 对于任何uri，可以先用这个接口进行卸载，然后再使用动态配置增加接口，借此实现接口的动态更新
+    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method);
+
+
 
     int update_runtime_conf(const libconfig::Config& conf);
-    int module_status(std::string& strKey, std::string& strValue);
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 
 
 private:

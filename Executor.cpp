@@ -59,9 +59,9 @@ bool Executor::init() {
     }
 
     Status::instance().register_status_callback(
-                "Executor" + instance_name(),
+                "executor_" + instance_name(),
                 std::bind(&Executor::module_status, shared_from_this(),
-                          std::placeholders::_1, std::placeholders::_2));
+                          std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
 
     return true;
@@ -134,9 +134,10 @@ void Executor::executor_threads_adjust() {
 
 }
 
-int Executor::module_status(std::string& strKey, std::string& strValue) {
+int Executor::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
 
-    strKey = "[executor_" + instance_name() + "]";
+    strModule = "tzhttpd";
+    strKey = "executor_" + instance_name();
 
     std::stringstream ss;
 
@@ -150,9 +151,10 @@ int Executor::module_status(std::string& strKey, std::string& strValue) {
     ss << "\t" << "current_thread_number: " << executor_threads_.get_pool_size() << std::endl;
     ss << "\t" << "current_queue_size: " << http_req_queue_.SIZE() << std::endl;
 
+    std::string nullModule;
     std::string subKey;
     std::string subValue;
-    service_impl_->module_status(subKey, subValue);
+    service_impl_->module_status(nullModule, subKey, subValue);
 
     // collect
     strValue = ss.str() + subValue;

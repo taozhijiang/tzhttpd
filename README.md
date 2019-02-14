@@ -19,21 +19,6 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 ### Performance
 ![siege](siege.png?raw=true "siege")
 
-### Manage URI
-```bash
-# dynamic reload cfg
-curl 'http://127.0.0.1:18430/internal_manage?cmd=reload'
-
-# disable & enable handler
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
-
-# steps to dynamic update handler from so, without impact other service
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
-cp libgetdemo.so ../cgi-bin 
-curl 'http://127.0.0.1:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
-```
-
 ### NOTE
 As a common sense, you should try your best to make your uri not blocking or consume too long time, otherwise your server will support only little throughput. Sometime these may be inevitable, I will try to fix this problem later if I can.
 

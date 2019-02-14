@@ -26,7 +26,7 @@ namespace tzhttpd {
 // 配置动态更新回调函数接口类型
 // 注意keyOut的构造，输出的时候按照这个排序
 
-typedef std::function<int (std::string& keyOut, std::string& valueOut)> StatusCallable;
+typedef std::function<int (std::string& moduleName, std::string& keyName, std::string& valueOut)> StatusCallable;
 
 
 class Status {

@@ -40,7 +40,7 @@ public:
         }
         func_ = func; // record it
 
-        for (int i=0; i<pool_size_; ++i) {
+        for (uint32_t i=0; i<pool_size_; ++i) {
             ThreadObjPtr workobj(new ThreadObj(ThreadStatus::kInit));
             if (!workobj) {
                 tzhttpd_log_err("create ThreadObj failed!");
@@ -189,7 +189,7 @@ public:
 private:
     int spawn_task(uint32_t num){
 
-        for (int i = 0; i < num; ++i) {
+        for (uint32_t i = 0; i < num; ++i) {
             ThreadObjPtr workobj(new ThreadObj(ThreadStatus::kInit));
             if (!workobj) {
                 tzhttpd_log_err("create ThreadObj failed!");

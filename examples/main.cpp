@@ -44,6 +44,34 @@ static void usage() {
 char cfgFile[PATH_MAX] = "httpsrv.conf";
 bool daemonize = false;
 
+static void interrupted_callback(int signal){
+
+    tzhttpd::tzhttpd_log_notice("signal %d received ...", signal);
+    switch(signal) {
+        case SIGHUP:
+            {
+                tzhttpd::tzhttpd_log_notice("reconf this service ... ");
+//                int ret = ConfHelper::instance().update_runtime_conf();
+                tzhttpd::tzhttpd_log_notice("reconf this service done... ");
+            }
+            break;
+
+        default:
+            tzhttpd::tzhttpd_log_err("Unhandled signal: %d", signal);
+            break;
+    }
+}
+
+static int module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
+
+    strModule = "httpsrv";
+    strKey = "main";
+
+    strValue = "conf_file: " + std::string(cfgFile);
+
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
 
     int opt_g = 0;
@@ -92,6 +120,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // 信号处理
+    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGHUP, interrupted_callback);
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
     if (!http_server_ptr ) {
@@ -99,6 +130,7 @@ int main(int argc, char* argv[]) {
         return false;
     }
 
+    // must called before http_server init
     http_server_ptr->add_http_vhost("example2.com");
     http_server_ptr->add_http_vhost("www.example2.com");
     http_server_ptr->add_http_vhost("www.example3.com");
@@ -109,6 +141,7 @@ int main(int argc, char* argv[]) {
     }
 
     http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
+    http_server_ptr->register_module_status("httpsrv", module_status);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

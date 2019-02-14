@@ -50,9 +50,11 @@ public:
 
     // 外部注册http handler的接口
     int add_http_get_handler(const std::string& hostname, const std::string& uri_regex,
-                                  const HttpGetHandler& handler);
+                             const HttpGetHandler& handler, bool built_in);
     int add_http_post_handler(const std::string& hostname, const std::string& uri_regex,
-                                   const HttpPostHandler& handler);
+                              const HttpPostHandler& handler, bool built_in);
+
+    int drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method);
 
     io_service& get_io_service() {
         return  io_service_;
