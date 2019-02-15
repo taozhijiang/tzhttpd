@@ -96,15 +96,20 @@ int Dispatcher::add_http_get_handler(const std::string& hostname, const std::str
                                      const HttpGetHandler& handler, bool built_in) {
 
     std::shared_ptr<Executor> service;
-    auto it = services_.find(hostname);
-    if (it != services_.end()) {
-        service = it->second;
+
+    if (hostname.empty() || hostname == "[default]") {
+        service = default_service_;
+    } else {
+        auto it = services_.find(hostname);
+        if (it != services_.end()) {
+            service = it->second;
+        } else {
+            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            return -1;
+        }
     }
 
-    if (!service) {
-        tzhttpd_log_notice("hostname %s not found, add handler to [default]",  hostname.c_str());
-        service = default_service_;
-    }
+    SAFE_ASSERT(service);
 
     return service->add_get_handler(uri_regex, handler, built_in);
 }
@@ -113,32 +118,40 @@ int Dispatcher::add_http_post_handler(const std::string& hostname, const std::st
                                       const HttpPostHandler& handler, bool built_in) {
 
     std::shared_ptr<Executor> service;
-    auto it = services_.find(hostname);
-    if (it != services_.end()) {
-        service = it->second;
-    }
 
-    if (!service) {
-        tzhttpd_log_notice("hostname %s not found, add handler to host [default]", hostname.c_str());
+    if (hostname.empty() || hostname == "[default]") {
         service = default_service_;
+    } else {
+        auto it = services_.find(hostname);
+        if (it != services_.end()) {
+            service = it->second;
+        } else {
+            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            return -1;
+        }
     }
 
+    SAFE_ASSERT(service);
     return service->add_post_handler(uri_regex, handler, built_in);
 }
 
 int Dispatcher::drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method) {
 
     std::shared_ptr<Executor> service;
-    auto it = services_.find(hostname);
-    if (it != services_.end()) {
-        service = it->second;
-    }
 
-    if (!service) {
-        tzhttpd_log_notice("hostname %s not found, add handler to host [default]", hostname.c_str());
+    if (hostname.empty() || hostname == "[default]") {
         service = default_service_;
+    } else {
+        auto it = services_.find(hostname);
+        if (it != services_.end()) {
+            service = it->second;
+        } else {
+            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            return -1;
+        }
     }
 
+    SAFE_ASSERT(service);
     return service->drop_handler(uri_regex, method);
 }
 

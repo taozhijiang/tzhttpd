@@ -131,9 +131,9 @@ public:
     int add_http_vhost(const std::string& hostname);
 
     int add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
-                             const std::string hostname = "", bool built_in = false);
+                             bool built_in = false, const std::string hostname = "");
     int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
-                              const std::string hostname = "", bool built_in = false);
+                              bool built_in = false, const std::string hostname = "");
 
     int register_module_status(const std::string& strKey, StatusCallable func) {
         return Status::instance().register_status_callback(strKey, func);

@@ -317,12 +317,12 @@ int HttpServer::add_http_vhost(const std::string& hostname) {
 }
 
 int HttpServer::add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
-                                     const std::string hostname, bool built_in) {
+                                     bool built_in, const std::string hostname) {
     return Dispatcher::instance().add_http_get_handler(hostname, uri_regex, handler, built_in);
 }
 
 int HttpServer::add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
-                                      const std::string hostname, bool built_in) {
+                                      bool built_in, const std::string hostname) {
     return Dispatcher::instance().add_http_post_handler(hostname, uri_regex, handler, built_in);
 }
 

@@ -29,17 +29,17 @@ static int system_drop_handler(const HttpParser& http_parser,
 
 bool system_manage_page_init(HttpServer& server) {
 
-    if (server.add_http_get_handler("^/internal/status$", system_status_handler, "", true) != 0) {
+    if (server.add_http_get_handler("^/internal/status$", system_status_handler, true) != 0) {
         tzhttpd_log_err("register system status module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/updateconf$", system_updateconf_handler, "", true) != 0) {
+    if (server.add_http_get_handler("^/internal/updateconf$", system_updateconf_handler, true) != 0) {
         tzhttpd_log_err("register system update runtime conf module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/drop$", system_drop_handler, "", true) != 0) {
+    if (server.add_http_get_handler("^/internal/drop$", system_drop_handler, true) != 0) {
         tzhttpd_log_err("register system handler control failed, treat as fatal.");
         return false;
     }
