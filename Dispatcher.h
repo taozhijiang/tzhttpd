@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_DISPATCHER_H__
 #define __TZHTTPD_DISPATCHER_H__
 
@@ -94,7 +101,7 @@ private:
 
 };
 
-} // tzhttpd
+} // end namespace tzhttpd
 
 
 #endif // __TZHTTPD_SERVICE_DISPATCHER_H__

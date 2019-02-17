@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
@@ -85,7 +85,7 @@ struct HttpHandlerObject {
 
 typedef std::shared_ptr<HttpHandlerObject>  HttpHandlerObjectPtr;
 
-} // tzhttpd
+} // end namespace tzhttpd
 
 
 #endif // __TZHTTPD_HTTP_HANDLER_H__

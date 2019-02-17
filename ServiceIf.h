@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_SERVICE_IF_H__
 #define __TZHTTPD_SERVICE_IF_H__
 
@@ -37,6 +44,6 @@ public:
     virtual int update_runtime_conf(const libconfig::Config& cfg) = 0;
 };
 
-} // end tzhttpd
+} // end namespace tzhttpd
 
 #endif // __TZHTTPD_SERVICE_IF_H__

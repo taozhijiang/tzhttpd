@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
@@ -130,6 +130,15 @@ check:
         return items_.empty();
     }
 
+    size_t SHRINK_FRONT(size_t sz) {
+        std::lock_guard<std::mutex> lock(lock_);
+        size_t orig_sz = items_.size();
+        if (orig_sz <= sz)
+            return 0;
+        auto iter = items_.end() - sz;
+        items_.erase(items_.begin(), iter);
+        return orig_sz - items_.size();
+    }
 private:
     std::mutex lock_;
     std::condition_variable item_notify_;

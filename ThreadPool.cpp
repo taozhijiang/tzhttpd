@@ -1,8 +1,16 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include <mutex>
 #include <functional>
 
 #include <boost/noncopyable.hpp>
 #include <boost/thread.hpp>
+#include <boost/chrono.hpp>
 
 #include "Log.h"
 #include "ThreadPool.h"
@@ -140,8 +148,7 @@ public:
         enum ThreadStatus old_status = it->second->status_;
         it->second->status_ = ThreadStatus::kTerminating;
         if (timed_seconds) {
-            const boost::system_time timeout = boost::get_system_time() + boost::posix_time::milliseconds(timed_seconds * 1000);
-            it->first->timed_join(timeout);
+            it->first->try_join_for(boost::chrono::seconds(timed_seconds));
         } else {
             it->first->join();
         }
@@ -234,7 +241,7 @@ private:
             }
         } while (0);
 
-        tzhttpd_log_alert("Current ThreadPool size: %d", pool_size_);
+        tzhttpd_log_alert("current ThreadPool size: %d", pool_size_);
         return ((currsize - workers_.size()) >= num) ? 0 : -1;
     }
 

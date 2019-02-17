@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include "ConfHelper.h"
 #include "HttpExecutor.h"
 
@@ -180,5 +187,5 @@ int Dispatcher::update_runtime_conf(const libconfig::Config& conf) {
 }
 
 
-} // tzrpc
+} // end namespace tzhttpd
 
