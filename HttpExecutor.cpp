@@ -223,21 +223,24 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
 bool HttpExecutor::init() override {
 
     auto conf_ptr = ConfHelper::instance().get_conf();
+	if(!conf_ptr) {
+		tzhttpd_log_err("ConfHelper not initialized? return conf_ptr empty!!!");
+		return false;
+	}
 
+	bool init_success = false;
     const libconfig::Setting &http_vhosts = conf_ptr->lookup("http.vhosts");
-
     for(int i = 0; i < http_vhosts.getLength(); ++i) {
 
         const libconfig::Setting& vhost = http_vhosts[i];
-
         std::string server_name;
         ConfUtil::conf_value(vhost, "server_name", server_name);
-        if ( server_name.empty() ) {
+        if (server_name.empty() ) {
             tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
             continue;
         }
 
-        tzhttpd_log_debug("detected server_name: %s", server_name.c_str());
+        // tzhttpd_log_debug("detected server_name: %s", server_name.c_str());
 
         // 发现是匹配的，则找到对应虚拟主机的配置文件了
         if (server_name == hostname_) {
@@ -248,11 +251,15 @@ bool HttpExecutor::init() override {
 
             tzhttpd_log_debug("handle detail conf for host %s success!", server_name.c_str());
             // OK
+			init_success = true;
             break;
         }
     }
 
-    return true;
+	if(!init_success) {
+		tzhttpd_log_err("host %s init failed, may not configure for it?", hostname_.c_str());
+	}
+    return init_success;
 }
 
 bool HttpExecutor::parse_http_cgis(const libconfig::Setting& setting, const std::string& key,

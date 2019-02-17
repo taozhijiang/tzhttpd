@@ -14,7 +14,10 @@ bool Executor::init() {
 
     if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
         conf_ = http_executor->get_executor_conf();
-    }
+    } else {
+		tzhttpd_log_err("cast instance failed.");
+		return false;
+	}
 
     if (conf_.exec_thread_number_hard_ < conf_.exec_thread_number_) {
         conf_.exec_thread_number_hard_ = conf_.exec_thread_number_;

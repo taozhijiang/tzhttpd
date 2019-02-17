@@ -160,8 +160,21 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
     io_service_threads_() {
 
    bool ret = ConfHelper::instance().init(cfgfile_);
-   if (!ret)
-       fprintf(stderr, "init conf failed.\n");
+   if (!ret) {
+       tzhttpd_log_err("init conf failed.");
+       return;
+   }
+
+   auto conf_ptr = ConfHelper::instance().get_conf();
+   int log_level = 0;
+   ConfUtil::conf_value(*conf_ptr, "http.log_level", log_level);
+    if (log_level <= 0 || log_level > 7) {
+        tzhttpd_log_notice("invalid log_level value, reset to default 7.");
+        log_level = 7;
+    }
+
+    tzhttpd_log_init(log_level);
+    tzhttpd_log_notice("initialized log with level: %d", log_level);
 }
 
 
@@ -199,11 +212,11 @@ bool HttpServer::init() {
         return false;
     }
 
-    if(!ConfHelper::instance().init(cfgfile_)) {
-        tzhttpd_log_err("init ConfHelper (%s) failed, critical !!!!", cfgfile_.c_str());
-        return false;
-    }
     auto conf_ptr = ConfHelper::instance().get_conf();
+	if(!conf_ptr) { 
+		tzhttpd_log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
+		return false;
+	}
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
@@ -412,10 +425,15 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
     ss << "\t" << "backlog_size: " << conf_.backlog_size_ << std::endl;
     ss << "\t" << "io_thread_pool_size: " << conf_.io_thread_number_ << std::endl;
     ss << "\t" << "safe_ips: " ;
-    for (auto iter = conf_.safe_ip_.begin(); iter != conf_.safe_ip_.end(); ++iter) {
-        ss << *iter << ", ";
+
+    {
+        // protect cfg race conditon
+        std::lock_guard<std::mutex> lock(conf_.lock_);
+        for (auto iter = conf_.safe_ip_.begin(); iter != conf_.safe_ip_.end(); ++iter) {
+            ss << *iter << ", ";
+        }
+        ss << std::endl;
     }
-    ss << std::endl;
 
     ss << "\t" << std::endl;
 

@@ -19,6 +19,9 @@ namespace tzhttpd {
 // The use of openlog() is optional; it will automatically be called by syslog() if necessary.
 bool tzhttpd_log_init(int log_level) {
 
+    // close first, then initialize with new log_level
+    closelog();
+
     openlog(program_invocation_short_name, LOG_PID , LOG_LOCAL6);
     setlogmask (LOG_UPTO (log_level));
     return true;
