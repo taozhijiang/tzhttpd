@@ -115,7 +115,7 @@ public:
 private:
     // 根据http_req_queue_自动伸缩线程负载
     std::unique_ptr<steady_timer> threads_adjust_timer_;
-    void executor_threads_adjust();
+    void executor_threads_adjust(const boost::system::error_code& ec);
 
 };
 
