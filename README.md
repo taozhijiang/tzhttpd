@@ -10,7 +10,7 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 6. Support regex-based Http Basic Authorization.   
 7. Not buggy, and has stood tests in a way.
 
-### Possible usage
+### Possible use case
 1. General Web server, KIDDING. TZHTTPD does not support full HTTP protocal, so it may not behave well in this situation. But I also add the VHost, Cache Control features, and my [homepage](http://taozj.net) is hosted by this, it works fine.   
 2. Backend application gateway, YES. TZHTTPD is designed and optimized for this purpose.   
 3. HTTP protocal adaptor. This way TZHTTPD can be use as proxy, it accept and parse HTTP request, forward the request and transform corresponding respose as standard HTTP response.   
@@ -19,24 +19,20 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 ### Performance
 ![siege](siege.png?raw=true "siege")
 
-### Manage URI
+### Internal UI
 ```bash
-# dynamic reload cfg
-curl 'http://127.0.0.1:18430/internal_manage?cmd=reload'
+# system status
+curl 'http://127.0.0.1:18430/internal/status'
 
-# disable & enable handler
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
+# dynamic update runtime conf
+curl 'http://127.0.0.1:18430/internal/updateconf'
 
-# steps to dynamic update handler from so, without impact other service
-curl 'http://127.0.0.1:18430/internal_manage?cmd=switch_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=off'
+# reload so handler
+curl 'http://127.0.0.1:18430/internal/drop?uri=^/cgi-bin/getdemo.cgi$'
 cp libgetdemo.so ../cgi-bin 
-curl 'http://127.0.0.1:18430/internal_manage?cmd=update_handler&method=get&path=^/cgi-bin/getdemo.cgi$&enable=on'
+curl 'http://127.0.0.1:18430/internal/updateconf'
 ```
 
-### NOTE
-As a common sense, you should try your best to make your uri not blocking or consume too long time, otherwise your server will support only little throughput. Sometime these may be inevitable, I will try to fix this problem later if I can.
-
-### Reference project   
+### Reference project
 [tzmonitor](https://github.com/taozhijiang/tzmonitor).   
 

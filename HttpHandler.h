@@ -39,8 +39,7 @@ struct HttpHandlerObject {
     boost::atomic<int64_t> success_count_;
     boost::atomic<int64_t> fail_count_;
 
-    boost::atomic<bool>    built_in_;       // built_in handler，无需引用计数
-    boost::atomic<bool>    working_;        //  启用，禁用等标记
+    boost::atomic<bool>    built_in_;       // built_in handler,无法被卸载更新
 
 
     HttpGetHandler         http_get_handler_;
@@ -48,29 +47,29 @@ struct HttpHandlerObject {
 
     HttpHandlerObject(const std::string& path,
                       const HttpGetHandler& get_handler,
-                      bool built_in = false, bool working = true):
+                      bool built_in = false):
         path_(path),
         success_count_(0), fail_count_(0),
-        built_in_(built_in), working_(working),
+        built_in_(built_in),
         http_get_handler_(get_handler) {
     }
 
     HttpHandlerObject(const std::string& path,
                       const HttpPostHandler& post_handler,
-                      bool built_in = false, bool working = true):
+                      bool built_in = false):
         path_(path),
         success_count_(0), fail_count_(0),
-        built_in_(built_in), working_(working),
+        built_in_(built_in),
         http_post_handler_(post_handler) {
     }
 
     HttpHandlerObject(const std::string& path,
                       const HttpGetHandler& get_handler,
                       const HttpPostHandler& post_handler,
-                      bool built_in = false, bool working = true):
+                      bool built_in = false):
         path_(path),
         success_count_(0), fail_count_(0),
-        built_in_(built_in), working_(working),
+        built_in_(built_in),
         http_get_handler_(get_handler),
         http_post_handler_(post_handler) {
     }

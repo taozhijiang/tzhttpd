@@ -27,6 +27,7 @@
 #include "EQueue.h"
 #include "ThreadPool.h"
 
+#include "Status.h"
 #include "ConfHelper.h"
 
 #include "HttpParser.h"
@@ -45,7 +46,8 @@ class HttpConf {
     friend class HttpServer;
 
 private:
-    bool load_config(std::shared_ptr<libconfig::Config> conf_ptr);
+    bool load_conf(std::shared_ptr<libconfig::Config> conf_ptr);
+    bool load_conf(const libconfig::Config& conf);
 
 private:
     std::string bind_addr_;
@@ -56,11 +58,11 @@ private:
     int io_thread_number_;
 
     // 加载、更新配置的时候保护竞争状态
-    std::mutex          lock_;
-    boost::atomic<int>     conn_time_out_;
-    boost::atomic<int>     conn_time_out_linger_;
+    // 这里保护主要是非atomic的原子结构
+    std::mutex             lock_;
 
-    boost::atomic<int>     ops_cancel_time_out_;    // sec 会话超时自动取消ops
+    boost::atomic<int>     session_cancel_time_out_;    // session间隔会话时长
+    boost::atomic<int>     ops_cancel_time_out_;        // ops操作超时时长
 
     boost::atomic<bool>    http_service_enabled_;   // 服务开关
     boost::atomic<int64_t> http_service_speed_;
@@ -74,11 +76,16 @@ private:
 
     bool get_http_service_token() {
 
-        // if (!http_service_enabled_) {
-        //    tzhttpd_log_alert("http_service not enabled ...");
-        //    return false;
-        // }
+        // 注意：
+        // 如果关闭这个选项，则整个服务都不可用了(包括管理页面)
+        // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
 
+        if (!http_service_enabled_) {
+            tzhttpd_log_alert("http_service not enabled ...");
+            return false;
+        }
+
+        // 下面就不使用锁来保证严格的一致性了，因为非关键参数，过多的锁会影响性能
         if (http_service_speed_ == 0) // 没有限流
             return true;
 
@@ -99,7 +106,7 @@ private:
         http_service_token_ = http_service_speed_.load();
     }
 
-    std::shared_ptr<boost::asio::deadline_timer> timed_feed_token_;
+    std::shared_ptr<steady_timer> timed_feed_token_;
     void timed_feed_token_handler(const boost::system::error_code& ec);
 
 };  // end class HttpConf
@@ -113,18 +120,28 @@ class HttpServer : public boost::noncopyable,
 
 public:
 
+    // PUBLIC API CALL HERE
+
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     bool init();
 
     void service();
 
-    int register_http_vhost(const std::string& hostname);
+    int add_http_vhost(const std::string& hostname);
 
-    int register_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
-                                  const std::string hostname = "");
-    int register_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
-                                   const std::string hostname = "");
+    int add_http_get_handler(const std::string& uri_regex, const HttpGetHandler& handler,
+                             bool built_in = false, const std::string hostname = "");
+    int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
+                              bool built_in = false, const std::string hostname = "");
+
+    int register_module_status(const std::string& strKey, StatusCallable func) {
+        return Status::instance().register_status_callback(strKey, func);
+    }
+
+    int update_http_runtime_conf() {
+        return ConfHelper::instance().update_runtime_conf();
+    }
 
 private:
     const std::string instance_name_;
@@ -146,11 +163,19 @@ public:
         return conf_.ops_cancel_time_out_;
     }
 
+    int session_cancel_time_out() const {
+        return conf_.session_cancel_time_out_;
+    }
+
 public:
     ThreadPool io_service_threads_;
     void io_service_run(ThreadObjPtr ptr);  // main task loop
     int io_service_stop_graceful();
     int io_service_join();
+
+public:
+    int update_runtime_conf(const libconfig::Config& conf);
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 };
 
 

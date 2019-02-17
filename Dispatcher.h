@@ -12,61 +12,19 @@
 
 #include "Log.h"
 
-#include "ServiceIf.h"
 #include "Executor.h"
 
-#include "HttpExecutor.h"
 #include "HttpReqInstance.h"
 
 
 namespace tzhttpd {
 
-class Dispatcher: public boost::noncopyable,
-                  public ServiceIf {
+class Dispatcher: public boost::noncopyable {
+
 public:
     static Dispatcher& instance();
 
-    bool init() {
-
-        initialized_ = true;
-
-        // 注册默认default vhost
-        SAFE_ASSERT(!default_service_);
-
-        // 创建 default virtual host
-        // http impl
-        auto default_http_impl = std::make_shared<HttpExecutor>("[default]");
-        if (!default_http_impl|| !default_http_impl->init()) {
-            tzhttpd_log_err("create default http_impl failed.");
-            return false;
-        }
-
-        // http executor
-        default_service_.reset(new Executor(default_http_impl));
-        Executor* executor = dynamic_cast<Executor *>(default_service_.get());
-
-        SAFE_ASSERT(executor);
-        if (!executor || !executor->init()) {
-            tzhttpd_log_err("init default virtual host executor failed.");
-            return false;
-        }
-
-        executor->executor_start();
-        tzhttpd_log_debug("start default virtual host executor: %s success",  executor->instance_name().c_str());
-        //
-
-
-        for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
-            Executor* executor = dynamic_cast<Executor *>(iter->second.get());
-            SAFE_ASSERT(executor);
-
-            executor->executor_start();
-            tzhttpd_log_debug("start virtual host executor for %s success",  executor->instance_name().c_str());
-        }
-
-        return true;
-    }
-
+    bool init();
 
     void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
 
@@ -85,46 +43,54 @@ public:
         service->handle_http_request(http_req_instance);
     }
 
-    std::string instance_name() override {
-        return "HttpDispatcher";
-    }
+    int update_runtime_conf(const libconfig::Config& conf);
 
     // 注册虚拟主机
-    int register_virtual_host(const std::string& hostname);
+    int add_virtual_host(const std::string& hostname);
 
     // 外部注册http handler的接口
-    int register_http_get_handler(const std::string& hostname, const std::string& uri_regex,
-                                  const HttpGetHandler& handler);
-    int register_http_post_handler(const std::string& hostname, const std::string& uri_regex,
-                                   const HttpPostHandler& handler);
+    int add_http_get_handler(const std::string& hostname, const std::string& uri_regex,
+                             const HttpGetHandler& handler, bool built_in);
+    int add_http_post_handler(const std::string& hostname, const std::string& uri_regex,
+                              const HttpPostHandler& handler, bool built_in);
+
+    int drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method);
+
+    io_service& get_io_service() {
+        return  io_service_;
+    }
 
 private:
 
-    int register_get_handler(const std::string& uri_regex, const HttpGetHandler& handler) override {
-        SAFE_ASSERT(false);
-        tzhttpd_log_err("YOU SHOULD NOT CALL THIS FUNC...");
-        return -1;
-    }
-
-    int register_post_handler(const std::string& uri_regex, const HttpPostHandler& handler) override {
-        SAFE_ASSERT(false);
-        tzhttpd_log_err("YOU SHOULD NOT CALL THIS FUNC...");
-        return -1;
-    }
-
     Dispatcher():
         initialized_(false),
-        services_({}) {
+        services_({}),
+        io_service_thread_(),
+        io_service_() {
     }
 
     bool initialized_;
 
     // 系统在启动的时候进行注册初始化，然后再提供服务，所以
     // 这边就不使用锁结构进行保护了，防止影响性能
-    std::map<std::string, std::shared_ptr<ServiceIf>> services_;
+    std::map<std::string, std::shared_ptr<Executor>> services_;
 
     // 默认的http虚拟主机
-    std::shared_ptr<ServiceIf> default_service_;
+    std::shared_ptr<Executor> default_service_;
+
+
+    // 再启一个io_service_，主要使用DIspatcher单例和boost::asio异步框架
+    // 来处理定时器等常用服务
+    boost::thread io_service_thread_;
+    io_service io_service_;
+
+    void io_service_run() {
+
+        tzhttpd_log_notice("Dispatcher io_service thread running...");
+
+        boost::system::error_code ec;
+        io_service_.run(ec);
+    }
 
 };
 

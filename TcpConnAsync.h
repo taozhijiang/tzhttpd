@@ -8,9 +8,7 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-using namespace boost::posix_time;
-using namespace boost::gregorian;
+#include <xtra_asio.h>
 
 #include <boost/noncopyable.hpp>
 
@@ -56,6 +54,8 @@ private:
     void do_read_body();
     void read_body_handler(const boost::system::error_code &ec, std::size_t bytes_transferred);
 
+    void set_session_cancel_timeout();
+    void revoke_session_cancel_timeout();
     void set_ops_cancel_timeout();
     void revoke_ops_cancel_timeout();
     bool was_ops_cancelled() {
@@ -106,7 +106,12 @@ private:
 
     bool was_cancelled_;
     std::mutex ops_cancel_mutex_;
-    std::unique_ptr<boost::asio::deadline_timer> ops_cancel_timer_;
+
+    // IO操作的最大时长
+    std::unique_ptr<steady_timer> ops_cancel_timer_;
+
+    // 会话间隔的最大时长
+    std::unique_ptr<steady_timer> session_cancel_timer_;
 
 private:
 

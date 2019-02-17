@@ -9,6 +9,7 @@
 #define __TZHTTPD_HTTP_PROTO_H__
 
 #include <map>
+#include <vector>
 #include <string>
 
 namespace tzhttpd {
@@ -17,6 +18,7 @@ namespace tzhttpd {
 enum HTTP_METHOD {
     GET = 1,
     POST = 2,
+    ALL = 98,   // internal use
     UNKNOWN = 99,
 };
 
@@ -35,7 +37,7 @@ namespace http_proto {
 
 using std::string;
 
-static const string content_ok = "{}";
+static const string content_ok = "{OK}";
 
 static const string content_error =
                     "<html>"

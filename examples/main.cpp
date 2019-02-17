@@ -44,6 +44,34 @@ static void usage() {
 char cfgFile[PATH_MAX] = "httpsrv.conf";
 bool daemonize = false;
 
+static void interrupted_callback(int signal){
+
+    tzhttpd::tzhttpd_log_notice("signal %d received ...", signal);
+    switch(signal) {
+        case SIGHUP:
+            {
+                tzhttpd::tzhttpd_log_notice("reconf this service ... ");
+//                int ret = ConfHelper::instance().update_runtime_conf();
+                tzhttpd::tzhttpd_log_notice("reconf this service done... ");
+            }
+            break;
+
+        default:
+            tzhttpd::tzhttpd_log_err("Unhandled signal: %d", signal);
+            break;
+    }
+}
+
+static int module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
+
+    strModule = "httpsrv";
+    strKey = "main";
+
+    strValue = "conf_file: " + std::string(cfgFile);
+
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
 
     int opt_g = 0;
@@ -74,41 +102,46 @@ int main(int argc, char* argv[]) {
 
     // default syslog
     tzhttpd::set_checkpoint_log_store_func(syslog);
+    // setup in default DEBUG level, then reinialize when conf prased
     tzhttpd::tzhttpd_log_init(7);
+    tzhttpd::tzhttpd_log_debug("first stage log init with default DEBUG finished.");
 
     // daemonize should before any thread creation...
     if (daemonize) {
-        std::cout << "We will daemonize this service..." << std::endl;
-        tzhttpd::tzhttpd_log_notice("We will daemonize this service...");
+        tzhttpd::tzhttpd_log_notice("we will daemonize this service...");
 
         bool chdir = false; // leave the current working directory in case
                             // the user has specified relative paths for
                             // the config file, etc
         bool close = true;  // close stdin, stdout, stderr
         if (::daemon(!chdir, !close) != 0) {
-            tzhttpd::tzhttpd_log_err("Call to daemon() failed: %s", strerror(errno));
-            std::cout << "Call to daemon() failed: " << strerror(errno) << std::endl;
+            tzhttpd::tzhttpd_log_err("call to daemon() failed: %s", strerror(errno));
             ::exit(EXIT_FAILURE);
         }
     }
 
+    // 信号处理
+    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGHUP, interrupted_callback);
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
     if (!http_server_ptr ) {
-        fprintf(stderr, "create HttpServer failed!");
-        return false;
+        tzhttpd::tzhttpd_log_err("create HttpServer failed!");
+        ::exit(EXIT_FAILURE);
     }
 
-    http_server_ptr->register_http_vhost("example2.com");
-    http_server_ptr->register_http_vhost("www.example2.com");
-    http_server_ptr->register_http_vhost("www.example3.com");
+    // must called before http_server init
+    http_server_ptr->add_http_vhost("example2.com");
+    http_server_ptr->add_http_vhost("www.example2.com");
+    http_server_ptr->add_http_vhost("www.example3.com");
 
     if(!http_server_ptr->init()){
-        fprintf(stderr, "init HttpServer failed!");
-        return false;
+        tzhttpd::tzhttpd_log_err("init HttpServer failed!");
+        ::exit(EXIT_FAILURE);
     }
 
-    http_server_ptr->register_http_get_handler("^/test$", tzhttpd::get_test_handler);
+    http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
+    http_server_ptr->register_module_status("httpsrv", module_status);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();
@@ -122,6 +155,7 @@ namespace boost {
 
 void assertion_failed(char const * expr, char const * function, char const * file, long line) {
     fprintf(stderr, "BAD!!! expr `%s` assert failed at %s(%ld): %s", expr, file, line, function);
+    tzhttpd::tzhttpd_log_err("BAD!!! expr `%s` assert failed at %s(%ld): %s", expr, file, line, function);
 }
 
 } // end boost

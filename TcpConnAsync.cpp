@@ -31,6 +31,7 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
     was_cancelled_(false),
     ops_cancel_mutex_(),
     ops_cancel_timer_(),
+    session_cancel_timer_(),
     http_server_(server),
     http_parser_(new HttpParser()),
     strand_(std::make_shared<io_service::strand>(server.io_service_)) {
@@ -69,7 +70,7 @@ void TcpConnAsync::do_read_head() {
 
     tzhttpd_log_debug("strand read read_until ... in thread %#lx", (long)pthread_self());
 
-    set_ops_cancel_timeout();
+    set_session_cancel_timeout();
     async_read_until(*socket_, request_,
                         http_proto::header_crlfcrlf_str,
                              strand_->wrap(
@@ -82,7 +83,7 @@ void TcpConnAsync::do_read_head() {
 
 void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t bytes_transferred) {
 
-    revoke_ops_cancel_timeout();
+    revoke_session_cancel_timeout();
 
     if (ec) {
         handle_socket_ec(ec);
@@ -180,15 +181,24 @@ error_return:
     request_.consume(request_.size());
 
 write_return:
-    do_write();
 
     // If HTTP 1.0 or HTTP 1.1 without Keep-Alived, close the connection directly
     // Else, trigger the next generation read again!
 
-    // 算了，强制一个读操作，从而可以引发其错误处理
+    // Bug:
+    // 因为异步写也会触发定时器的设置和取消，所以这里的读定时器会被误取消导致永久阻塞
+    // 解决的方式：
+    // (1)将超时器分开设置
+    //
+    // 在 do_write()中启动读操作不合理，见do_write()的注释
+    // 在这个路径返回的，基本都是异常情况导致的错误返回，此时根据情况看是否发起请求
+    // 读操作必须在写操作之前，否则可能会导致引用计数消失
+
     if (keep_continue()) {
-        return start();
+        start();
     }
+
+    do_write();
 }
 
 void TcpConnAsync::do_read_body() {
@@ -268,6 +278,7 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
 
     // 算了，强制一个读操作，从而可以引发其错误处理
 
+    // 这里是POST方法，而GET方法在读完头部后就直接再次发起读操作了
     // 再次开始读取请求，可以shared_from_this()保持住连接
     start();
 
@@ -284,6 +295,8 @@ void TcpConnAsync::do_write() override {
     if(send_bound_.buffer_.get_length() == 0) {
 
         // 看是否关闭主动关闭连接
+        // 因为在读取请求的时候默认就当作长连接发起再次读了，所以如果这里检测到是
+        // 短连接，就采取主动关闭操作，否则就让之前的长连接假设继续生效
         if (!keep_continue()) {
 
             revoke_ops_cancel_timeout();
@@ -302,6 +315,7 @@ void TcpConnAsync::do_write() override {
                                static_cast<size_t>(kFixedIoBufferSize));
 
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
+
     set_ops_cancel_timeout();
     async_write(*socket_, buffer(send_bound_.io_block_, to_write),
                     boost::asio::transfer_exactly(to_write),
@@ -413,6 +427,40 @@ bool TcpConnAsync::keep_continue() {
     return false;
 }
 
+void TcpConnAsync::set_session_cancel_timeout() {
+
+    std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
+
+    if (http_server_.session_cancel_time_out() == 0){
+        SAFE_ASSERT(!session_cancel_timer_);
+        return;
+    }
+
+    // cancel the already timer first if any
+    boost::system::error_code ignore_ec;
+    if (session_cancel_timer_) {
+        session_cancel_timer_->cancel(ignore_ec);
+    } else {
+        session_cancel_timer_.reset(new steady_timer (http_server_.io_service_));
+    }
+
+    SAFE_ASSERT(http_server_.session_cancel_time_out());
+    session_cancel_timer_->expires_from_now(boost::chrono::seconds(http_server_.session_cancel_time_out()));
+    session_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
+                                                std::placeholders::_1));
+    tzhttpd_log_debug("register session_cancel_time_out %d sec", http_server_.session_cancel_time_out());
+}
+
+void TcpConnAsync::revoke_session_cancel_timeout() {
+
+    std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
+
+    boost::system::error_code ignore_ec;
+    if (session_cancel_timer_) {
+        session_cancel_timer_->cancel(ignore_ec);
+    }
+}
+
 void TcpConnAsync::set_ops_cancel_timeout() {
 
     std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
@@ -422,11 +470,18 @@ void TcpConnAsync::set_ops_cancel_timeout() {
         return;
     }
 
-    ops_cancel_timer_.reset( new boost::asio::deadline_timer (http_server_.io_service_,
-                                      boost::posix_time::seconds(http_server_.ops_cancel_time_out())) );
+    // cancel the already timer first if any
+    boost::system::error_code ignore_ec;
+    if (ops_cancel_timer_) {
+        ops_cancel_timer_->cancel(ignore_ec);
+    } else {
+        ops_cancel_timer_.reset(new steady_timer (http_server_.io_service_));
+    }
+
     SAFE_ASSERT(http_server_.ops_cancel_time_out());
+    ops_cancel_timer_->expires_from_now(boost::chrono::seconds(http_server_.ops_cancel_time_out()));
     ops_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
-                                           std::placeholders::_1));
+                                            std::placeholders::_1));
     tzhttpd_log_debug("register ops_cancel_time_out %d sec", http_server_.ops_cancel_time_out());
 }
 
@@ -437,7 +492,6 @@ void TcpConnAsync::revoke_ops_cancel_timeout() {
     boost::system::error_code ignore_ec;
     if (ops_cancel_timer_) {
         ops_cancel_timer_->cancel(ignore_ec);
-        ops_cancel_timer_.reset();
     }
 }
 
