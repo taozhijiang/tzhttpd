@@ -24,9 +24,6 @@ bool Dispatcher::init() {
     // 注册默认default vhost
     SAFE_ASSERT(!default_service_);
 
-    // 创建io_service工作线程
-    io_service_thread_ = boost::thread(std::bind(&Dispatcher::io_service_run, this));
-
     // 创建默认虚拟主机 default virtual host
     auto default_http_impl = std::make_shared<HttpExecutor>("[default]");
 

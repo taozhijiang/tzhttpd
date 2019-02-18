@@ -63,22 +63,14 @@ public:
 
     int drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method);
 
-    io_service& get_io_service() {
-        return  io_service_;
-    }
-
 private:
 
     Dispatcher():
         initialized_(false),
-        services_({}),
-        io_service_thread_(),
-        io_service_(),
-        work_guard_(new io_service::work(io_service_)){
+        services_({}){
     }
 
     ~Dispatcher() {
-        work_guard_.reset();
     }
 
     bool initialized_;
@@ -89,30 +81,6 @@ private:
 
     // 默认的http虚拟主机
     std::shared_ptr<Executor> default_service_;
-
-
-    // 再启一个io_service_，主要使用DIspatcher单例和boost::asio异步框架
-    // 来处理定时器等常用服务
-    boost::thread io_service_thread_;
-    io_service io_service_;
-
-    // io_service如果没有任务，会直接退出执行，所以需要
-    // 一个强制的work来持有之
-    std::unique_ptr<io_service::work> work_guard_;
-
-    void io_service_run() {
-
-        tzhttpd_log_notice("Dispatcher io_service thread running...");
-
-        // io_service would not have had any work to do,
-        // and consequently io_service::run() would have returned immediately.
-
-        boost::system::error_code ec;
-        io_service_.run(ec);
-
-        tzhttpd_log_notice("Dispatcher io_service thread terminated ...");
-    }
-
 };
 
 } // end namespace tzhttpd

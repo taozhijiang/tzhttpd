@@ -28,6 +28,7 @@ extern std::string http_server_version;
 
 } // end namespace tzhttpd
 
+
 extern char * program_invocation_short_name;
 static void usage() {
     std::stringstream ss;
@@ -44,15 +45,22 @@ static void usage() {
 char cfgFile[PATH_MAX] = "httpsrv.conf";
 bool daemonize = false;
 
-static void interrupted_callback(int signal){
 
-    tzhttpd::tzhttpd_log_notice("signal %d received ...", signal);
+static void interrupted_callback(int signal){
+    tzhttpd::tzhttpd_log_alert("Signal %d received ...", signal);
     switch(signal) {
         case SIGHUP:
+            tzhttpd::tzhttpd_log_notice("SIGHUP recv, do update_run_conf... ");
+            tzhttpd::ConfHelper::instance().update_runtime_conf();
+            break;
+
+        case SIGUSR1:
+            tzhttpd::tzhttpd_log_notice("SIGUSR recv, do module_status ... ");
             {
-                tzhttpd::tzhttpd_log_notice("reconf this service ... ");
-//                int ret = ConfHelper::instance().update_runtime_conf();
-                tzhttpd::tzhttpd_log_notice("reconf this service done... ");
+                std::string output;
+                tzhttpd::Status::instance().collect_status(output);
+                std::cout << output << std::endl;
+                tzhttpd::tzhttpd_log_notice("%s", output.c_str());
             }
             break;
 
@@ -60,6 +68,15 @@ static void interrupted_callback(int signal){
             tzhttpd::tzhttpd_log_err("Unhandled signal: %d", signal);
             break;
     }
+}
+
+static void init_signal_handle(){
+
+    ::signal(SIGPIPE, SIG_IGN);
+    ::signal(SIGUSR1, interrupted_callback);
+    ::signal(SIGHUP,  interrupted_callback);
+
+    return;
 }
 
 static int module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
@@ -121,8 +138,7 @@ int main(int argc, char* argv[]) {
     }
 
     // 信号处理
-    ::signal(SIGPIPE, SIG_IGN);
-    ::signal(SIGHUP, interrupted_callback);
+    init_signal_handle();
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
     if (!http_server_ptr ) {
