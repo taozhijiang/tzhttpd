@@ -139,6 +139,10 @@ public:
         return Status::instance().register_status_callback(strKey, func);
     }
 
+    int register_update_runtime_conf(ConfUpdateCallable func) {
+        return ConfHelper::instance().register_conf_callback(func);
+    }
+
     int update_http_runtime_conf() {
         return ConfHelper::instance().update_runtime_conf();
     }

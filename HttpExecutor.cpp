@@ -229,31 +229,40 @@ bool HttpExecutor::init() override {
 	}
 
 	bool init_success = false;
-    const libconfig::Setting &http_vhosts = conf_ptr->lookup("http.vhosts");
-    for(int i = 0; i < http_vhosts.getLength(); ++i) {
 
-        const libconfig::Setting& vhost = http_vhosts[i];
-        std::string server_name;
-        ConfUtil::conf_value(vhost, "server_name", server_name);
-        if (server_name.empty() ) {
-            tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
-            continue;
-        }
+    try
+    {
+        const libconfig::Setting& http_vhosts = conf_ptr->lookup("http.vhosts");
+        for(int i = 0; i < http_vhosts.getLength(); ++i) {
 
-        // tzhttpd_log_debug("detected server_name: %s", server_name.c_str());
-
-        // 发现是匹配的，则找到对应虚拟主机的配置文件了
-        if (server_name == hostname_) {
-            if (!handle_virtual_host_conf(vhost)) {
-                tzhttpd_log_err("handle detail conf for %s failed.", server_name.c_str());
-                return false;
+            const libconfig::Setting& vhost = http_vhosts[i];
+            std::string server_name;
+            ConfUtil::conf_value(vhost, "server_name", server_name);
+            if (server_name.empty() ) {
+                tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
+                continue;
             }
 
-            tzhttpd_log_debug("handle detail conf for host %s success!", server_name.c_str());
-            // OK
-			init_success = true;
-            break;
+            // tzhttpd_log_debug("detected server_name: %s", server_name.c_str());
+
+            // 发现是匹配的，则找到对应虚拟主机的配置文件了
+            if (server_name == hostname_) {
+                if (!handle_virtual_host_conf(vhost)) {
+                    tzhttpd_log_err("handle detail conf for %s failed.", server_name.c_str());
+                    return false;
+                }
+
+                tzhttpd_log_debug("handle detail conf for host %s success!", server_name.c_str());
+                // OK
+                init_success = true;
+                break;
+            }
         }
+
+    } catch (const libconfig::SettingNotFoundException &nfex) {
+        tzhttpd_log_err("http.vhosts not found!");
+    } catch (std::exception& e) {
+        tzhttpd_log_err("execptions catched for %s",  e.what());
     }
 
 	if(!init_success) {
@@ -1128,20 +1137,27 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
 
 int HttpExecutor::update_runtime_conf(const libconfig::Config& conf) {
 
-    const libconfig::Setting &http_vhosts = conf.lookup("http.vhosts");
+    try
+    {
+        const libconfig::Setting &http_vhosts = conf.lookup("http.vhosts");
 
-    for(int i = 0; i < http_vhosts.getLength(); ++i) {
+        for(int i = 0; i < http_vhosts.getLength(); ++i) {
 
-        const libconfig::Setting& vhost = http_vhosts[i];
+            const libconfig::Setting& vhost = http_vhosts[i];
 
-        std::string server_name;
-        ConfUtil::conf_value(vhost, "server_name", server_name);
+            std::string server_name;
+            ConfUtil::conf_value(vhost, "server_name", server_name);
 
-        // 发现是匹配的，则找到对应虚拟主机的配置文件了
-        if (server_name == hostname_) {
-            tzhttpd_log_notice("about to handle_virtual_host_runtime_conf update for host %s", hostname_.c_str());
-            return handle_virtual_host_runtime_conf(vhost);
+            // 发现是匹配的，则找到对应虚拟主机的配置文件了
+            if (server_name == hostname_) {
+                tzhttpd_log_notice("about to handle_virtual_host_runtime_conf update for host %s", hostname_.c_str());
+                return handle_virtual_host_runtime_conf(vhost);
+            }
         }
+    } catch (const libconfig::SettingNotFoundException &nfex) {
+        tzhttpd_log_err("http.vhosts not found!");
+    } catch (std::exception& e) {
+        tzhttpd_log_err("execptions catched for %s",  e.what());
     }
 
     tzhttpd_log_err("conf for host %s not found!!!!", hostname_.c_str());
