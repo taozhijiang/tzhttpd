@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
@@ -19,6 +19,7 @@
 #include "HttpProto.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
+#include "Timer.h"
 #include "Dispatcher.h"
 #include "Status.h"
 
@@ -209,6 +210,11 @@ bool HttpServer::init() {
 
     if (!Ssl_thread_setup()) {
         tzhttpd_log_err("Ssl_thread_setup failed!");
+        return false;
+    }
+
+    if(!Timer::instance().init()) {
+        tzhttpd_log_err("Timer service init failed.");
         return false;
     }
 

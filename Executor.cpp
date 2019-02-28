@@ -1,3 +1,11 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
+#include "Timer.h"
 #include "Dispatcher.h"
 #include "HttpReqInstance.h"
 #include "HttpExecutor.h"
@@ -15,9 +23,9 @@ bool Executor::init() {
     if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
         conf_ = http_executor->get_executor_conf();
     } else {
-		tzhttpd_log_err("cast instance failed.");
-		return false;
-	}
+        tzhttpd_log_err("cast instance failed.");
+        return false;
+    }
 
     if (conf_.exec_thread_number_hard_ < conf_.exec_thread_number_) {
         conf_.exec_thread_number_hard_ = conf_.exec_thread_number_;
@@ -47,18 +55,15 @@ bool Executor::init() {
     if (conf_.exec_thread_number_hard_ > conf_.exec_thread_number_ &&
         conf_.exec_thread_step_queue_size_ > 0)
     {
-        threads_adjust_timer_.reset(new steady_timer (Dispatcher::instance().get_io_service()));
-        if (!threads_adjust_timer_) {
+        tzhttpd_log_debug("we will support thread adjust for %s, with param hard %d, queue_step %d",
+                          instance_name().c_str(),
+                          conf_.exec_thread_number_hard_, conf_.exec_thread_step_queue_size_);
+
+        if (!Timer::instance().add_timer(std::bind(&Executor::executor_threads_adjust, shared_from_this(), std::placeholders::_1),
+                                        1*1000, true)) {
             tzhttpd_log_err("create thread adjust timer failed.");
             return false;
         }
-
-        tzhttpd_log_debug("we will support thread adjust for %s, with param %d:%d",
-                          instance_name().c_str(),
-                          conf_.exec_thread_number_hard_, conf_.exec_thread_step_queue_size_);
-        threads_adjust_timer_->expires_from_now(boost::chrono::seconds(1));
-        threads_adjust_timer_->async_wait(
-                    std::bind(&Executor::executor_threads_adjust, this));
     }
 
     Status::instance().register_status_callback(
@@ -106,7 +111,7 @@ void Executor::executor_service_run(ThreadObjPtr ptr) {
 }
 
 
-void Executor::executor_threads_adjust() {
+void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
 
     ExecutorConf conf {};
 
@@ -122,18 +127,17 @@ void Executor::executor_threads_adjust() {
 
     int queueSize = http_req_queue_.SIZE();
     if (queueSize > conf.exec_thread_step_queue_size_) {
-        expect_thread = queueSize / conf.exec_thread_step_queue_size_;
+        expect_thread += queueSize / conf.exec_thread_step_queue_size_;
     }
     if (expect_thread > conf.exec_thread_number_hard_) {
         expect_thread = conf.exec_thread_number_hard_;
     }
 
+    if (expect_thread != conf.exec_thread_number_) {
+        tzhttpd_log_notice("start thread number: %d, expect resize to %d",
+                           conf.exec_thread_number_, expect_thread);
+    }
     executor_threads_.resize_threads(expect_thread);
-
-
-    threads_adjust_timer_->expires_from_now(boost::chrono::seconds(1));
-    threads_adjust_timer_->async_wait(
-            std::bind(&Executor::executor_threads_adjust, shared_from_this()));
 
 }
 
@@ -183,4 +187,4 @@ int Executor::update_runtime_conf(const libconfig::Config& conf) {
     return ret;
 }
 
-} // end tzhttpd
+} // end namespace tzhttpd

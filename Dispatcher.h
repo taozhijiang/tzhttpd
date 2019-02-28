@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_DISPATCHER_H__
 #define __TZHTTPD_DISPATCHER_H__
 
@@ -56,17 +63,14 @@ public:
 
     int drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method);
 
-    io_service& get_io_service() {
-        return  io_service_;
-    }
-
 private:
 
     Dispatcher():
         initialized_(false),
-        services_({}),
-        io_service_thread_(),
-        io_service_() {
+        services_({}){
+    }
+
+    ~Dispatcher() {
     }
 
     bool initialized_;
@@ -77,24 +81,9 @@ private:
 
     // 默认的http虚拟主机
     std::shared_ptr<Executor> default_service_;
-
-
-    // 再启一个io_service_，主要使用DIspatcher单例和boost::asio异步框架
-    // 来处理定时器等常用服务
-    boost::thread io_service_thread_;
-    io_service io_service_;
-
-    void io_service_run() {
-
-        tzhttpd_log_notice("Dispatcher io_service thread running...");
-
-        boost::system::error_code ec;
-        io_service_.run(ec);
-    }
-
 };
 
-} // tzhttpd
+} // end namespace tzhttpd
 
 
 #endif // __TZHTTPD_SERVICE_DISPATCHER_H__

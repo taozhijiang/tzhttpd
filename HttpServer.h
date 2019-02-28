@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 TAO Zhijiang<taozhijiang@gmail.com>
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
  *
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
@@ -137,6 +137,10 @@ public:
 
     int register_module_status(const std::string& strKey, StatusCallable func) {
         return Status::instance().register_status_callback(strKey, func);
+    }
+
+    int register_update_runtime_conf(ConfUpdateCallable func) {
+        return ConfHelper::instance().register_conf_callback(func);
     }
 
     int update_http_runtime_conf() {

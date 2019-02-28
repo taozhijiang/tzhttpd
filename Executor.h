@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2018-2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #ifndef __TZHTTPD_EXECUTOR_H__
 #define __TZHTTPD_EXECUTOR_H__
 
@@ -31,8 +38,7 @@ public:
         service_impl_(service_impl),
         http_req_queue_(),
         conf_lock_(),
-        conf_({}),
-        threads_adjust_timer_() {
+        conf_({}) {
     }
 
     void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
@@ -106,13 +112,11 @@ public:
     }
 
 private:
-    // 根据http_req_queue_自动伸缩线程负载
-    std::unique_ptr<steady_timer> threads_adjust_timer_;
-    void executor_threads_adjust();
+    void executor_threads_adjust(const boost::system::error_code& ec);
 
 };
 
-} // end tzhttpd
+} // end namespace tzhttpd
 
 
 #endif // __TZHTTPD_EXECUTOR_H__
