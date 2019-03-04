@@ -34,7 +34,7 @@ void set_checkpoint_report_event_func(CP_report_event_func_t func);
 
 struct CountPerfByMs {
 
-    CountPerfByMs(const std::string& event):
+    explicit CountPerfByMs(const std::string& event):
         error_(false), event_(event) {
         ::gettimeofday(&start_, NULL);
     }
@@ -68,7 +68,7 @@ private:
 
 struct CountPerfByUs {
 
-    CountPerfByUs(const std::string& event):
+    explicit CountPerfByUs(const std::string& event):
         error_(false), event_(event) {
         ::gettimeofday(&start_, NULL);
     }

@@ -25,6 +25,8 @@
 
 #include "CryptoUtil.h"
 
+#include "CheckPoint.h"
+
 #include "Log.h"
 
 namespace tzhttpd {
@@ -829,11 +831,19 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         std::string response_str;
         std::string status_str;
         std::vector<std::string> headers;
-        int code = handler(*http_req_instance->http_parser_, response_str, status_str, headers);
-        if (code == 0) {
-            handler_object->success_count_ ++;
-        } else {
-            handler_object->fail_count_ ++;
+        int code = 0;
+
+        {
+            std::string key = "GET_" + handler_object->path_;
+            CountPerfByMs call_perf { key };
+
+            code = handler(*http_req_instance->http_parser_, response_str, status_str, headers);
+            if (code == 0) {
+                handler_object->success_count_ ++;
+            } else {
+                handler_object->fail_count_ ++;
+                call_perf.set_error();
+            }
         }
 
         // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
@@ -857,12 +867,21 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         std::string response_str;
         std::string status_str;
         std::vector<std::string> headers;
-        int code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
-                           response_str, status_str, headers);
-        if (code == 0) {
-            handler_object->success_count_ ++;
-        } else {
-            handler_object->fail_count_ ++;
+        int code = 0;
+
+        {
+            std::string key = "GET_" + handler_object->path_;
+            CountPerfByMs call_perf { key };
+
+            code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
+                               response_str, status_str, headers);
+            if (code == 0) {
+                handler_object->success_count_ ++;
+            } else {
+                handler_object->fail_count_ ++;
+                call_perf.set_error();
+            }
+
         }
 
         // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
