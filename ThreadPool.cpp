@@ -8,7 +8,6 @@
 #include <mutex>
 #include <functional>
 
-#include <boost/noncopyable.hpp>
 #include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 
@@ -19,12 +18,15 @@
 
 namespace tzhttpd {
 
-class ThreadPool::Impl : private boost::noncopyable {
+class ThreadPool::Impl {
 
 public:
     explicit Impl(uint32_t pool_size):
         pool_size_(pool_size) {
     }
+
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
 
     void callable_wrapper(ThreadObjPtr ptr){
 

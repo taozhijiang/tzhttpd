@@ -11,7 +11,6 @@
 #include <xtra_asio.h>
 
 #include <boost/thread.hpp>
-#include <boost/noncopyable.hpp>
 
 #include <functional>
 #include <memory>
@@ -25,8 +24,7 @@ typedef std::function<void (const boost::system::error_code& ec)> TimerEventCall
 
 namespace tzhttpd {
 
-class TimerObject: public boost::noncopyable,
-                   public std::enable_shared_from_this<TimerObject> {
+class TimerObject: public std::enable_shared_from_this<TimerObject> {
 public:
     TimerObject(io_service& ioservice,
                 const TimerEventCallable& func, uint64_t msec,
@@ -76,7 +74,7 @@ private:
     bool forever_;
 };
 
-class Timer: public boost::noncopyable {
+class Timer {
 
 public:
     static Timer& instance();
@@ -114,6 +112,8 @@ private:
         work_guard_.reset();
     }
 
+    Timer(const Timer&) = delete;
+    Timer& operator=(const Timer&) = delete;
 
     // 再启一个io_service_，主要使用Timer单例和boost::asio异步框架
     // 来处理定时器等常用服务

@@ -13,19 +13,17 @@
 
 #include <libconfig.h++>
 
-#include <boost/atomic/atomic.hpp>
 #include <boost/thread/locks.hpp>
-
-#include "StrUtil.h"
 
 #include "Executor.h"
 #include "HttpProto.h"
 #include "ServiceIf.h"
 #include "HttpHandler.h"
-#include "BasicAuth.h"
+
 
 namespace tzhttpd {
 
+class BasicAuth;
 
 class HttpExecutor: public ServiceIf {
 
@@ -67,7 +65,7 @@ public:
 
 
 
-    int update_runtime_conf(const libconfig::Config& conf);
+    int module_runtime(const libconfig::Config& conf);
     int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 
 

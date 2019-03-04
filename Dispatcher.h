@@ -14,43 +14,21 @@
 #include <map>
 #include <mutex>
 
-
-#include <boost/noncopyable.hpp>
-
-#include "Log.h"
-
-#include "Executor.h"
-
-#include "HttpReqInstance.h"
-
+#include "HttpHandler.h"
 
 namespace tzhttpd {
 
-class Dispatcher: public boost::noncopyable {
+class HttpReqInstance;
+class Executor;
+
+class Dispatcher {
 
 public:
     static Dispatcher& instance();
 
     bool init();
 
-    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
-
-        std::shared_ptr<ServiceIf> service;
-        auto it = services_.find(http_req_instance->hostname_);
-        if (it != services_.end()) {
-            service = it->second;
-        }
-
-        if (!service) {
-            tzhttpd_log_debug("find http service_impl (virtualhost) for %s failed, using default.",
-                              http_req_instance->hostname_.c_str());
-            service = default_service_;
-        }
-
-        service->handle_http_request(http_req_instance);
-    }
-
-    int update_runtime_conf(const libconfig::Config& conf);
+    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance);
 
     // 注册虚拟主机
     int add_virtual_host(const std::string& hostname);
@@ -63,6 +41,8 @@ public:
 
     int drop_http_handler(const std::string& hostname, const std::string& uri_regex, enum HTTP_METHOD method);
 
+    int module_runtime(const libconfig::Config& conf);
+
 private:
 
     Dispatcher():
@@ -72,6 +52,9 @@ private:
 
     ~Dispatcher() {
     }
+
+    Dispatcher(const Dispatcher&) = delete;
+    Dispatcher& operator=(const Dispatcher&) = delete;
 
     bool initialized_;
 

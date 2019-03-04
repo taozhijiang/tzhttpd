@@ -8,6 +8,8 @@
 #include "HttpParser.h"
 #include "HttpProto.h"
 
+#include "CgiHelper.h"
+#include "SlibLoader.h"
 #include "CgiWrapper.h"
 
 namespace tzhttpd {

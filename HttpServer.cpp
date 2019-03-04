@@ -50,15 +50,13 @@ bool HttpConf::load_conf(std::shared_ptr<libconfig::Config> conf_ptr) {
 
 bool HttpConf::load_conf(const libconfig::Config& conf) {
 
-    int listen_port = 0;
     ConfUtil::conf_value(conf, "http.bind_addr", bind_addr_);
-    ConfUtil::conf_value(conf, "http.listen_port", listen_port);
-    if (bind_addr_.empty() || listen_port <=0 ){
+    ConfUtil::conf_value(conf, "http.bind_port", bind_port_);
+    if (bind_addr_.empty() || bind_port_ <=0 ){
         tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d",
-                         bind_addr_.c_str(), listen_port);
+                         bind_addr_.c_str(), bind_port_);
         return false;
     }
-    listen_port_ = static_cast<unsigned short>(listen_port);
 
     std::string ip_list;
     ConfUtil::conf_value(conf, "http.safe_ip", ip_list);
@@ -123,8 +121,8 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
         tzhttpd_log_err("invalid http.service_speed value %d.", value_i);
         return false;
     }
-    http_service_enabled_ = value_b;
-    http_service_speed_ = value_i;
+    service_enabled_ = value_b;
+    service_speed_ = value_i;
 
     tzhttpd_log_debug("HttpConf parse conf OK!");
 
@@ -133,7 +131,7 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
 
 void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
-    if (http_service_speed_ == 0) {
+    if (service_speed_ == 0) {
         tzhttpd_log_alert("unlock speed jail, close the timer.");
         timed_feed_token_.reset();
         return;
@@ -219,10 +217,10 @@ bool HttpServer::init() {
     }
 
     auto conf_ptr = ConfHelper::instance().get_conf();
-	if(!conf_ptr) { 
-		tzhttpd_log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
-		return false;
-	}
+    if(!conf_ptr) {
+        tzhttpd_log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
+        return false;
+    }
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
@@ -231,15 +229,15 @@ bool HttpServer::init() {
         return false;
     }
 
-    ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.listen_port_);
+    ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.bind_port_);
     tzhttpd_log_alert("create listen endpoint for %s:%d",
-                      conf_.bind_addr_.c_str(), conf_.listen_port_);
+                      conf_.bind_addr_.c_str(), conf_.bind_port_);
 
     tzhttpd_log_debug("socket/session conn cancel time_out: %d secs, enabled: %s",
-                      conf_.ops_cancel_time_out_.load(),
+                      conf_.ops_cancel_time_out_,
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
-    if (conf_.http_service_speed_) {
+    if (conf_.service_speed_) {
         conf_.timed_feed_token_.reset(new steady_timer (io_service_)); // 1sec
         if (!conf_.timed_feed_token_) {
             tzhttpd_log_err("Create timed_feed_token_ failed!");
@@ -250,8 +248,8 @@ bool HttpServer::init() {
         conf_.timed_feed_token_->async_wait(
                     std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
-    tzhttpd_log_debug("http service enabled: %s, speed: %ld tps", conf_.http_service_enabled_ ? "true" : "false",
-                      conf_.http_service_speed_.load());
+    tzhttpd_log_debug("http service enabled: %s, speed: %d tps", conf_.service_enabled_ ? "true" : "false",
+                      conf_.service_speed_);
 
     if (!io_service_threads_.init_threads(
         std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
@@ -266,8 +264,9 @@ bool HttpServer::init() {
     }
 
     // 注册配置动态更新的回调函数
-    ConfHelper::instance().register_conf_callback(
-            std::bind(&HttpServer::update_runtime_conf, shared_from_this(),
+    ConfHelper::instance().register_runtime_callback(
+            "tzhttpd-HttpServer",
+            std::bind(&HttpServer::module_runtime, shared_from_this(),
                       std::placeholders::_1));
 
     // 系统状态展示相关的初始化
@@ -382,8 +381,8 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         }
 
         if (!conf_.get_http_service_token()) {
-            tzhttpd_log_err("request http service token failed, enabled: %s, speed: %ld",
-                    conf_.http_service_enabled_ ? "true" : "false", conf_.http_service_speed_.load());
+            tzhttpd_log_err("request http service token failed, enabled: %s, speed: %d",
+                            conf_.service_enabled_ ? "true" : "false", conf_.service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -427,7 +426,7 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
     std::stringstream ss;
 
     ss << "\t" << "instance_name: " << instance_name_ << std::endl;
-    ss << "\t" << "service_addr: " << conf_.bind_addr_ << "@" << conf_.listen_port_ << std::endl;
+    ss << "\t" << "service_addr: " << conf_.bind_addr_ << "@" << conf_.bind_port_ << std::endl;
     ss << "\t" << "backlog_size: " << conf_.backlog_size_ << std::endl;
     ss << "\t" << "io_thread_pool_size: " << conf_.io_thread_number_ << std::endl;
     ss << "\t" << "safe_ips: " ;
@@ -443,8 +442,8 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
 
     ss << "\t" << std::endl;
 
-    ss << "\t" << "http_service_enabled: " << (conf_.http_service_enabled_  ? "true" : "false") << std::endl;
-    ss << "\t" << "http_service_speed(tps): " << conf_.http_service_speed_ << std::endl;
+    ss << "\t" << "service_enabled: " << (conf_.service_enabled_  ? "true" : "false") << std::endl;
+    ss << "\t" << "service_speed(tps): " << conf_.service_speed_ << std::endl;
     ss << "\t" << "session_cancel_time_out: " << conf_.session_cancel_time_out_ << std::endl;
     ss << "\t" << "ops_cancel_time_out: " << conf_.ops_cancel_time_out_ << std::endl;
 
@@ -453,7 +452,7 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
 }
 
 
-int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
+int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
     HttpConf conf {};
     if (!conf.load_conf(cfg)) {
@@ -463,14 +462,14 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
 
     if (conf_.session_cancel_time_out_ != conf.session_cancel_time_out_) {
         tzhttpd_log_notice("update session_cancel_time_out from %d to %d",
-                           conf_.session_cancel_time_out_.load(), conf.session_cancel_time_out_.load());
-        conf_.session_cancel_time_out_ = conf.session_cancel_time_out_.load();
+                           conf_.session_cancel_time_out_, conf.session_cancel_time_out_);
+        conf_.session_cancel_time_out_ = conf.session_cancel_time_out_;
     }
 
     if (conf_.ops_cancel_time_out_ != conf.ops_cancel_time_out_) {
         tzhttpd_log_notice("update ops_cancel_time_out from %d to %d",
-                           conf_.ops_cancel_time_out_.load(),  conf.ops_cancel_time_out_.load());
-        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_.load();
+                           conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
+        conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
     }
 
 
@@ -482,13 +481,13 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
         conf_.safe_ip_.swap(conf.safe_ip_);
     }
 
-    if (conf_.http_service_speed_ != conf.http_service_speed_) {
-        tzhttpd_log_notice("update http_service_speed from %ld to %ld",
-                           conf_.http_service_speed_.load() , conf.http_service_speed_.load());
-        conf_.http_service_speed_ = conf.http_service_speed_.load();
+    if (conf_.service_speed_ != conf.service_speed_) {
+        tzhttpd_log_notice("update http_service_speed from %d to %d",
+                           conf_.service_speed_ , conf.service_speed_);
+        conf_.service_speed_ = conf.service_speed_;
 
         // 检查定时器是否存在
-        if (conf_.http_service_speed_) {
+        if (conf_.service_speed_) {
 
             // 直接重置定时器，无论有没有
             conf_.timed_feed_token_.reset(new steady_timer(io_service_)); // 1sec
@@ -511,8 +510,8 @@ int HttpServer::update_runtime_conf(const libconfig::Config& cfg) {
         }
     }
 
-    tzhttpd_log_notice("http service enabled: %s, speed: %ld", conf_.http_service_enabled_ ? "true" : "false",
-                      conf_.http_service_speed_.load());
+    tzhttpd_log_notice("http service enabled: %s, speed: %d", conf_.service_enabled_ ? "true" : "false",
+                       conf_.service_speed_);
 
     return 0;
 }

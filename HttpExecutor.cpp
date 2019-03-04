@@ -17,6 +17,7 @@
 #include "HttpParser.h"
 #include "HttpExecutor.h"
 #include "HttpReqInstance.h"
+#include "BasicAuth.h"
 
 #include "CgiHelper.h"
 #include "CgiWrapper.h"
@@ -1135,7 +1136,7 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
 
 }
 
-int HttpExecutor::update_runtime_conf(const libconfig::Config& conf) {
+int HttpExecutor::module_runtime(const libconfig::Config& conf) {
 
     try
     {

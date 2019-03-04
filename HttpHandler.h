@@ -14,7 +14,6 @@
 
 #include <libconfig.h++>
 
-#include <boost/atomic/atomic.hpp>
 #include <boost/thread/locks.hpp>
 
 #include "StrUtil.h"
@@ -35,15 +34,16 @@ typedef std::function<int (const HttpParser& http_parser, const std::string& pos
 
 struct HttpHandlerObject {
 
-    std::string            path_;
-    boost::atomic<int64_t> success_count_;
-    boost::atomic<int64_t> fail_count_;
+    const std::string   path_;
 
-    boost::atomic<bool>    built_in_;       // built_in handler,无法被卸载更新
+    int32_t             success_count_;
+    int32_t             fail_count_;
+
+    bool                built_in_;       // built_in handler,无法被卸载更新
 
 
-    HttpGetHandler         http_get_handler_;
-    HttpPostHandler        http_post_handler_;
+    HttpGetHandler      http_get_handler_;
+    HttpPostHandler     http_post_handler_;
 
     HttpHandlerObject(const std::string& path,
                       const HttpGetHandler& get_handler,

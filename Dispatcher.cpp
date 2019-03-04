@@ -5,8 +5,12 @@
  *
  */
 
+#include "Log.h"
 #include "ConfHelper.h"
+
+#include "Executor.h"
 #include "HttpExecutor.h"
+#include "HttpReqInstance.h"
 
 #include "Dispatcher.h"
 
@@ -55,12 +59,30 @@ bool Dispatcher::init() {
     }
 
     // 注册配置动态配置更新接口，由此处分发到各个虚拟主机，不再每个虚拟主机自己注册
-    ConfHelper::instance().register_conf_callback(
-            std::bind(&Dispatcher::update_runtime_conf, this,
+    ConfHelper::instance().register_runtime_callback(
+            "tzhttpd-Dispatcher",
+            std::bind(&Dispatcher::module_runtime, this,
                       std::placeholders::_1));
 
 
     return true;
+}
+
+void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
+
+    std::shared_ptr<ServiceIf> service;
+    auto it = services_.find(http_req_instance->hostname_);
+    if (it != services_.end()) {
+        service = it->second;
+    }
+
+    if (!service) {
+        tzhttpd_log_debug("find http service_impl (virtualhost) for %s failed, using default.",
+                          http_req_instance->hostname_.c_str());
+        service = default_service_;
+    }
+
+    service->handle_http_request(http_req_instance);
 }
 
 
@@ -161,21 +183,21 @@ int Dispatcher::drop_http_handler(const std::string& hostname, const std::string
 
 
 // 依次调用触发进行默认、其他虚拟主机的配置更新
-int Dispatcher::update_runtime_conf(const libconfig::Config& conf) {
+int Dispatcher::module_runtime(const libconfig::Config& conf) override {
 
     int ret_sum = 0;
     int ret = 0;
 
-    tzhttpd_log_notice("update_runtime_conf begin to handle host [default].");
-    ret = default_service_->update_runtime_conf(conf);
-    tzhttpd_log_notice("update_runtime_conf for host [default] return: %d", ret);
+    tzhttpd_log_notice("module_runtime begin to handle host [default].");
+    ret = default_service_->module_runtime(conf);
+    tzhttpd_log_notice("module_runtime for host [default] return: %d", ret);
     ret_sum += ret;
 
     for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
 
         auto executor = iter->second;
-        ret = executor->update_runtime_conf(conf);
-        tzhttpd_log_notice("update_runtime_conf for host %s return: %d",
+        ret = executor->module_runtime(conf);
+        tzhttpd_log_notice("module_runtime for host %s return: %d",
                            executor->instance_name().c_str(), ret);
         ret_sum += ret;
     }

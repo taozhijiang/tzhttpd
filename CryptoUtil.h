@@ -278,10 +278,10 @@ static int Gzip(const std::string& src, std::string& store) {
             return 0;
         }
     } catch (std::exception& e) {
-		std::cerr << "Gzip exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Gzip exception: unknown" << std::endl;
-	}
+        std::cerr << "Gzip exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Gzip exception: unknown" << std::endl;
+    }
     
     return -1;
 }
@@ -303,10 +303,10 @@ static int Gunzip(const std::string& src, std::string& store) {
             return 0;
         }
     } catch (std::exception& e) {
-		std::cerr << "Gunzip exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Gunzip exception: unknown" << std::endl;
-	}
+        std::cerr << "Gunzip exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Gunzip exception: unknown" << std::endl;
+    }
 
     return -1;
 }
@@ -326,10 +326,10 @@ static int Deflator(const std::string& src, std::string& store) {
             return 0;
         }
     } catch (std::exception& e) {
-		std::cerr << "Deflator exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Deflator exception: unknown" << std::endl;
-	}
+        std::cerr << "Deflator exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Deflator exception: unknown" << std::endl;
+    }
     
     return -1;
 }
@@ -349,10 +349,10 @@ static int Inflator(const std::string& src, std::string& store) {
             return 0;
         }
     } catch (std::exception& e) {
-		std::cerr << "Inflator exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Inflator exception: unknown" << std::endl;
-	}
+        std::cerr << "Inflator exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Inflator exception: unknown" << std::endl;
+    }
     
     return -1;
 }
@@ -376,10 +376,10 @@ static std::string Gzip(const std::string& src) {
             zipper.Get((byte*)&store[0], store.size());
         }    
     } catch (std::exception& e) {
-		std::cerr << "Gzip exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Gzip exception: unknown" << std::endl;
-	}
+        std::cerr << "Gzip exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Gzip exception: unknown" << std::endl;
+    }
     
     return store;
 }
@@ -399,10 +399,10 @@ static std::string Gunzip(const std::string& src) {
             unzipper.Get((byte*)&store[0], store.size());
         }
     } catch (std::exception& e) {
-		std::cerr << "Gunzip exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Gunzip exception: unknown" << std::endl;
-	}
+        std::cerr << "Gunzip exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Gunzip exception: unknown" << std::endl;
+    }
 
     return store;
 }
@@ -422,10 +422,10 @@ static std::string Deflator(const std::string& src) {
             zipper.Get((byte*)&store[0], store.size());
         }
     } catch (std::exception& e) {
-		std::cerr << "Deflator exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Deflator exception: unknown" << std::endl;
-	}
+        std::cerr << "Deflator exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Deflator exception: unknown" << std::endl;
+    }
 
     return store;
 }
@@ -445,10 +445,10 @@ static std::string Inflator(const std::string& src) {
             unzipper.Get((byte*)&store[0], store.size());
         }
     } catch (std::exception& e) {
-		std::cerr << "Inflator exception: " << e.what() << std::endl;
-	} catch (...) {
-		std::cerr << "Inflator exception: unknown" << std::endl;
-	}
+        std::cerr << "Inflator exception: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "Inflator exception: unknown" << std::endl;
+    }
 
     return store;
 }

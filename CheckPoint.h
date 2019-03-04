@@ -9,9 +9,7 @@
 #define __TZHTTPD_CHECK_POINT__
 
 #include <sys/time.h>
-
 #include <string>
-#include <boost/noncopyable.hpp>
 
 #include "Log.h"
 
@@ -34,7 +32,7 @@ void set_checkpoint_report_event_func(CP_report_event_func_t func);
 
 // impl
 
-struct CountPerfByMs: public boost::noncopyable {
+struct CountPerfByMs {
 
     CountPerfByMs(const std::string& event):
         error_(false), event_(event) {
@@ -54,6 +52,9 @@ struct CountPerfByMs: public boost::noncopyable {
         }
     }
 
+    CountPerfByMs(const CountPerfByMs&) = delete;
+    CountPerfByMs& operator=(const CountPerfByMs&) = delete;
+
     void set_error() {
         error_ = true;
     }
@@ -65,7 +66,7 @@ private:
 };
 
 
-struct CountPerfByUs: public boost::noncopyable {
+struct CountPerfByUs {
 
     CountPerfByUs(const std::string& event):
         error_(false), event_(event) {
@@ -83,6 +84,9 @@ struct CountPerfByUs: public boost::noncopyable {
             tzhttpd_log_debug("%s - success: %s, perf: %ldus, ", event_.c_str(), error_ ? "false" : "true", time_us);
         }
     }
+
+    CountPerfByUs(const CountPerfByUs&) = delete;
+    CountPerfByUs& operator=(const CountPerfByUs&) = delete;
 
 private:
     struct timeval start_;

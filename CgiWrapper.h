@@ -18,13 +18,10 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
-#include <boost/atomic/atomic.hpp>
-
-#include "CgiHelper.h"
-#include "SlibLoader.h"
 
 namespace tzhttpd {
 
+class SLibLoader;
 class HttpParser;
 
 namespace http_handler {

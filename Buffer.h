@@ -13,13 +13,12 @@
 #include <string>
 
 #include <memory>
-#include <boost/noncopyable.hpp>
 
 #include <xtra_rhel6.h>
 
 namespace tzhttpd {
 
-class Buffer: public boost::noncopyable {
+class Buffer {
 
 public:
     // 构造函数
@@ -105,6 +104,9 @@ public:
     }
 
 private:
+
+    Buffer(const Buffer&) = delete;
+    Buffer& operator=(const Buffer&) = delete;
 
     std::vector<char> data_;
 };
