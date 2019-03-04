@@ -67,7 +67,7 @@ bool Executor::init() {
     }
 
     Status::instance().register_status_callback(
-                "executor_" + instance_name(),
+                "tzhttpd-executor_" + instance_name(),
                 std::bind(&Executor::module_status, shared_from_this(),
                           std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 

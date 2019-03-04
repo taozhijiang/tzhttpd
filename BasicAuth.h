@@ -49,7 +49,7 @@ public:
                 continue;
             }
             std::string auth_uri_regex;
-            ConfUtil::conf_value(basic_auths_item, "uri", auth_uri_regex);
+            basic_auths_item.lookupValue("uri", auth_uri_regex);
             auth_uri_regex = StrUtil::pure_uri_path(auth_uri_regex);
 
             std::set<std::string> auth_set{};
@@ -60,8 +60,8 @@ public:
                 std::string auth_user;
                 std::string auth_passwd;
 
-                ConfUtil::conf_value(auth_acct, "user", auth_user);
-                ConfUtil::conf_value(auth_acct, "passwd", auth_passwd);
+                auth_acct.lookupValue("user", auth_user);
+                auth_acct.lookupValue("passwd", auth_passwd);
 
                 if (auth_user.empty() || auth_passwd.empty()) {
                     if (strict) {

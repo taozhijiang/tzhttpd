@@ -12,7 +12,6 @@
 #include <functional>
 
 #include <boost/format.hpp>
-#include <boost/atomic/atomic.hpp>
 
 #include "TcpConnAsync.h"
 
@@ -50,16 +49,16 @@ bool HttpConf::load_conf(std::shared_ptr<libconfig::Config> conf_ptr) {
 
 bool HttpConf::load_conf(const libconfig::Config& conf) {
 
-    ConfUtil::conf_value(conf, "http.bind_addr", bind_addr_);
-    ConfUtil::conf_value(conf, "http.bind_port", bind_port_);
+    conf.lookupValue("http.bind_addr", bind_addr_);
+    conf.lookupValue("http.bind_port", bind_port_);
     if (bind_addr_.empty() || bind_port_ <=0 ){
-        tzhttpd_log_err( "invalid http.bind_addr %s & http.listen_port %d",
-                         bind_addr_.c_str(), bind_port_);
+        tzhttpd_log_err("invalid http.bind_addr %s & http.bind_port %d",
+                        bind_addr_.c_str(), bind_port_);
         return false;
     }
 
     std::string ip_list;
-    ConfUtil::conf_value(conf, "http.safe_ip", ip_list);
+    conf.lookupValue("http.safe_ip", ip_list);
     if (!ip_list.empty()) {
         std::vector<std::string> ip_vec;
         std::set<std::string> ip_set;
@@ -79,13 +78,13 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
                           static_cast<int>(safe_ip_.size()));
     }
 
-    ConfUtil::conf_value(conf, "http.backlog_size", backlog_size_);
+    conf.lookupValue("http.backlog_size", backlog_size_);
     if (backlog_size_ < 0) {
         tzhttpd_log_err( "invalid http.backlog_size %d.", backlog_size_);
         return false;
     }
 
-    ConfUtil::conf_value(conf, "http.io_thread_pool_size", io_thread_number_);
+    conf.lookupValue("http.io_thread_pool_size", io_thread_number_);
     if (io_thread_number_ < 0) {
         tzhttpd_log_err( "invalid http.io_thread_number %d", io_thread_number_);
         return false;
@@ -93,39 +92,37 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
 
     // once init
     std::string server_version;
-    ConfUtil::conf_value(conf, "http.version", server_version);
+    conf.lookupValue("http.version", server_version);
     if (!server_version.empty()) {
         std::call_once(http_version_once, init_http_version, server_version);
     }
-    // other http parameters
-    int value_i;
 
-    ConfUtil::conf_value(conf, "http.ops_cancel_time_out", value_i);
-    if (value_i < 0){
-        tzhttpd_log_err("invalid http ops_cancel_time_out value.");
+    conf.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_);
+    if (ops_cancel_time_out_ < 0){
+        tzhttpd_log_err("invalid http ops_cancel_time_out: %d", ops_cancel_time_out_);
         return false;
     }
-    ops_cancel_time_out_ = value_i;
 
-    ConfUtil::conf_value(conf, "http.session_cancel_time_out", value_i);
-    if (value_i < 0){
-        tzhttpd_log_err("invalid http session_cancel_time_out value.");
+    conf.lookupValue("http.session_cancel_time_out", session_cancel_time_out_);
+    if (session_cancel_time_out_ < 0){
+        tzhttpd_log_err("invalid http session_cancel_time_out: %d", session_cancel_time_out_);
         return false;
     }
-    session_cancel_time_out_ = value_i;
 
-    bool value_b;
-    ConfUtil::conf_value(conf, "http.service_enable", value_b, true);
-    ConfUtil::conf_value(conf, "http.service_speed", value_i);
-    if (value_i < 0){
-        tzhttpd_log_err("invalid http.service_speed value %d.", value_i);
+    conf.lookupValue("http.service_enable", service_enabled_);
+    conf.lookupValue("http.service_speed", service_speed_);
+    if (service_speed_ < 0){
+        tzhttpd_log_err("invalid http.service_speed: %d.", service_speed_);
         return false;
     }
-    service_enabled_ = value_b;
-    service_speed_ = value_i;
+
+    conf.lookupValue("http.service_concurrency", service_concurrency_);
+    if (service_concurrency_ < 0){
+        tzhttpd_log_err("invalid http.service_concurrency: %d.", service_concurrency_);
+        return false;
+    }
 
     tzhttpd_log_debug("HttpConf parse conf OK!");
-
     return true;
 }
 
@@ -166,7 +163,7 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 
    auto conf_ptr = ConfHelper::instance().get_conf();
    int log_level = 0;
-   ConfUtil::conf_value(*conf_ptr, "http.log_level", log_level);
+   conf_ptr->lookupValue("log_level", log_level);
     if (log_level <= 0 || log_level > 7) {
         tzhttpd_log_notice("invalid log_level value, reset to default 7.");
         log_level = 7;
@@ -198,13 +195,6 @@ bool HttpServer::init() {
 
     // incase not forget
     ::signal(SIGPIPE, SIG_IGN);
-
-    boost::atomic<int> atomic_int;
-    if (atomic_int.is_lock_free()) {
-        tzhttpd_log_alert("GOOD, your system atomic is lock_free ...");
-    } else {
-        tzhttpd_log_err("BAD, your system atomic is not lock_free, may impact performance ...");
-    }
 
     if (!Ssl_thread_setup()) {
         tzhttpd_log_err("Ssl_thread_setup failed!");
@@ -389,6 +379,15 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
             break;
         }
 
+        if (conf_.service_concurrency_ != 0 &&
+            conf_.service_concurrency_ < TcpConnAsync::current_concurrency_) {
+            tzhttpd_log_err("service_concurrency_ error, limit: %d, current: %d",
+                            conf_.service_concurrency_, TcpConnAsync::current_concurrency_.load());
+            sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
+            sock_ptr->close(ignore_ec);
+            break;
+        }
+
         std::shared_ptr<ConnType> new_conn = std::make_shared<ConnType>(sock_ptr, *this);
 
         new_conn->start();
@@ -444,6 +443,7 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
 
     ss << "\t" << "service_enabled: " << (conf_.service_enabled_  ? "true" : "false") << std::endl;
     ss << "\t" << "service_speed(tps): " << conf_.service_speed_ << std::endl;
+    ss << "\t" << "service_concurrency: " << conf_.service_concurrency_ << std::endl;
     ss << "\t" << "session_cancel_time_out: " << conf_.session_cancel_time_out_ << std::endl;
     ss << "\t" << "ops_cancel_time_out: " << conf_.ops_cancel_time_out_ << std::endl;
 
@@ -508,6 +508,12 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
                 conf_.timed_feed_token_.reset();
             }
         }
+    }
+
+    if (conf_.service_concurrency_ != conf.service_concurrency_ ) {
+        tzhttpd_log_err("update service_concurrency from %d to %d.",
+                        conf_.service_concurrency_, conf.service_concurrency_);
+        conf_.service_concurrency_ = conf.service_concurrency_;
     }
 
     tzhttpd_log_notice("http service enabled: %s, speed: %d", conf_.service_enabled_ ? "true" : "false",

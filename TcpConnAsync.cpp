@@ -25,6 +25,8 @@ extern int default_http_get_handler(const HttpParser& http_parser,
                                     std::string& response, string& status, std::vector<std::string>& add_header);
 } // end namespace http_handler
 
+boost::atomic<int32_t> TcpConnAsync::current_concurrency_(0);
+
 TcpConnAsync::TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
                            HttpServer& server):
     ConnIf(p_socket),
@@ -38,9 +40,13 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
 
     set_tcp_nodelay(true);
     set_tcp_nonblocking(true);
+
+    ++ current_concurrency_;
 }
 
 TcpConnAsync::~TcpConnAsync() {
+
+    -- current_concurrency_;
     tzhttpd_log_debug("TcpConnAsync SOCKET RELEASED!!!");
 }
 

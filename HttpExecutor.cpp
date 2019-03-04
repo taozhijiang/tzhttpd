@@ -224,12 +224,12 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
 bool HttpExecutor::init() override {
 
     auto conf_ptr = ConfHelper::instance().get_conf();
-	if(!conf_ptr) {
-		tzhttpd_log_err("ConfHelper not initialized? return conf_ptr empty!!!");
-		return false;
-	}
+    if(!conf_ptr) {
+        tzhttpd_log_err("ConfHelper not initialized? return conf_ptr empty!!!");
+        return false;
+    }
 
-	bool init_success = false;
+    bool init_success = false;
 
     try
     {
@@ -238,7 +238,7 @@ bool HttpExecutor::init() override {
 
             const libconfig::Setting& vhost = http_vhosts[i];
             std::string server_name;
-            ConfUtil::conf_value(vhost, "server_name", server_name);
+            vhost.lookupValue("server_name", server_name);
             if (server_name.empty() ) {
                 tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
                 continue;
@@ -266,9 +266,9 @@ bool HttpExecutor::init() override {
         tzhttpd_log_err("execptions catched for %s",  e.what());
     }
 
-	if(!init_success) {
-		tzhttpd_log_err("host %s init failed, may not configure for it?", hostname_.c_str());
-	}
+    if(!init_success) {
+        tzhttpd_log_err("host %s init failed, may not configure for it?", hostname_.c_str());
+    }
     return init_success;
 }
 
@@ -290,8 +290,8 @@ bool HttpExecutor::parse_http_cgis(const libconfig::Setting& setting, const std:
         std::string uri_path {};
         std::string dl_path {};
 
-        ConfUtil::conf_value(handler, "uri", uri_path);
-        ConfUtil::conf_value(handler, "dl_path", dl_path);
+        handler.lookupValue("uri", uri_path);
+        handler.lookupValue("dl_path", dl_path);
 
         if(uri_path.empty() || dl_path.empty()) {
             tzhttpd_log_err("vhost:%s skip err configure item %s:%s...",
@@ -388,14 +388,14 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
     std::string docu_root_str;
     std::string docu_index_str;
 
-    ConfUtil::conf_value(setting, "server_name", server_name);
-    ConfUtil::conf_value(setting, "redirect", redirect_str);
-    ConfUtil::conf_value(setting, "docu_root", docu_root_str);
-    ConfUtil::conf_value(setting, "docu_index", docu_index_str);
+    setting.lookupValue("server_name", server_name);
+    setting.lookupValue("redirect", redirect_str);
+    setting.lookupValue("docu_root", docu_root_str);
+    setting.lookupValue("docu_index", docu_index_str);
 
-    ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_ptr_->executor_conf_.exec_thread_number_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_size_hard", conf_ptr_->executor_conf_.exec_thread_number_hard_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_step_queue_size", conf_ptr_->executor_conf_.exec_thread_step_queue_size_);
+    setting.lookupValue("exec_thread_pool_size", conf_ptr_->executor_conf_.exec_thread_number_);
+    setting.lookupValue("exec_thread_pool_size_hard", conf_ptr_->executor_conf_.exec_thread_number_hard_);
+    setting.lookupValue("exec_thread_pool_step_queue_size", conf_ptr_->executor_conf_.exec_thread_step_queue_size_);
 
 
     if (!redirect_str.empty()) {
@@ -505,8 +505,8 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
             std::string suffix {};
             std::string ctrl_head {};
 
-            ConfUtil::conf_value(ctrl_item, "suffix", suffix);
-            ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+            ctrl_item.lookupValue("suffix", suffix);
+            ctrl_item.lookupValue("header", ctrl_head);
             if(suffix.empty() || ctrl_head.empty()) {
                 tzhttpd_log_err("skip err cache ctrl configure item ...");
                 continue;
@@ -546,7 +546,7 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
     if (setting.exists("compress_control")) {
 
         std::string suffix {};
-        ConfUtil::conf_value(setting, "compress_control", suffix);
+        setting.lookupValue("compress_control", suffix);
 
         std::vector<std::string> suffixes {};
         boost::split(suffixes, suffix, boost::is_any_of(";"));
@@ -958,13 +958,13 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
     std::string docu_root_str;
     std::string docu_index_str;
 
-    ConfUtil::conf_value(setting, "redirect", redirect_str);
-    ConfUtil::conf_value(setting, "docu_root", docu_root_str);
-    ConfUtil::conf_value(setting, "docu_index", docu_index_str);
+    setting.lookupValue("redirect", redirect_str);
+    setting.lookupValue("docu_root", docu_root_str);
+    setting.lookupValue("docu_index", docu_index_str);
 
-    ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_ptr->executor_conf_.exec_thread_number_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_size_hard", conf_ptr->executor_conf_.exec_thread_number_hard_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_step_queue_size", conf_ptr->executor_conf_.exec_thread_step_queue_size_);
+    setting.lookupValue("exec_thread_pool_size", conf_ptr->executor_conf_.exec_thread_number_);
+    setting.lookupValue("exec_thread_pool_size_hard", conf_ptr->executor_conf_.exec_thread_number_hard_);
+    setting.lookupValue("exec_thread_pool_step_queue_size", conf_ptr->executor_conf_.exec_thread_step_queue_size_);
 
     // 检查ExecutorConf参数合法性
     if (conf_ptr->executor_conf_.exec_thread_number_hard_ < conf_ptr->executor_conf_.exec_thread_number_) {
@@ -1069,8 +1069,8 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
             std::string suffix {};
             std::string ctrl_head {};
 
-            ConfUtil::conf_value(ctrl_item, "suffix", suffix);
-            ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+            ctrl_item.lookupValue("suffix", suffix);
+            ctrl_item.lookupValue("header", ctrl_head);
             if(suffix.empty() || ctrl_head.empty()) {
                 tzhttpd_log_err("skip err cache ctrl configure item ...");
                 continue;
@@ -1110,7 +1110,7 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
     if (setting.exists("compress_control")) {
 
         std::string suffix {};
-        ConfUtil::conf_value(setting, "compress_control", suffix);
+        setting.lookupValue("compress_control", suffix);
 
         std::vector<std::string> suffixes {};
         boost::split(suffixes, suffix, boost::is_any_of(";"));
@@ -1147,7 +1147,7 @@ int HttpExecutor::module_runtime(const libconfig::Config& conf) {
             const libconfig::Setting& vhost = http_vhosts[i];
 
             std::string server_name;
-            ConfUtil::conf_value(vhost, "server_name", server_name);
+            vhost.lookupValue("server_name", server_name);
 
             // 发现是匹配的，则找到对应虚拟主机的配置文件了
             if (server_name == hostname_) {

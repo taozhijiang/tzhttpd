@@ -9,6 +9,7 @@
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
 #include <xtra_asio.h>
+#include <boost/atomic/atomic.hpp>
 
 #include "ConnIf.h"
 #include "HttpParser.h"
@@ -25,6 +26,9 @@ class TcpConnAsync: public ConnIf,
     friend class HttpReqInstance;
 
 public:
+
+    // 当前并发连接数目
+    static boost::atomic<int32_t> current_concurrency_;
 
     /// Construct a connection with the given socket.
     TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket, HttpServer& server);

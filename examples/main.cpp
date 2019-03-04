@@ -157,7 +157,7 @@ int main(int argc, char* argv[]) {
     }
 
     http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
-    http_server_ptr->register_module_status("httpsrv", module_status);
+    http_server_ptr->register_http_status_callback("httpsrv", module_status);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

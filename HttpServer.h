@@ -153,8 +153,8 @@ public:
     int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
                               bool built_in = false, const std::string hostname = "");
 
-    int register_module_status(const std::string& strKey, StatusCallable func) {
-        return Status::instance().register_status_callback(strKey, func);
+    int register_http_status_callback(const std::string& name, StatusCallable func) {
+        return Status::instance().register_status_callback(name, func);
     }
 
     int register_http_runtime_callback(const std::string& name, ConfUpdateCallable func) {

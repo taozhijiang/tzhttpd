@@ -46,7 +46,7 @@ private:
         calls_() {
 
         register_status_callback(
-            "Status",
+            "tzhttpd-Status",
             std::bind(&Status::module_status, this,
                       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 

@@ -8,14 +8,9 @@
 #ifndef __TZHTTPD_STR_UTIL_H__
 #define __TZHTTPD_STR_UTIL_H__
 
-#include <libconfig.h++>
-
-
 #include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
-
-#include "Log.h"
 
 // 类静态函数可以直接将函数定义丢在头文件中
 
@@ -75,55 +70,6 @@ struct StrUtil {
         return host;
     }
 };
-
-
-
-struct ConfUtil {
-
-    template<typename T>
-    static bool conf_value(const libconfig::Config& conf, const std::string& key, T& value) {
-        T t{};  // default value
-        if (!conf.lookupValue(key, value)) {
-            tzhttpd_log_err("conf %s not found, using construct default value.", key.c_str());
-            value = t;
-            return false;
-        }
-        return true;
-    }
-
-    template<typename T>
-    static bool conf_value(const libconfig::Config& conf, const std::string& key, T& value, const T& def_value) {
-        if (!conf.lookupValue(key, value)) {
-            tzhttpd_log_err("conf %s not found, using provided default value.", key.c_str());
-            value = def_value;
-            return false;
-        }
-        return true;
-    }
-
-    template<typename T>
-    static bool conf_value(const libconfig::Setting& conf, const std::string& key, T& value) {
-        T t{};  // default value
-        if (!conf.lookupValue(key, value)) {
-            tzhttpd_log_err("conf %s not found, using construct default value.", key.c_str());
-            value = t;
-            return false;
-        }
-        return true;
-    }
-
-    template<typename T>
-    static bool conf_value(const libconfig::Setting& conf, const std::string& key, T& value, const T& def_value) {
-        if (!conf.lookupValue(key, value)) {
-            tzhttpd_log_err("conf %s not found, using provided default value.", key.c_str());
-            value = def_value;
-            return false;
-        }
-        return true;
-    }
-
-};
-
 
 
 class UriRegex: public boost::regex {
