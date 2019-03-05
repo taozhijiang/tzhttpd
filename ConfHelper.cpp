@@ -120,4 +120,4 @@ int ConfHelper::module_status(std::string& module, std::string& name, std::strin
 }
 
 
-} // end namespace tzrpc
+} // end namespace tzhttpd

@@ -25,7 +25,7 @@ void set_checkpoint_log_store_func(CP_log_store_func_t func);
 
 // Event Report
 
-typedef int (* CP_report_event_func_t)(const std::string& name, int64_t value, bool failed);
+typedef int (* CP_report_event_func_t)(const std::string& metric, int32_t value, const std::string& tag);
 extern CP_report_event_func_t checkpoint_report_event_func_impl_ ;
 void set_checkpoint_report_event_func(CP_report_event_func_t func);
 
@@ -34,8 +34,9 @@ void set_checkpoint_report_event_func(CP_report_event_func_t func);
 
 struct CountPerfByMs {
 
-    explicit CountPerfByMs(const std::string& event):
-        error_(false), event_(event) {
+    explicit CountPerfByMs(const std::string& metric, std::string tag = "T"):
+        metric_(metric),
+        tag_(tag) {
         ::gettimeofday(&start_, NULL);
     }
 
@@ -46,30 +47,32 @@ struct CountPerfByMs {
         int64_t time_ms = ( 1000000 * ( end.tv_sec - start_.tv_sec ) + end.tv_usec - start_.tv_usec ) / 1000; // ms
 
         if(checkpoint_report_event_func_impl_) {
-            checkpoint_report_event_func_impl_(event_, time_ms, error_);
+            checkpoint_report_event_func_impl_(metric_, static_cast<int32_t>(time_ms), tag_);
         } else {
-            tzhttpd_log_debug("%s - success: %s, perf: %ldms, ", event_.c_str(), error_ ? "false" : "true", time_ms);
+            tzhttpd_log_debug("report metric:%s, value:%d, tag:%s",
+                              metric_.c_str(), static_cast<int32_t>(time_ms), tag_.c_str());
         }
     }
 
     CountPerfByMs(const CountPerfByMs&) = delete;
     CountPerfByMs& operator=(const CountPerfByMs&) = delete;
 
-    void set_error() {
-        error_ = true;
+    void set_tag(const std::string& tag) {
+        tag_ = tag;
     }
 
 private:
     struct timeval start_;
-    bool error_;                // 是否是调用错误等标记
-    std::string event_;
+    const std::string metric_;
+    std::string tag_;                // 是否是调用错误等标记
 };
 
 
 struct CountPerfByUs {
 
-    explicit CountPerfByUs(const std::string& event):
-        error_(false), event_(event) {
+    explicit CountPerfByUs(const std::string& metric, std::string tag = "T"):
+        metric_(metric),
+        tag_(tag) {
         ::gettimeofday(&start_, NULL);
     }
 
@@ -79,19 +82,38 @@ struct CountPerfByUs {
 
         int64_t time_us = ( 1000000 * ( end.tv_sec - start_.tv_sec ) + end.tv_usec - start_.tv_usec ); // us
         if(checkpoint_report_event_func_impl_) {
-            checkpoint_report_event_func_impl_(event_, time_us, error_);
+            checkpoint_report_event_func_impl_(metric_, static_cast<int32_t>(time_us), tag_);
         } else {
-            tzhttpd_log_debug("%s - success: %s, perf: %ldus, ", event_.c_str(), error_ ? "false" : "true", time_us);
+            tzhttpd_log_debug("report metric:%s, value:%d, tag:%s",
+                              metric_.c_str(), static_cast<int32_t>(time_us), tag_.c_str());
         }
     }
 
     CountPerfByUs(const CountPerfByUs&) = delete;
     CountPerfByUs& operator=(const CountPerfByUs&) = delete;
 
+    void set_tag(const std::string& tag) {
+        tag_ = tag;
+    }
+
 private:
     struct timeval start_;
-    bool error_;                // 是否是调用错误等标记
-    std::string event_;
+    const std::string metric_;
+    std::string tag_;                // 是否是调用错误等标记
+};
+
+
+// raw reporter
+struct ReportEvent {
+
+    static void report_event(const std::string& metric, int32_t value, std::string tag = "T") {
+        if(checkpoint_report_event_func_impl_) {
+            checkpoint_report_event_func_impl_(metric, value, tag);
+        } else {
+            tzhttpd_log_debug("report metric:%s, value:%d, tag:%s",
+                              metric.c_str(), value, tag.c_str());
+        }
+    }
 };
 
 

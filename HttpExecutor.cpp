@@ -834,26 +834,38 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         int code = 0;
 
         {
-            std::string key = "GET_" + handler_object->path_;
-            CountPerfByMs call_perf { key };
+            std::string key = hostname_ + "_GET_" + handler_object->path_;
+            CountPerfByMs call_perf { key, "SUCCESS" };
 
             code = handler(*http_req_instance->http_parser_, response_str, status_str, headers);
             if (code == 0) {
                 handler_object->success_count_ ++;
             } else {
                 handler_object->fail_count_ ++;
-                call_perf.set_error();
+                call_perf.set_tag("FAIL");
             }
         }
 
-        // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
-        if (status_str.empty()) {
-            if (code == 0)
-                http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
-            else
-                http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
-        } else {
-            http_req_instance->http_response(response_str, status_str, headers);
+        {
+            // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
+            if (status_str.empty()) {
+                if (code == 0) {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::success_ok);
+                    http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
+                } else  {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::server_error_internal_server_error);
+                    http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+                }
+            } else {
+                http_req_instance->http_response(response_str, status_str, headers);
+            }
+
+            // report status:
+            std::string key = hostname_ + "_GET_" + status_str;
+            ReportEvent::report_event(key, 1);
+
         }
     }
     else if (http_req_instance->method_ == HTTP_METHOD::POST)
@@ -870,8 +882,8 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         int code = 0;
 
         {
-            std::string key = "GET_" + handler_object->path_;
-            CountPerfByMs call_perf { key };
+            std::string key = hostname_ + "_POST_" + handler_object->path_;
+            CountPerfByMs call_perf { key, "SUCCESS" };
 
             code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
                                response_str, status_str, headers);
@@ -879,19 +891,30 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
                 handler_object->success_count_ ++;
             } else {
                 handler_object->fail_count_ ++;
-                call_perf.set_error();
+                call_perf.set_tag("FAIL");
             }
 
         }
 
-        // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
-        if (status_str.empty()) {
-            if (code == 0)
-                http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
-            else
-                http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
-        } else {
-            http_req_instance->http_response(response_str, status_str, headers);
+        {
+            // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
+            if (status_str.empty()) {
+                if (code == 0) {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::success_ok);
+                    http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
+                } else {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::server_error_internal_server_error);
+                    http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+                }
+            } else {
+                http_req_instance->http_response(response_str, status_str, headers);
+            }
+
+            // report status:
+            std::string key = hostname_ + "_POST_" + status_str;
+            ReportEvent::report_event(key, 1);
         }
     }
     else

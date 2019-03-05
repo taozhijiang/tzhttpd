@@ -26,14 +26,13 @@ extern std::string http_server_version;
 std::shared_ptr<tzmonitor_client::MonitorClient> monitor_ptr_ {};
 
 
-int tzmonitor_report(const std::string& name, int64_t value, bool failed) {
-    if (!failed) {
-        monitor_ptr_->report_event(name, value, "success");
-    } else {
-        monitor_ptr_->report_event(name, value, "failed");
+int tzmonitor_report(const std::string& name, int32_t value, const std::string& tag) {
+    if (monitor_ptr_) {
+        monitor_ptr_->report_event(name, value, tag);
+        return 0;
     }
 
-    return 0;
+    return -1;
 }
 
 extern char * program_invocation_short_name;
