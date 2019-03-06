@@ -10,7 +10,7 @@
 
 #include <functional>
 
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include <libconfig.h++>
 

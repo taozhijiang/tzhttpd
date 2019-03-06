@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_BASIC_AUTH_H__
 #define __TZHTTPD_BASIC_AUTH_H__
 
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include <set>
 #include <boost/algorithm/string.hpp>

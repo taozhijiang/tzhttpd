@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_CRYPTO_UTIL_H__
 #define __TZHTTPD_CRYPTO_UTIL_H__
 
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include <cmath>
 #include <iomanip>

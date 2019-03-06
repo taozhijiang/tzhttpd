@@ -9,7 +9,7 @@
 #define __TZHTTPD_HTTP_EXECUTOR_H__
 
 
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include <libconfig.h++>
 

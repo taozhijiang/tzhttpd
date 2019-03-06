@@ -9,7 +9,7 @@
 #define __TZHTTPD_EXECUTOR_H__
 
 #include <xtra_asio.h>
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include "Log.h"
 #include "EQueue.h"

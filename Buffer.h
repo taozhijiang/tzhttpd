@@ -14,7 +14,7 @@
 
 #include <memory>
 
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 namespace tzhttpd {
 
