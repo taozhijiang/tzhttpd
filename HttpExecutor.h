@@ -43,7 +43,7 @@ public:
 
     bool init();
 
-    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance);
+    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override;
 
     std::string instance_name() override {
         return hostname_;
@@ -55,18 +55,18 @@ public:
 
 
     // override
-    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in);
-    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in);
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override;
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override;
 
-    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method);
+    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method) override;
 
     // 对于任何uri，可以先用这个接口进行卸载，然后再使用动态配置增加接口，借此实现接口的动态更新
-    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method);
+    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method) override;
 
 
 
-    int module_runtime(const libconfig::Config& conf);
-    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
+    int module_runtime(const libconfig::Config& conf) override;
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue) override;
 
 
 private:

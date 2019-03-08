@@ -170,7 +170,7 @@ int Executor::module_status(std::string& strModule, std::string& strKey, std::st
 }
 
 
-int Executor::module_runtime(const libconfig::Config& conf) override {
+int Executor::module_runtime(const libconfig::Config& conf) {
 
     int ret = service_impl_->module_runtime(conf);
 

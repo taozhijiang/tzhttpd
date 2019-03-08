@@ -8,21 +8,25 @@
 #ifndef __TZHTTPD_TIMER_H__
 #define __TZHTTPD_TIMER_H__
 
-#include <xtra_asio.h>
+#include <xtra_rhel.h>
 
+#include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
-#include <functional>
-#include <memory>
+#include <boost/asio/steady_timer.hpp>
+using boost::asio::steady_timer;
 
 #include "EQueue.h"
 #include "Log.h"
+
 
 // 提供定时回调接口服务
 
 typedef std::function<void (const boost::system::error_code& ec)> TimerEventCallable;
 
 namespace tzhttpd {
+
+using boost::asio::io_service;
 
 class TimerObject: public std::enable_shared_from_this<TimerObject> {
 public:
@@ -46,7 +50,7 @@ public:
             return false;
         }
 
-        steady_timer_->expires_from_now(boost::chrono::milliseconds(timeout_));
+        steady_timer_->expires_from_now(milliseconds(timeout_));
         steady_timer_->async_wait(
                 std::bind(&TimerObject::timer_run, shared_from_this(), std::placeholders::_1));
         return true;
@@ -60,7 +64,7 @@ public:
         }
 
         if (forever_) {
-            steady_timer_->expires_from_now(boost::chrono::milliseconds(timeout_));
+            steady_timer_->expires_from_now(milliseconds(timeout_));
             steady_timer_->async_wait(
                     std::bind(&TimerObject::timer_run, shared_from_this(), std::placeholders::_1));
         }
@@ -69,6 +73,7 @@ public:
 private:
     io_service& io_service_;
     std::unique_ptr<steady_timer> steady_timer_;
+
     TimerEventCallable func_;
     uint64_t timeout_;
     bool forever_;

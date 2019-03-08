@@ -24,19 +24,19 @@ static long*            mutex_count = 0;
 SSL_CTX* global_ssl_ctx = NULL;
 
 static void pthreads_locking_callback(int mode, int type, char *file,
-	     int line) {
+         int line) {
 #if 0
-	tzhttpd_log_err("thread=%4d mode=%s lock=%s %s:%d\n",
-		CRYPTO_thread_id(),
-		(mode&CRYPTO_LOCK)?"l":"u",
-		(type&CRYPTO_READ)?"r":"w",file,line);
+    tzhttpd_log_err("thread=%4d mode=%s lock=%s %s:%d\n",
+        CRYPTO_thread_id(),
+        (mode&CRYPTO_LOCK)?"l":"u",
+        (type&CRYPTO_READ)?"r":"w",file,line);
 #endif
-	if (mode & CRYPTO_LOCK){
-		pthread_mutex_lock(&(mutex_buf[type]));
-		mutex_count[type]++;
-	} else {
-		pthread_mutex_unlock(&(mutex_buf[type]));
-	}
+    if (mode & CRYPTO_LOCK){
+        pthread_mutex_lock(&(mutex_buf[type]));
+        mutex_count[type]++;
+    } else {
+        pthread_mutex_unlock(&(mutex_buf[type]));
+    }
 }
 
 #if 0
@@ -47,10 +47,10 @@ static void handle_error(const char *file, int lineno, const char *msg) {
 #endif
 
 static unsigned long pthreads_thread_id(void) {
-	unsigned long ret;
+    unsigned long ret;
 
-	ret=(unsigned long)pthread_self();
-	return(ret);
+    ret=(unsigned long)pthread_self();
+    return(ret);
 }
 
 static SSL_CTX* ssl_setup_client_ctx() {
@@ -67,7 +67,7 @@ static SSL_CTX* ssl_setup_client_ctx() {
 bool Ssl_thread_setup() {
 
     mutex_buf = (pthread_mutex_t *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(pthread_mutex_t));
-	mutex_count = (long *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(long));
+    mutex_count = (long *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(long));
 
     if (!mutex_buf || !mutex_count) {
         tzhttpd_log_err("Alloc Ssl thread resource failed!");
@@ -76,11 +76,11 @@ bool Ssl_thread_setup() {
 
     for (int i=0; i<CRYPTO_num_locks(); ++i) {
         mutex_count[i] = 0;
-		pthread_mutex_init(&(mutex_buf[i]), NULL);
+        pthread_mutex_init(&(mutex_buf[i]), NULL);
     }
 
-	CRYPTO_set_id_callback((unsigned long (*)())pthreads_thread_id);
-	CRYPTO_set_locking_callback((void (*)(int, int, const char*, int))pthreads_locking_callback);
+    CRYPTO_set_id_callback((unsigned long (*)())pthreads_thread_id);
+    CRYPTO_set_locking_callback((void (*)(int, int, const char*, int))pthreads_locking_callback);
 
     // SSL common routine setup
     if (!SSL_library_init()) {
@@ -119,17 +119,17 @@ void Ssl_thread_clean() {
     }
 
     CRYPTO_set_id_callback(NULL);
-	CRYPTO_set_locking_callback(NULL);
+    CRYPTO_set_locking_callback(NULL);
 
-	for (int i=0; i<CRYPTO_num_locks(); ++i)
-	{
+    for (int i=0; i<CRYPTO_num_locks(); ++i)
+    {
         pthread_mutex_destroy(&(mutex_buf[i]));
         tzhttpd_log_err("%8ld:%s\n", mutex_count[i],
-			CRYPTO_get_lock_name(i));
-	}
+            CRYPTO_get_lock_name(i));
+    }
 
     OPENSSL_free(mutex_buf);
-	OPENSSL_free(mutex_count);
+    OPENSSL_free(mutex_count);
 
     mutex_buf = NULL;
     mutex_count = 0;

@@ -68,7 +68,7 @@ bool Dispatcher::init() {
     return true;
 }
 
-void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
+void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) {
 
     std::shared_ptr<ServiceIf> service;
     auto it = services_.find(http_req_instance->hostname_);
@@ -183,7 +183,7 @@ int Dispatcher::drop_http_handler(const std::string& hostname, const std::string
 
 
 // 依次调用触发进行默认、其他虚拟主机的配置更新
-int Dispatcher::module_runtime(const libconfig::Config& conf) override {
+int Dispatcher::module_runtime(const libconfig::Config& conf) {
 
     int ret_sum = 0;
     int ret = 0;

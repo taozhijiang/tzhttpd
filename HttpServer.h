@@ -8,7 +8,11 @@
 #ifndef __TZHTTPD_HTTP_SERVER_H__
 #define __TZHTTPD_HTTP_SERVER_H__
 
-#include <xtra_asio.h>
+#include <boost/asio/steady_timer.hpp>
+using boost::asio::steady_timer;
+
+
+#include <boost/asio.hpp>
 
 #include <libconfig.h++>
 
@@ -26,7 +30,6 @@
 #include "Status.h"
 #include "ConfHelper.h"
 
-#include "HttpParser.h"
 #include "HttpHandler.h"
 
 namespace tzhttpd {
@@ -126,6 +129,8 @@ class HttpConf {
 } __attribute__ ((aligned (4))) ;  // end class HttpConf
 
 
+typedef std::shared_ptr<boost::asio::ip::tcp::socket>    SocketPtr;
+
 
 class HttpServer : public std::enable_shared_from_this<HttpServer> {
 
@@ -167,11 +172,11 @@ public:
 
 private:
     const std::string instance_name_;
-    io_service io_service_;
+    boost::asio::io_service io_service_;
 
     // 侦听地址信息
-    ip::tcp::endpoint ep_;
-    std::unique_ptr<ip::tcp::acceptor> acceptor_;
+    boost::asio::ip::tcp::endpoint ep_;
+    std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor_;
 
     const std::string cfgfile_;
     HttpConf conf_;

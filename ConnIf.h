@@ -8,8 +8,6 @@
 #ifndef __TZHTTPD_CONN_IF_H__
 #define __TZHTTPD_CONN_IF_H__
 
-#include <xtra_asio.h>
-
 
 #include "Buffer.h"
 
@@ -33,7 +31,7 @@ class ConnIf {
 public:
 
     /// Construct a connection with the given socket.
-    explicit ConnIf(std::shared_ptr<ip::tcp::socket> sock):
+    explicit ConnIf(std::shared_ptr<boost::asio::ip::tcp::socket> sock):
         conn_stat_(kPending),
         socket_(sock)
     {
@@ -43,11 +41,19 @@ public:
     virtual ~ConnIf() {}
 
 public:
+
+    virtual void do_read() = 0;
+    virtual void read_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) = 0;
+
+    virtual void do_write() = 0;
+    virtual void write_handler(const boost::system::error_code &ec, std::size_t bytes_transferred) = 0;
+
+
     // some general tiny function
     // some general tiny settings function
 
     bool set_tcp_nonblocking(bool set_value) {
-        socket_base::non_blocking_io command(set_value);
+        boost::asio::socket_base::non_blocking_io command(set_value);
         socket_->io_control(command);
 
         return true;
@@ -120,7 +126,7 @@ private:
     enum ConnStat conn_stat_;
 
 protected:
-    std::shared_ptr<ip::tcp::socket> socket_;
+    std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 };
 
 const static uint32_t kFixedIoBufferSize = 2048;
@@ -128,8 +134,8 @@ const static uint32_t kFixedIoBufferSize = 2048;
 struct IOBound {
     IOBound():
         io_block_({}),
-        length_hint_(0),
-        buffer_() {
+        length_hint_({0}),
+        buffer_(){
     }
 
     char io_block_[kFixedIoBufferSize];     // 读写操作的固定缓存

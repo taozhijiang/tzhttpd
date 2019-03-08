@@ -9,12 +9,8 @@
 #ifndef __TZHTTPD_BUFFER_H__
 #define __TZHTTPD_BUFFER_H__
 
-#include <cstdint>
-#include <string>
-
-#include <memory>
-
 #include <xtra_rhel.h>
+#include <cstdint>
 
 namespace tzhttpd {
 

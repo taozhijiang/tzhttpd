@@ -8,11 +8,17 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
-#include <xtra_asio.h>
+#include <xtra_rhel.h>
+
+#include <boost/asio.hpp>
 #include <boost/atomic/atomic.hpp>
 
 #include "ConnIf.h"
 #include "HttpParser.h"
+
+#include <boost/chrono.hpp>
+#include <boost/asio/steady_timer.hpp>
+using boost::asio::steady_timer;
 
 namespace tzhttpd {
 
@@ -31,7 +37,7 @@ public:
     static boost::atomic<int32_t> current_concurrency_;
 
     /// Construct a connection with the given socket.
-    TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket, HttpServer& server);
+    TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket, HttpServer& server);
     virtual ~TcpConnAsync();
 
     TcpConnAsync(const TcpConnAsync&) = delete;
@@ -50,8 +56,8 @@ private:
         SAFE_ASSERT(false);
     }
 
-    virtual void do_write();
-    virtual void write_handler(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    virtual void do_write() override;
+    virtual void write_handler(const boost::system::error_code &ec, std::size_t bytes_transferred) override;
 
     void do_read_head();
     void read_head_handler(const boost::system::error_code &ec, std::size_t bytes_transferred);
@@ -132,7 +138,7 @@ private:
     // is no possibility of concurrent execution of the handlers. This is an implicit strand.
 
     // Strand to ensure the connection's handlers are not called concurrently. ???
-    std::shared_ptr<io_service::strand> strand_;
+    std::shared_ptr<boost::asio::io_service::strand> strand_;
 
 };
 

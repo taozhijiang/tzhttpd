@@ -33,6 +33,9 @@ cp libgetdemo.so ../cgi-bin
 curl 'http://127.0.0.1:18430/internal/updateconf'
 ```
 
+### Attention:
+With rdynamic and whole-archive link options, dynamic cgi-handler (through .so) can also use main program symbols, but those symbols should be built with --fvisibility=default, or so may complain for undefined symbol. Though so deploy will, but should be using very carefully, please use nm -r to check U symbols of your \*.so, and use readelf -s to check whether these symbol are DEFAULT in main program.   
+
 ### Reference project
 [tzmonitor](https://github.com/taozhijiang/tzmonitor).   
 

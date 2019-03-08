@@ -5,6 +5,8 @@
  *
  */
 
+#include <xtra_rhel.h>
+
 #include <signal.h>
 #include <iostream>
 #include <sstream>
@@ -16,6 +18,7 @@
 #include "TcpConnAsync.h"
 
 #include "HttpProto.h"
+#include "HttpParser.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
 #include "Timer.h"
@@ -23,6 +26,9 @@
 #include "Status.h"
 
 #include "SslSetup.h"
+
+
+using namespace boost::asio;
 
 namespace tzhttpd {
 
@@ -138,7 +144,7 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
     feed_http_service_token();
 
     // 再次启动定时器
-    timed_feed_token_->expires_from_now(boost::chrono::seconds(1)); // 1sec
+    timed_feed_token_->expires_from_now(seconds(1)); // 1sec
     timed_feed_token_->async_wait(
                 std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
 }
@@ -152,8 +158,7 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
     io_service_(),
     acceptor_(),
     cfgfile_(cfgfile),
-    conf_({}),
-    io_service_threads_() {
+    conf_() {
 
    bool ret = ConfHelper::instance().init(cfgfile_);
    if (!ret) {
@@ -234,7 +239,7 @@ bool HttpServer::init() {
             return false;
         }
 
-        conf_.timed_feed_token_->expires_from_now(boost::chrono::seconds(1));
+        conf_.timed_feed_token_->expires_from_now(seconds(1));
         conf_.timed_feed_token_->async_wait(
                     std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
@@ -496,7 +501,7 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
                 return -1;
             }
 
-            conf_.timed_feed_token_->expires_from_now(boost::chrono::seconds(1));
+            conf_.timed_feed_token_->expires_from_now(seconds(1));
             conf_.timed_feed_token_->async_wait(
                         std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
         }

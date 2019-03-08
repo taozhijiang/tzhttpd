@@ -223,7 +223,7 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
 }
 
 
-bool HttpExecutor::init() override {
+bool HttpExecutor::init() {
 
     auto conf_ptr = ConfHelper::instance().get_conf();
     if(!conf_ptr) {
@@ -643,7 +643,7 @@ int HttpExecutor::drop_handler(const std::string& uri_regex, enum HTTP_METHOD me
 
 
 
-int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override {
+int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -676,7 +676,7 @@ int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHan
 }
 
 
-int HttpExecutor::add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override {
+int HttpExecutor::add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -798,7 +798,7 @@ int HttpExecutor::http_redirect_handler(
 }
 
 
-void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
+void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) {
 
     HttpHandlerObjectPtr handler_object {};
 
@@ -863,8 +863,8 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
             }
 
             // report status:
-            std::string key = hostname_ + "_GET_" + status_str;
-            ReportEvent::report_event(key, 1);
+//            std::string key = hostname_ + "_GET_" + status_str;
+//            ReportEvent::report_event(key, 1);
 
         }
     }
@@ -913,8 +913,8 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
             }
 
             // report status:
-            std::string key = hostname_ + "_POST_" + status_str;
-            ReportEvent::report_event(key, 1);
+//            std::string key = hostname_ + "_POST_" + status_str;
+//            ReportEvent::report_event(key, 1);
         }
     }
     else
