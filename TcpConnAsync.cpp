@@ -294,12 +294,11 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
 
 }
 
-
-void TcpConnAsync::do_write() {
+bool TcpConnAsync::do_write() {
 
     if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
-        return;
+        return false;
     }
 
     if(send_bound_.buffer_.get_length() == 0) {
@@ -314,7 +313,7 @@ void TcpConnAsync::do_write() {
             sock_shutdown_and_close(ShutdownType::kBoth);
         }
 
-        return;
+        return true;
     }
 
     SAFE_ASSERT(send_bound_.buffer_.get_length() > 0);
@@ -334,7 +333,7 @@ void TcpConnAsync::do_write() {
                                      shared_from_this(),
                                      std::placeholders::_1,
                                      std::placeholders::_2)));
-    return;
+    return true;
 }
 
 

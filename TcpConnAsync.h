@@ -51,12 +51,12 @@ public:
 
 private:
 
-    virtual void do_read() override { SAFE_ASSERT(false); }
+    virtual bool do_read() override { SAFE_ASSERT(false); return false;}
     virtual void read_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) override {
         SAFE_ASSERT(false);
     }
 
-    virtual void do_write() override;
+    virtual bool do_write() override;
     virtual void write_handler(const boost::system::error_code &ec, std::size_t bytes_transferred) override;
 
     void do_read_head();
