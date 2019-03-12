@@ -130,8 +130,23 @@ public:
 
     void join_tasks() {
         do {
-            for (auto iter = workers_.begin(); iter != workers_.end(); ++iter) {
-                iter->first->join();
+            for (auto iter = workers_.begin(); iter != workers_.end(); ) {
+
+#if __cplusplus >= 201103L
+
+                if (iter->first->joinable()) {
+                    iter->first->join();
+                }
+                iter = workers_.erase(iter);
+
+#else
+                auto curr_iter = iter ++;
+                if (curr_iter->first->joinable()) {
+                    curr_iter->first->join();
+                }
+                workers_.erase(curr_iter);
+#endif
+
             }
         } while (!workers_.empty());
     }
