@@ -5,11 +5,14 @@
  *
  */
 
+#include <xtra_rhel.h>
+
 #include <thread>
 #include <functional>
 
 #include <boost/algorithm/string.hpp>
 
+#include "HttpParser.h"
 #include "HttpServer.h"
 #include "HttpProto.h"
 #include "TcpConnAsync.h"
@@ -18,6 +21,7 @@
 #include "Dispatcher.h"
 #include "HttpReqInstance.h"
 
+
 namespace tzhttpd {
 
 namespace http_handler {
@@ -25,7 +29,9 @@ extern int default_http_get_handler(const HttpParser& http_parser,
                                     std::string& response, string& status, std::vector<std::string>& add_header);
 } // end namespace http_handler
 
-TcpConnAsync::TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
+boost::atomic<int32_t> TcpConnAsync::current_concurrency_(0);
+
+TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket,
                            HttpServer& server):
     ConnIf(p_socket),
     was_cancelled_(false),
@@ -34,17 +40,21 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<ip::tcp::socket> p_socket,
     session_cancel_timer_(),
     http_server_(server),
     http_parser_(new HttpParser()),
-    strand_(std::make_shared<io_service::strand>(server.io_service_)) {
+    strand_(std::make_shared<boost::asio::io_service::strand>(server.io_service_)) {
 
     set_tcp_nodelay(true);
     set_tcp_nonblocking(true);
+
+    ++ current_concurrency_;
 }
 
 TcpConnAsync::~TcpConnAsync() {
+
+    -- current_concurrency_;
     tzhttpd_log_debug("TcpConnAsync SOCKET RELEASED!!!");
 }
 
-void TcpConnAsync::start() override {
+void TcpConnAsync::start() {
 
     set_conn_stat(ConnStat::kWorking);
     do_read_head();
@@ -222,7 +232,7 @@ void TcpConnAsync::do_read_body() {
                               static_cast<size_t>(kFixedIoBufferSize));
 
     set_ops_cancel_timeout();
-    async_read(*socket_, buffer(recv_bound_.io_block_, to_read),
+    async_read(*socket_, boost::asio::buffer(recv_bound_.io_block_, to_read),
                     boost::asio::transfer_at_least(to_read),
                              strand_->wrap(
                                  std::bind(&TcpConnAsync::read_body_handler,
@@ -284,12 +294,11 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
 
 }
 
-
-void TcpConnAsync::do_write() override {
+bool TcpConnAsync::do_write() {
 
     if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
-        return;
+        return false;
     }
 
     if(send_bound_.buffer_.get_length() == 0) {
@@ -304,7 +313,7 @@ void TcpConnAsync::do_write() override {
             sock_shutdown_and_close(ShutdownType::kBoth);
         }
 
-        return;
+        return true;
     }
 
     SAFE_ASSERT(send_bound_.buffer_.get_length() > 0);
@@ -317,14 +326,14 @@ void TcpConnAsync::do_write() override {
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
 
     set_ops_cancel_timeout();
-    async_write(*socket_, buffer(send_bound_.io_block_, to_write),
+    async_write(*socket_, boost::asio::buffer(send_bound_.io_block_, to_write),
                     boost::asio::transfer_exactly(to_write),
                               strand_->wrap(
                                  std::bind(&TcpConnAsync::write_handler,
                                      shared_from_this(),
                                      std::placeholders::_1,
                                      std::placeholders::_2)));
-    return;
+    return true;
 }
 
 
@@ -445,7 +454,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
     }
 
     SAFE_ASSERT(http_server_.session_cancel_time_out());
-    session_cancel_timer_->expires_from_now(boost::chrono::seconds(http_server_.session_cancel_time_out()));
+    session_cancel_timer_->expires_from_now(seconds(http_server_.session_cancel_time_out()));
     session_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
                                                 std::placeholders::_1));
     tzhttpd_log_debug("register session_cancel_time_out %d sec", http_server_.session_cancel_time_out());
@@ -479,7 +488,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
     }
 
     SAFE_ASSERT(http_server_.ops_cancel_time_out());
-    ops_cancel_timer_->expires_from_now(boost::chrono::seconds(http_server_.ops_cancel_time_out()));
+    ops_cancel_timer_->expires_from_now(seconds(http_server_.ops_cancel_time_out()));
     ops_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
                                             std::placeholders::_1));
     tzhttpd_log_debug("register ops_cancel_time_out %d sec", http_server_.ops_cancel_time_out());

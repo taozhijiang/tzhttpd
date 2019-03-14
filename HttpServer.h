@@ -8,7 +8,11 @@
 #ifndef __TZHTTPD_HTTP_SERVER_H__
 #define __TZHTTPD_HTTP_SERVER_H__
 
-#include <xtra_asio.h>
+#include <boost/asio/steady_timer.hpp>
+using boost::asio::steady_timer;
+
+
+#include <boost/asio.hpp>
 
 #include <libconfig.h++>
 
@@ -19,18 +23,13 @@
 #include <functional>
 #include <algorithm>
 
-#include <boost/noncopyable.hpp>
-#include <boost/atomic/atomic.hpp>
-
 #include "Log.h"
-#include "StrUtil.h"
 #include "EQueue.h"
 #include "ThreadPool.h"
 
 #include "Status.h"
 #include "ConfHelper.h"
 
-#include "HttpParser.h"
 #include "HttpHandler.h"
 
 namespace tzhttpd {
@@ -45,29 +44,31 @@ class HttpConf {
 
     friend class HttpServer;
 
-private:
-    bool load_conf(std::shared_ptr<libconfig::Config> conf_ptr);
-    bool load_conf(const libconfig::Config& conf);
+    bool        service_enabled_;   // 服务开关
+    int32_t     service_speed_;
 
-private:
-    std::string bind_addr_;
-    unsigned short listen_port_;
-    std::set<std::string> safe_ip_;
+    int32_t     service_token_;
 
-    int backlog_size_;
-    int io_thread_number_;
+    int32_t     service_concurrency_;       // 最大连接并发控制
+
+    int32_t     session_cancel_time_out_;    // session间隔会话时长
+    int32_t     ops_cancel_time_out_;        // ops操作超时时长
 
     // 加载、更新配置的时候保护竞争状态
     // 这里保护主要是非atomic的原子结构
     std::mutex             lock_;
+    std::set<std::string>  safe_ip_;
 
-    boost::atomic<int>     session_cancel_time_out_;    // session间隔会话时长
-    boost::atomic<int>     ops_cancel_time_out_;        // ops操作超时时长
+    std::string    bind_addr_;
+    int32_t        bind_port_;
 
-    boost::atomic<bool>    http_service_enabled_;   // 服务开关
-    boost::atomic<int64_t> http_service_speed_;
+    int32_t        backlog_size_;
+    int32_t        io_thread_number_;
 
-    boost::atomic<int64_t> http_service_token_;
+
+    bool load_conf(std::shared_ptr<libconfig::Config> conf_ptr);
+    bool load_conf(const libconfig::Config& conf);
+
 
     bool check_safe_ip(const std::string& ip) {
         std::lock_guard<std::mutex> lock(lock_);
@@ -80,41 +81,58 @@ private:
         // 如果关闭这个选项，则整个服务都不可用了(包括管理页面)
         // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
 
-        if (!http_service_enabled_) {
+        if (!service_enabled_) {
             tzhttpd_log_alert("http_service not enabled ...");
             return false;
         }
 
         // 下面就不使用锁来保证严格的一致性了，因为非关键参数，过多的锁会影响性能
-        if (http_service_speed_ == 0) // 没有限流
+        if (service_speed_ == 0) // 没有限流
             return true;
 
-        if (http_service_token_ <= 0) {
+        if (service_token_ <= 0) {
             tzhttpd_log_alert("http_service not speed over ...");
             return false;
         }
 
-        -- http_service_token_;
+        -- service_token_;
         return true;
     }
 
     void withdraw_http_service_token() {    // 支持将令牌还回去
-        ++ http_service_token_;
+        ++ service_token_;
     }
 
     void feed_http_service_token(){
-        http_service_token_ = http_service_speed_.load();
+        service_token_ = service_speed_;
     }
 
     std::shared_ptr<steady_timer> timed_feed_token_;
     void timed_feed_token_handler(const boost::system::error_code& ec);
 
-};  // end class HttpConf
+    // 默认初始化良好的数据
+    HttpConf():
+        service_enabled_(true),
+        service_speed_(0),
+        service_token_(0),
+        service_concurrency_(0),
+        session_cancel_time_out_(0),
+        ops_cancel_time_out_(0),
+        lock_(),
+        safe_ip_({}),
+        bind_addr_(),
+        bind_port_(0),
+        backlog_size_(0),
+        io_thread_number_(0) {
+    }
+
+} __attribute__ ((aligned (4))) ;  // end class HttpConf
 
 
+typedef std::shared_ptr<boost::asio::ip::tcp::socket>    SocketPtr;
 
-class HttpServer : public boost::noncopyable,
-                   public std::enable_shared_from_this<HttpServer> {
+
+class HttpServer : public std::enable_shared_from_this<HttpServer> {
 
     friend class TcpConnAsync;  // can not work with typedef, ugly ...
 
@@ -124,6 +142,11 @@ public:
 
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
+    ~HttpServer() {};
+
+    HttpServer(const HttpServer&) = delete;
+    HttpServer& operator=(const HttpServer&) = delete;
+
     bool init();
 
     void service();
@@ -135,12 +158,12 @@ public:
     int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
                               bool built_in = false, const std::string hostname = "");
 
-    int register_module_status(const std::string& strKey, StatusCallable func) {
-        return Status::instance().register_status_callback(strKey, func);
+    int register_http_status_callback(const std::string& name, StatusCallable func) {
+        return Status::instance().register_status_callback(name, func);
     }
 
-    int register_update_runtime_conf(ConfUpdateCallable func) {
-        return ConfHelper::instance().register_conf_callback(func);
+    int register_http_runtime_callback(const std::string& name, ConfUpdateCallable func) {
+        return ConfHelper::instance().register_runtime_callback(name, func);
     }
 
     int update_http_runtime_conf() {
@@ -149,11 +172,11 @@ public:
 
 private:
     const std::string instance_name_;
-    io_service io_service_;
+    boost::asio::io_service io_service_;
 
     // 侦听地址信息
-    ip::tcp::endpoint ep_;
-    std::unique_ptr<ip::tcp::acceptor> acceptor_;
+    boost::asio::ip::tcp::endpoint ep_;
+    std::unique_ptr<boost::asio::ip::tcp::acceptor> acceptor_;
 
     const std::string cfgfile_;
     HttpConf conf_;
@@ -178,7 +201,7 @@ public:
     int io_service_join();
 
 public:
-    int update_runtime_conf(const libconfig::Config& conf);
+    int module_runtime(const libconfig::Config& conf);
     int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
 };
 

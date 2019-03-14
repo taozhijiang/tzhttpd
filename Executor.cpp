@@ -67,7 +67,7 @@ bool Executor::init() {
     }
 
     Status::instance().register_status_callback(
-                "executor_" + instance_name(),
+                "tzhttpd-executor_" + instance_name(),
                 std::bind(&Executor::module_status, shared_from_this(),
                           std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -121,6 +121,9 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
     }
 
     SAFE_ASSERT(conf.exec_thread_step_queue_size_ > 0);
+    if (!conf.exec_thread_step_queue_size_) {
+        return;
+    }
 
     // 进行检查，看是否需要伸缩线程池
     int expect_thread = conf.exec_thread_number_;
@@ -137,8 +140,11 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
         tzhttpd_log_notice("start thread number: %d, expect resize to %d",
                            conf.exec_thread_number_, expect_thread);
     }
+        
+    // 如果当前运行的线程和实际的线程一样，就不会伸缩
     executor_threads_.resize_threads(expect_thread);
 
+    return;
 }
 
 int Executor::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
@@ -170,9 +176,9 @@ int Executor::module_status(std::string& strModule, std::string& strKey, std::st
 }
 
 
-int Executor::update_runtime_conf(const libconfig::Config& conf) {
+int Executor::module_runtime(const libconfig::Config& conf) {
 
-    int ret = service_impl_->update_runtime_conf(conf);
+    int ret = service_impl_->module_runtime(conf);
 
     // 如果返回0，表示配置文件已经正确解析了，同时ExecutorConf也重新初始化了
     if (ret == 0) {

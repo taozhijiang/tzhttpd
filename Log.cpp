@@ -6,7 +6,7 @@
  */
 
  
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include <boost/algorithm/string.hpp>
 

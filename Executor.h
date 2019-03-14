@@ -8,8 +8,7 @@
 #ifndef __TZHTTPD_EXECUTOR_H__
 #define __TZHTTPD_EXECUTOR_H__
 
-#include <xtra_asio.h>
-#include <xtra_rhel6.h>
+#include <xtra_rhel.h>
 
 #include "Log.h"
 #include "EQueue.h"
@@ -68,9 +67,8 @@ public:
 
 
     bool init();
-    int update_runtime_conf(const libconfig::Config& conf);
-
-    int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
+    int module_runtime(const libconfig::Config& conf) override;
+    int module_status(std::string& strModule, std::string& strKey, std::string& strValue) override;
 
 private:
     // point to HttpExecutor, forward some request

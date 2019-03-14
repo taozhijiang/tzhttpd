@@ -11,20 +11,21 @@
 #include <dlfcn.h>
 #include <linux/limits.h>
 
-#include <boost/noncopyable.hpp>
-
 #include "Log.h"
 #include "CgiHelper.h"
 
 
 namespace tzhttpd {
 
-class SLibLoader: private boost::noncopyable {
+class SLibLoader {
 public:
     SLibLoader(const std::string& dl_path):
         dl_path_(dl_path),
         dl_handle_(NULL) {
     }
+
+    SLibLoader(const SLibLoader&) = delete;
+    SLibLoader& operator=(const SLibLoader&) = delete;
 
     std::string get_dl_path() {
         return dl_path_;

@@ -13,7 +13,6 @@
 #include <iterator>
 #include <string>
 
-#include <boost/noncopyable.hpp>
 #include <boost/algorithm/string.hpp>
 
 // The GNU C++ standard library supports <regex>, but not until version 4.9.0.
@@ -30,13 +29,16 @@ namespace tzhttpd {
 
 typedef KVVec<std::string, std::string> UriParamContainer;
 
-class HttpParser: private boost::noncopyable {
+class HttpParser {
 public:
     HttpParser():
         request_headers_(),
         request_uri_params_(),
         method_(HTTP_METHOD::UNKNOWN) {
     }
+
+    HttpParser(const HttpParser&) = delete;
+    HttpParser& operator=(const HttpParser&) = delete;
 
     enum HTTP_METHOD get_method() const {
         return method_;

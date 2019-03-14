@@ -9,7 +9,6 @@
 #define __TZHTTPD_SERVICE_IF_H__
 
 #include <libconfig.h++>
-#include <boost/noncopyable.hpp>
 
 #include <string>
 #include "HttpHandler.h"
@@ -27,6 +26,9 @@ public:
     ServiceIf() { }
     ~ServiceIf() { }
 
+    ServiceIf(const ServiceIf&) = delete;
+    ServiceIf& operator=(const ServiceIf&) = delete;
+
     // 根据opCode分发rpc请求的处理
     virtual void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) = 0;
     virtual std::string instance_name() = 0;
@@ -41,7 +43,7 @@ public:
 
     // 收集模块的状态信息
     virtual int module_status(std::string& strModule, std::string& strKey, std::string& strValue) = 0;
-    virtual int update_runtime_conf(const libconfig::Config& cfg) = 0;
+    virtual int module_runtime(const libconfig::Config& cfg) = 0;
 };
 
 } // end namespace tzhttpd

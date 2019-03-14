@@ -17,6 +17,7 @@
 #include "HttpParser.h"
 #include "HttpExecutor.h"
 #include "HttpReqInstance.h"
+#include "BasicAuth.h"
 
 #include "CgiHelper.h"
 #include "CgiWrapper.h"
@@ -24,12 +25,14 @@
 
 #include "CryptoUtil.h"
 
+#include "CheckPoint.h"
+
 #include "Log.h"
 
 namespace tzhttpd {
 namespace http_handler {
 // init only once at startup, these are the default value
-std::string              http_server_version = "2.2.0";
+std::string              http_server_version = "2.3.0";
 } // end namespace http_handler
 
 
@@ -220,15 +223,15 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
 }
 
 
-bool HttpExecutor::init() override {
+bool HttpExecutor::init() {
 
     auto conf_ptr = ConfHelper::instance().get_conf();
-	if(!conf_ptr) {
-		tzhttpd_log_err("ConfHelper not initialized? return conf_ptr empty!!!");
-		return false;
-	}
+    if(!conf_ptr) {
+        tzhttpd_log_err("ConfHelper not initialized? return conf_ptr empty!!!");
+        return false;
+    }
 
-	bool init_success = false;
+    bool init_success = false;
 
     try
     {
@@ -237,7 +240,7 @@ bool HttpExecutor::init() override {
 
             const libconfig::Setting& vhost = http_vhosts[i];
             std::string server_name;
-            ConfUtil::conf_value(vhost, "server_name", server_name);
+            vhost.lookupValue("server_name", server_name);
             if (server_name.empty() ) {
                 tzhttpd_log_err("check virtual host conf, required server_name not found, skip this one.");
                 continue;
@@ -265,9 +268,9 @@ bool HttpExecutor::init() override {
         tzhttpd_log_err("execptions catched for %s",  e.what());
     }
 
-	if(!init_success) {
-		tzhttpd_log_err("host %s init failed, may not configure for it?", hostname_.c_str());
-	}
+    if(!init_success) {
+        tzhttpd_log_err("host %s init failed, may not configure for it?", hostname_.c_str());
+    }
     return init_success;
 }
 
@@ -289,8 +292,8 @@ bool HttpExecutor::parse_http_cgis(const libconfig::Setting& setting, const std:
         std::string uri_path {};
         std::string dl_path {};
 
-        ConfUtil::conf_value(handler, "uri", uri_path);
-        ConfUtil::conf_value(handler, "dl_path", dl_path);
+        handler.lookupValue("uri", uri_path);
+        handler.lookupValue("dl_path", dl_path);
 
         if(uri_path.empty() || dl_path.empty()) {
             tzhttpd_log_err("vhost:%s skip err configure item %s:%s...",
@@ -387,14 +390,14 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
     std::string docu_root_str;
     std::string docu_index_str;
 
-    ConfUtil::conf_value(setting, "server_name", server_name);
-    ConfUtil::conf_value(setting, "redirect", redirect_str);
-    ConfUtil::conf_value(setting, "docu_root", docu_root_str);
-    ConfUtil::conf_value(setting, "docu_index", docu_index_str);
+    setting.lookupValue("server_name", server_name);
+    setting.lookupValue("redirect", redirect_str);
+    setting.lookupValue("docu_root", docu_root_str);
+    setting.lookupValue("docu_index", docu_index_str);
 
-    ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_ptr_->executor_conf_.exec_thread_number_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_size_hard", conf_ptr_->executor_conf_.exec_thread_number_hard_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_step_queue_size", conf_ptr_->executor_conf_.exec_thread_step_queue_size_);
+    setting.lookupValue("exec_thread_pool_size", conf_ptr_->executor_conf_.exec_thread_number_);
+    setting.lookupValue("exec_thread_pool_size_hard", conf_ptr_->executor_conf_.exec_thread_number_hard_);
+    setting.lookupValue("exec_thread_pool_step_queue_size", conf_ptr_->executor_conf_.exec_thread_step_queue_size_);
 
 
     if (!redirect_str.empty()) {
@@ -504,8 +507,8 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
             std::string suffix {};
             std::string ctrl_head {};
 
-            ConfUtil::conf_value(ctrl_item, "suffix", suffix);
-            ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+            ctrl_item.lookupValue("suffix", suffix);
+            ctrl_item.lookupValue("header", ctrl_head);
             if(suffix.empty() || ctrl_head.empty()) {
                 tzhttpd_log_err("skip err cache ctrl configure item ...");
                 continue;
@@ -545,7 +548,7 @@ bool HttpExecutor::handle_virtual_host_conf(const libconfig::Setting& setting) {
     if (setting.exists("compress_control")) {
 
         std::string suffix {};
-        ConfUtil::conf_value(setting, "compress_control", suffix);
+        setting.lookupValue("compress_control", suffix);
 
         std::vector<std::string> suffixes {};
         boost::split(suffixes, suffix, boost::is_any_of(";"));
@@ -640,7 +643,7 @@ int HttpExecutor::drop_handler(const std::string& uri_regex, enum HTTP_METHOD me
 
 
 
-int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override {
+int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -673,7 +676,7 @@ int HttpExecutor::add_get_handler(const std::string& uri_regex, const HttpGetHan
 }
 
 
-int HttpExecutor::add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override {
+int HttpExecutor::add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) {
 
     std::string uri = StrUtil::pure_uri_path(uri_regex);
     boost::lock_guard<boost::shared_mutex> wlock(rwlock_);
@@ -795,7 +798,7 @@ int HttpExecutor::http_redirect_handler(
 }
 
 
-void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
+void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) {
 
     HttpHandlerObjectPtr handler_object {};
 
@@ -828,21 +831,41 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         std::string response_str;
         std::string status_str;
         std::vector<std::string> headers;
-        int code = handler(*http_req_instance->http_parser_, response_str, status_str, headers);
-        if (code == 0) {
-            handler_object->success_count_ ++;
-        } else {
-            handler_object->fail_count_ ++;
+        int code = 0;
+
+        {
+            std::string key = hostname_ + "_GET_" + handler_object->path_;
+            CountPerfByMs call_perf { key, "SUCCESS" };
+
+            code = handler(*http_req_instance->http_parser_, response_str, status_str, headers);
+            if (code == 0) {
+                handler_object->success_count_ ++;
+            } else {
+                handler_object->fail_count_ ++;
+                call_perf.set_tag("FAIL");
+            }
         }
 
-        // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
-        if (status_str.empty()) {
-            if (code == 0)
-                http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
-            else
-                http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
-        } else {
-            http_req_instance->http_response(response_str, status_str, headers);
+        {
+            // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
+            if (status_str.empty()) {
+                if (code == 0) {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::success_ok);
+                    http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
+                } else  {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::server_error_internal_server_error);
+                    http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+                }
+            } else {
+                http_req_instance->http_response(response_str, status_str, headers);
+            }
+
+            // report status:
+//            std::string key = hostname_ + "_GET_" + status_str;
+//            ReportEvent::report_event(key, 1);
+
         }
     }
     else if (http_req_instance->method_ == HTTP_METHOD::POST)
@@ -856,22 +879,42 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
         std::string response_str;
         std::string status_str;
         std::vector<std::string> headers;
-        int code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
-                           response_str, status_str, headers);
-        if (code == 0) {
-            handler_object->success_count_ ++;
-        } else {
-            handler_object->fail_count_ ++;
+        int code = 0;
+
+        {
+            std::string key = hostname_ + "_POST_" + handler_object->path_;
+            CountPerfByMs call_perf { key, "SUCCESS" };
+
+            code = handler(*http_req_instance->http_parser_, http_req_instance->data_,
+                               response_str, status_str, headers);
+            if (code == 0) {
+                handler_object->success_count_ ++;
+            } else {
+                handler_object->fail_count_ ++;
+                call_perf.set_tag("FAIL");
+            }
+
         }
 
-        // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
-        if (status_str.empty()) {
-            if (code == 0)
-                http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
-            else
-                http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
-        } else {
-            http_req_instance->http_response(response_str, status_str, headers);
+        {
+            // status_line 为必须返回参数，如果没有就按照调用结果返回标准内容
+            if (status_str.empty()) {
+                if (code == 0) {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::success_ok);
+                    http_req_instance->http_std_response(http_proto::StatusCode::success_ok);
+                } else {
+                    status_str = http_proto::generate_response_status_line(
+                            http_req_instance->http_parser_->get_version(), http_proto::StatusCode::server_error_internal_server_error);
+                    http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+                }
+            } else {
+                http_req_instance->http_response(response_str, status_str, headers);
+            }
+
+            // report status:
+//            std::string key = hostname_ + "_POST_" + status_str;
+//            ReportEvent::report_event(key, 1);
         }
     }
     else
@@ -957,13 +1000,13 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
     std::string docu_root_str;
     std::string docu_index_str;
 
-    ConfUtil::conf_value(setting, "redirect", redirect_str);
-    ConfUtil::conf_value(setting, "docu_root", docu_root_str);
-    ConfUtil::conf_value(setting, "docu_index", docu_index_str);
+    setting.lookupValue("redirect", redirect_str);
+    setting.lookupValue("docu_root", docu_root_str);
+    setting.lookupValue("docu_index", docu_index_str);
 
-    ConfUtil::conf_value(setting, "exec_thread_pool_size", conf_ptr->executor_conf_.exec_thread_number_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_size_hard", conf_ptr->executor_conf_.exec_thread_number_hard_);
-    ConfUtil::conf_value(setting, "exec_thread_pool_step_queue_size", conf_ptr->executor_conf_.exec_thread_step_queue_size_);
+    setting.lookupValue("exec_thread_pool_size", conf_ptr->executor_conf_.exec_thread_number_);
+    setting.lookupValue("exec_thread_pool_size_hard", conf_ptr->executor_conf_.exec_thread_number_hard_);
+    setting.lookupValue("exec_thread_pool_step_queue_size", conf_ptr->executor_conf_.exec_thread_step_queue_size_);
 
     // 检查ExecutorConf参数合法性
     if (conf_ptr->executor_conf_.exec_thread_number_hard_ < conf_ptr->executor_conf_.exec_thread_number_) {
@@ -1068,8 +1111,8 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
             std::string suffix {};
             std::string ctrl_head {};
 
-            ConfUtil::conf_value(ctrl_item, "suffix", suffix);
-            ConfUtil::conf_value(ctrl_item, "header", ctrl_head);
+            ctrl_item.lookupValue("suffix", suffix);
+            ctrl_item.lookupValue("header", ctrl_head);
             if(suffix.empty() || ctrl_head.empty()) {
                 tzhttpd_log_err("skip err cache ctrl configure item ...");
                 continue;
@@ -1109,7 +1152,7 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
     if (setting.exists("compress_control")) {
 
         std::string suffix {};
-        ConfUtil::conf_value(setting, "compress_control", suffix);
+        setting.lookupValue("compress_control", suffix);
 
         std::vector<std::string> suffixes {};
         boost::split(suffixes, suffix, boost::is_any_of(";"));
@@ -1135,7 +1178,7 @@ int HttpExecutor::handle_virtual_host_runtime_conf(const libconfig::Setting& set
 
 }
 
-int HttpExecutor::update_runtime_conf(const libconfig::Config& conf) {
+int HttpExecutor::module_runtime(const libconfig::Config& conf) {
 
     try
     {
@@ -1146,7 +1189,7 @@ int HttpExecutor::update_runtime_conf(const libconfig::Config& conf) {
             const libconfig::Setting& vhost = http_vhosts[i];
 
             std::string server_name;
-            ConfUtil::conf_value(vhost, "server_name", server_name);
+            vhost.lookupValue("server_name", server_name);
 
             // 发现是匹配的，则找到对应虚拟主机的配置文件了
             if (server_name == hostname_) {

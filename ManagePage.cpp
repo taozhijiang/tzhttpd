@@ -5,6 +5,7 @@
  *
  */
 
+#include "HttpParser.h"
 #include "HttpProto.h"
 #include "HttpServer.h"
 

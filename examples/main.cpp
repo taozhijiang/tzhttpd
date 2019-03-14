@@ -7,7 +7,12 @@
 
 #include "CheckPoint.h"
 #include "Log.h"
+#include "HttpParser.h"
 #include "HttpServer.h"
+
+void init_signal_handle();
+void usage();
+int create_process_pid();
 
 namespace tzhttpd {
 
@@ -30,61 +35,17 @@ extern std::string http_server_version;
 
 
 extern char * program_invocation_short_name;
-static void usage() {
-    std::stringstream ss;
-
-    ss << program_invocation_short_name << ":" << std::endl;
-    ss << "\t -c cfgFile  specify config file, default httpsrv.conf. " << std::endl;
-    ss << "\t -d          daemonize service." << std::endl;
-    ss << "\t -v          print version info." << std::endl;
-    ss << std::endl;
-
-    std::cout << ss.str();
-}
 
 char cfgFile[PATH_MAX] = "httpsrv.conf";
 bool daemonize = false;
 
 
-static void interrupted_callback(int signal){
-    tzhttpd::tzhttpd_log_alert("Signal %d received ...", signal);
-    switch(signal) {
-        case SIGHUP:
-            tzhttpd::tzhttpd_log_notice("SIGHUP recv, do update_run_conf... ");
-            tzhttpd::ConfHelper::instance().update_runtime_conf();
-            break;
+static int module_status(std::string& module, std::string& name, std::string& val) {
 
-        case SIGUSR1:
-            tzhttpd::tzhttpd_log_notice("SIGUSR recv, do module_status ... ");
-            {
-                std::string output;
-                tzhttpd::Status::instance().collect_status(output);
-                std::cout << output << std::endl;
-                tzhttpd::tzhttpd_log_notice("%s", output.c_str());
-            }
-            break;
+    module = "httpsrv";
+    name = "main";
 
-        default:
-            tzhttpd::tzhttpd_log_err("Unhandled signal: %d", signal);
-            break;
-    }
-}
-
-static void init_signal_handle(){
-
-    ::signal(SIGPIPE, SIG_IGN);
-    ::signal(SIGUSR1, interrupted_callback);
-    ::signal(SIGHUP,  interrupted_callback);
-
-    return;
-}
-
-static int module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
-
-    strModule = "httpsrv";
-    strKey = "main";
-
-    strValue = "conf_file: " + std::string(cfgFile);
+    val = "conf_file: " + std::string(cfgFile);
 
     return 0;
 }
@@ -157,7 +118,7 @@ int main(int argc, char* argv[]) {
     }
 
     http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
-    http_server_ptr->register_module_status("httpsrv", module_status);
+    http_server_ptr->register_http_status_callback("httpsrv", module_status);
 
     http_server_ptr->io_service_threads_.start_threads();
     http_server_ptr->service();

@@ -16,9 +16,7 @@
 #include <libconfig.h++>
 
 #include <boost/optional.hpp>
-#include <boost/noncopyable.hpp>
 
-#include "StrUtil.h"
 #include "Log.h"
 
 
@@ -29,7 +27,7 @@ namespace tzhttpd {
 // 配置动态更新回调函数接口类型
 typedef std::function<int (const libconfig::Config& cfg)> ConfUpdateCallable;
 
-class ConfHelper: public boost::noncopyable {
+class ConfHelper {
 
 public:
     static ConfHelper& instance();
@@ -38,8 +36,11 @@ public:
     bool init(std::string cfgfile);
 
     // 配置更新的调用入口函数
-    int  update_runtime_conf();
-    int  register_conf_callback(ConfUpdateCallable func);
+    int update_runtime_conf();
+    int register_runtime_callback(const std::string& name, ConfUpdateCallable func);
+
+    int module_status(std::string& module, std::string& name, std::string& val);
+
 
     std::shared_ptr<libconfig::Config> get_conf() {
 
@@ -63,7 +64,7 @@ public:
             auto conf = load_conf_file();
             if (!conf) {
                 tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
-                tzhttpd_log_err("try return old staged value.");
+                tzhttpd_log_err("we try best to return old staged value.");
             } else {
                 std::lock_guard<std::mutex> lock(lock_);
                 std::swap(conf, conf_ptr_);
@@ -72,7 +73,11 @@ public:
         }
 
         std::lock_guard<std::mutex> lock(lock_);
-        return ConfUtil::conf_value(*conf_ptr_, key, t);
+        if (conf_ptr_->lookupValue(key, t)) {
+            return true;
+        }
+        t = T {};
+        return false;
     }
 
 
@@ -114,7 +119,10 @@ private:
 
     bool in_process_;
     std::mutex lock_;
-    std::vector<ConfUpdateCallable> calls_;
+    std::vector<std::pair<std::string, ConfUpdateCallable>> calls_;
+
+    ConfHelper(const ConfHelper&) = delete;
+    ConfHelper& operator=(const ConfHelper&) = delete;
 };
 
 } // end namespace tzhttpd

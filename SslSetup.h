@@ -11,7 +11,7 @@
 #include <openssl/ssl.h>
 
 namespace tzhttpd {
-	
+
 bool Ssl_thread_setup();
 void Ssl_thread_clean();
 

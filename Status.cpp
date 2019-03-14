@@ -18,11 +18,31 @@ Status& Status::instance() {
 int Status::register_status_callback(const std::string& name, StatusCallable func) {
 
     if (name.empty() || !func){
+        tzhttpd_log_err("invalid name or func param.");
         return -1;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
-    calls_[name] = func;
+    calls_.push_back({name, func});
+    tzhttpd_log_debug("register status for %s success.",  name.c_str());
+
+    return 0;
+}
+
+int Status::module_status(std::string& module, std::string& name, std::string& val) {
+
+    module = "tzhttpd";
+    name   = "Status";
+
+    std::stringstream ss;
+    ss << "registered status: " << std::endl;
+
+    int i = 1;
+    for (auto it = calls_.begin(); it != calls_.end(); ++it) {
+        ss << "\t" << i++ << ". "<< it->first << std::endl;
+    }
+
+    val = ss.str();
     return 0;
 }
 
@@ -30,17 +50,17 @@ int Status::collect_status(std::string& output) {
 
     std::lock_guard<std::mutex> lock(lock_);
 
-    std::map<std::string, std::string> results;
+    std::vector<std::pair<std::string, std::string>> results;
     for (auto iter = calls_.begin(); iter != calls_.end(); ++iter) {
 
         std::string strModule;
-        std::string strKey;
+        std::string strName;
         std::string strValue;
 
-        int ret = iter->second(strModule, strKey, strValue);
+        int ret = iter->second(strModule, strName, strValue);
         if (ret == 0) {
-            std::string real = strModule + ":" + strKey;
-            results[real] = strValue;
+            std::string real = strModule + ":" + strName;
+            results.push_back({real,strValue});
         } else {
             tzhttpd_log_err("call collect_status of %s failed with: %d",  iter->first.c_str(), ret);
         }
@@ -48,7 +68,7 @@ int Status::collect_status(std::string& output) {
 
     std::stringstream ss;
 
-    ss << "  *** SYSTEM RUNTIME STATUS ***  " << std::endl << std::endl;
+    ss << std::endl << std::endl <<"  *** SYSTEM RUNTIME STATUS ***  " << std::endl << std::endl;
     for (auto iter = results.begin(); iter != results.end(); ++iter) {
         ss << "[" << iter->first << "]" << std::endl;
         ss << iter->second << std::endl;
