@@ -121,6 +121,9 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
     }
 
     SAFE_ASSERT(conf.exec_thread_step_queue_size_ > 0);
+    if (!conf.exec_thread_step_queue_size_) {
+        return;
+    }
 
     // 进行检查，看是否需要伸缩线程池
     int expect_thread = conf.exec_thread_number_;
@@ -137,8 +140,11 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
         tzhttpd_log_notice("start thread number: %d, expect resize to %d",
                            conf.exec_thread_number_, expect_thread);
     }
+        
+    // 如果当前运行的线程和实际的线程一样，就不会伸缩
     executor_threads_.resize_threads(expect_thread);
 
+    return;
 }
 
 int Executor::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {

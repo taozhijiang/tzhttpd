@@ -45,6 +45,31 @@ enum GroupType {
     kGroupNone = 0,
     kGroupbyTimestamp,
     kGroupbyTag,
+
+    kGroupbyBoundary,
+};
+
+enum OrderByType {
+    kOrderByNone = 0,
+    kOrderByTimestamp = 1,
+    kOrderByTag = 2,
+    kOrderByCount = 3,
+    kOrderBySum = 4,
+    kOrderByAvg = 5,
+    kOrderByMin = 6,
+    kOrderByMax = 7,
+    kOrderByP10 = 8,
+    kOrderByP50 = 9,
+    kOrderByP90 =10,
+
+    kOrderByBoundary,
+};
+
+enum OrderType {
+    kOrderDesc = 0,
+    kOrderAsc  = 1,
+
+    kOrderBoundary,
 };
 
 struct event_cond_t {
@@ -60,6 +85,27 @@ struct event_cond_t {
 
     // 有些存储引擎不支持
     enum GroupType groupby;
+
+    // 对于排序，如果有limit参数，则结果会在服务端进行排序，然后筛选出指定条目的
+    // 记录，并返回给客户端，这样可以减少网络开销；
+    // 如果没有limit参数，则服务端不会进行数据排序，而是将结果全部返回给客户端，
+    // 由客户端自身进行排序，以降低网络的开销
+
+    enum OrderByType orderby;
+    enum OrderType   orders;  // desc[default], asc
+    int32_t          limit;   // 限制返回排序后记录的条数
+
+    event_cond_t ():
+        version("1.0.0"),
+        tm_interval(0),
+        tm_start(0),
+        entity_idx(""),
+        tag(""),
+        groupby(GroupType::kGroupNone),
+        orderby(OrderByType::kOrderByNone),
+        orders(OrderType::kOrderDesc),
+        limit(0) {
+    }
 };
 
 // 查询结果信息

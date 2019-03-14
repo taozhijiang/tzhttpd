@@ -7,6 +7,7 @@
 
 #include "CheckPoint.h"
 #include "Log.h"
+#include "HttpParser.h"
 #include "HttpServer.h"
 
 void init_signal_handle();

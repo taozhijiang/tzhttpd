@@ -13,7 +13,6 @@
 #include <libconfig.h++>
 
 #include <memory>
-#include <boost/noncopyable.hpp>
 
 #include "EventTypes.h"
 
@@ -25,14 +24,31 @@ typedef void(* CP_log_store_func_t)(int priority, const char *format, ...);
 // 为什么不直接使用单例？单例用起来是在太臭了
 namespace tzmonitor_client {
 
-class MonitorClient: public boost::noncopyable,
-                     public std::enable_shared_from_this<MonitorClient> {
+struct order_cond_t {
+    enum OrderByType orderby_;
+    enum OrderType   orders_;
+    int32_t          limit_;   // 限制返回排序后记录的条数
+
+    order_cond_t(enum OrderByType btp, enum OrderType tp = OrderType::kOrderDesc, int32_t limit = 0):
+        orderby_(btp),
+        orders_(tp),
+        limit_(limit) {
+    }
+};
+
+class MonitorClient: public std::enable_shared_from_this<MonitorClient> {
 public:
     explicit MonitorClient(std::string entity_idx = "");
     MonitorClient(std::string service, std::string entity_idx = "");
 
     ~MonitorClient();
 
+    // 禁止拷贝
+    MonitorClient(const MonitorClient&) = delete;
+    MonitorClient& operator=(const MonitorClient&) = delete;
+
+    // 用存量的cfg进行更新，必须确保cfgFile_已经初始化了
+    bool init();
     bool init(const std::string& cfgFile, CP_log_store_func_t log_func);
     bool init(const libconfig::Setting& setting, CP_log_store_func_t log_func);
     bool init(const std::string& addr, uint16_t port, CP_log_store_func_t log_func);  // 简易，使用默认参数
@@ -51,6 +67,11 @@ public:
     int select_stat_groupby_tag (const std::string& metric, event_select_t& stat, time_t tm_intervel = 60);
     int select_stat_groupby_time(const std::string& metric, event_select_t& stat, time_t tm_intervel = 60);
     int select_stat_groupby_time(const std::string& metric, const std::string& tag, event_select_t& stat, time_t tm_intervel = 60);
+
+    int select_stat_groupby_tag_ordered (const std::string& metric, const order_cond_t& order, event_select_t& stat, time_t tm_intervel = 60);
+    int select_stat_groupby_time_ordered(const std::string& metric, const order_cond_t& order, event_select_t& stat, time_t tm_intervel = 60);
+    int select_stat_groupby_time_ordered(const std::string& metric, const std::string& tag,
+                                         const order_cond_t& order, event_select_t& stat, time_t tm_intervel = 60);
 
     // 最底层的接口，可以做更加精细化的查询
     int select_stat(event_cond_t& cond, event_select_t& stat);
