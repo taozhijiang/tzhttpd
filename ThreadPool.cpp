@@ -8,7 +8,6 @@
 #include <mutex>
 #include <functional>
 
-#include <boost/thread.hpp>
 #include <boost/chrono.hpp>
 
 #include "Log.h"

@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_THREAD_POOL_H__
 #define __TZHTTPD_THREAD_POOL_H__
 
-#include <boost/thread.hpp>
+#include <xtra_rhel.h>
 #include <memory>
 
 namespace tzhttpd {
