@@ -15,7 +15,7 @@
 namespace tzhttpd {
 
 // currently supported http methods
-enum HTTP_METHOD {
+enum class HTTP_METHOD : uint8_t {
     GET = 1,
     POST = 2,
     ALL = 98,   // internal use
@@ -123,7 +123,7 @@ namespace header_options {  // header key words
 } // namespace header_options
 
 
-enum class StatusCode {
+enum class StatusCode : uint16_t {
     unknown = 0,
     information_continue = 100,
     information_switching_protocols,

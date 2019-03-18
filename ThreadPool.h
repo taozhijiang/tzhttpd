@@ -13,7 +13,7 @@
 
 namespace tzhttpd {
 
-enum ThreadStatus {
+enum class ThreadStatus : uint8_t {
     kInit = 1,
     kRunning = 2,
     kSuspend = 3,
@@ -22,7 +22,7 @@ enum ThreadStatus {
 };
 
 struct ThreadObj {
-    ThreadObj(enum ThreadStatus status):
+    ThreadObj(enum ThreadStatus status) :
         status_(status) {
     }
     enum ThreadStatus status_;
@@ -32,9 +32,9 @@ const static uint32_t kMaxiumThreadPoolSize = 65535;
 
 // 因为需要适用timed_join，但是std::thread没有，所以这里仍然使用boost::thread
 
-typedef std::shared_ptr<boost::thread>       ThreadPtr;
-typedef std::shared_ptr<ThreadObj>           ThreadObjPtr;
-typedef std::function<void (ThreadObjPtr)>   ThreadRunnable;
+typedef std::shared_ptr<boost::thread>    ThreadPtr;
+typedef std::shared_ptr<ThreadObj>        ThreadObjPtr;
+typedef std::function<void(ThreadObjPtr)> ThreadRunnable;
 
 class ThreadPool {
 
