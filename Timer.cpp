@@ -33,16 +33,24 @@ bool TimerObject::init() {
 
 void TimerObject::timer_run(const boost::system::error_code& ec) {
 
-    if (func_) {
-        func_(ec);
+    if (ec == boost::asio::error::operation_aborted) {
+        tzhttpd_log_notice("timer was cancelled...");
     } else {
-        tzhttpd_log_err("critical, func not initialized");
+
+        // 正常，或者其他错误码则转发给应用程序处理
+        if (func_) {
+            func_(ec);
+        } else {
+            tzhttpd_log_err("critical, func not initialized");
+        }
+
     }
 
+    // 即使cancel了，还是可以触发下一步的事件，除非手动恢复forever_
     if (forever_) {
         steady_timer_->expires_from_now(milliseconds(timeout_));
         steady_timer_->async_wait(
-                std::bind(&TimerObject::timer_run, shared_from_this(), std::placeholders::_1));
+            std::bind(&TimerObject::timer_run, shared_from_this(), std::placeholders::_1));
         tzhttpd_log_info("renew forever timer with milliseconds %lu", timeout_);
     }
 }

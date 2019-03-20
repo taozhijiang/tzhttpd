@@ -39,6 +39,7 @@ public:
     }
 
     ~TimerObject() {
+        revoke_timer();
         tzhttpd_log_debug("Good, Timer released...");
     }
 
@@ -49,9 +50,20 @@ public:
 
 
     bool init();
-    bool cancel() {
 
-        return false;
+    void cancel_timer() {
+
+        if (steady_timer_) {
+            boost::system::error_code ec;
+            steady_timer_->cancel(ec);
+
+            steady_timer_.reset();
+        }
+    }
+
+    void revoke_timer() {
+        forever_ = false;
+        cancel_timer();
     }
 
 private:
