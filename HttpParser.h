@@ -31,7 +31,7 @@ typedef KVVec<std::string, std::string> UriParamContainer;
 
 class HttpParser {
 public:
-    HttpParser():
+    HttpParser() :
         request_headers_(),
         request_uri_params_(),
         method_(HTTP_METHOD::UNKNOWN) {
@@ -54,7 +54,7 @@ public:
 
     bool parse_request_header(const char* header_ptr) {
         if (!header_ptr || !strlen(header_ptr) || !strstr(header_ptr, "\r\n\r\n")) {
-            tzhttpd_log_err( "check raw header package failed ...");
+            tzhttpd_log_err("check raw header package failed ...");
             return false;
         }
 
@@ -67,11 +67,11 @@ public:
 
     std::string find_request_header(std::string option_name) const {
 
-        if (!option_name.size())
+        if (option_name.empty())
             return "";
 
         std::map<std::string, std::string>::const_iterator it;
-        for (it = request_headers_.cbegin(); it!=request_headers_.cend(); ++it) {
+        for (it = request_headers_.cbegin(); it != request_headers_.cend(); ++it) {
             if (boost::iequals(option_name, it->first))
                 return it->second;
         }
@@ -99,9 +99,9 @@ public:
         }
 
         request_headers_.insert(std::make_pair(http_proto::header_options::request_path_info,
-                                                        CryptoUtil::url_decode(uri.substr(0, item_idx))));
+                                               CryptoUtil::url_decode(uri.substr(0, item_idx))));
         request_headers_.insert(std::make_pair(http_proto::header_options::request_query_str,
-                                                        uri.substr(item_idx + 1)));
+                                               uri.substr(item_idx + 1)));
 
         // do query string parse, from cgicc
         std::string name, value;
@@ -109,26 +109,27 @@ public:
         std::string::size_type oldPos = 0;
         std::string query_str = find_request_header(http_proto::header_options::request_query_str);
 
-        while(true) {
+        while (true) {
 
             // Find the '=' separating the name from its value,
             // also have to check for '&' as its a common misplaced delimiter but is a delimiter none the less
-            pos = query_str.find_first_of( "&=", oldPos);
+            pos = query_str.find_first_of("&=", oldPos);
 
             // If no '=', we're finished
-            if(std::string::npos == pos)
+            if (std::string::npos == pos)
                 break;
 
             // Decode the name
             // pos == '&', that means whatever is in name is the only name/value
-            if( query_str.at(pos) == '&' ) {
+            if (query_str.at(pos) == '&') {
 
-                const char * pszData = query_str.c_str() + oldPos;
-                while( *pszData == '&' ) { // eat up extraneous '&'
-                    ++pszData; ++oldPos;
+                const char* pszData = query_str.c_str() + oldPos;
+                while (*pszData == '&') { // eat up extraneous '&'
+                    ++pszData;
+                    ++oldPos;
                 }
 
-                if( oldPos >= pos ) { // its all &'s
+                if (oldPos >= pos) { // its all &'s
                     oldPos = ++pos;
                     continue;
                 }
@@ -153,7 +154,7 @@ public:
             // Store the pair
             request_uri_params_.PUSH_BACK(name, value);
 
-            if(std::string::npos == pos)
+            if (std::string::npos == pos)
                 break;
 
             // Update parse position
@@ -180,12 +181,13 @@ public:
         std::string result;
         char first, second;
 
-        first =  static_cast<char>((c & 0xF0) / 16);
+        first = static_cast<char>((c & 0xF0) / 16);
         first += static_cast<char>(first > 9 ? 'A' - 10 : '0');
-        second =  c & 0x0F;
+        second = c & 0x0F;
         second += static_cast<char>(second > 9 ? 'A' - 10 : '0');
 
-        result.append(1, first); result.append(1, second);
+        result.append(1, first);
+        result.append(1, second);
         return result;
     }
 
@@ -198,10 +200,9 @@ public:
         return static_cast<char>(digit);
     }
 
-
 private:
 
-    std::string normalize_request_uri(const std::string& uri){
+    std::string normalize_request_uri(const std::string& uri) {
 
         // 因为Linux文件系统是大小写敏感的，所以这里不会进行uri大小写的规则化
         const std::string src = boost::algorithm::trim_copy(uri);
@@ -210,8 +211,8 @@ private:
 
         for (std::string::const_iterator iter = src.begin(); iter != src.end(); ++iter) {
             if (*iter == '/') {
-                while(std::distance(iter, src.end()) >= 1 && *(iter + 1) == '/')
-                    ++ iter;
+                while (std::distance(iter, src.end()) >= 1 && *(iter + 1) == '/')
+                    ++iter;
             }
 
             result.append(1, *iter); //store it!
@@ -233,22 +234,22 @@ private:
 
         while (std::getline(resp, item) && item != "\r") {
             index = item.find(':', 0);
-            if(index != std::string::npos) { // 直接Key-Value
+            if (index != std::string::npos) { // 直接Key-Value
                 request_headers_.insert(std::make_pair(
-                        boost::algorithm::trim_copy(item.substr(0, index)),
-                        boost::algorithm::trim_copy(item.substr(index + 1)) ));
+                                            boost::algorithm::trim_copy(item.substr(0, index)),
+                                            boost::algorithm::trim_copy(item.substr(index + 1))));
             } else { // HTTP 请求行，特殊处理
                 boost::smatch what;
                 if (boost::regex_match(item, what,
                                        boost::regex("([a-zA-Z]+)[ ]+([^ ]+)([ ]+(.*))?"))) {
                     request_headers_.insert(std::make_pair(http_proto::header_options::request_method,
-                                                       boost::algorithm::trim_copy(
-                                                           boost::to_upper_copy(std::string(what[1])))));
+                                                           boost::algorithm::trim_copy(
+                                                               boost::to_upper_copy(std::string(what[1])))));
 
                     // HTTP Method
-                    if (boost::iequals(find_request_header(http_proto::header_options::request_method), "GET") ) {
+                    if (boost::iequals(find_request_header(http_proto::header_options::request_method), "GET")) {
                         method_ = HTTP_METHOD::GET;
-                    } else if (boost::iequals(find_request_header(http_proto::header_options::request_method), "POST") ) {
+                    } else if (boost::iequals(find_request_header(http_proto::header_options::request_method), "POST")) {
                         method_ = HTTP_METHOD::POST;
                     } else {
                         method_ = HTTP_METHOD::UNKNOWN;

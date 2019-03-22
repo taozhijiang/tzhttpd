@@ -493,6 +493,19 @@ static std::string CInflator(const std::string& src) {
     return store;
 }
 
+static std::string hex_string(const char *data, size_t len) noexcept {
+
+    static const char *hexmap = "0123456789ABCDEF";
+    std::string result(len * 2, ' ');
+
+    for (size_t i = 0; i < len; ++i) {
+        result[2 * i]     = hexmap[(data[i] & 0xF0) >> 4];
+        result[2 * i + 1] = hexmap[ data[i] & 0x0F];
+    }
+
+    return result;
+}
+
 
 };
 

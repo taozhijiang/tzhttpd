@@ -204,11 +204,11 @@ write_return:
     // 在这个路径返回的，基本都是异常情况导致的错误返回，此时根据情况看是否发起请求
     // 读操作必须在写操作之前，否则可能会导致引用计数消失
 
+    do_write();
+
     if (keep_continue()) {
         start();
     }
-
-    do_write();
 }
 
 void TcpConnAsync::do_read_body() {
@@ -226,10 +226,11 @@ void TcpConnAsync::do_read_body() {
         recv_bound_.length_hint_ = ::atoi(http_parser_->find_request_header(http_proto::header_options::content_length).c_str());
     }
 
-    tzhttpd_log_debug("strand read async_read exactly... in thread %#lx", (long)pthread_self());
-
     size_t to_read = std::min(static_cast<size_t>(recv_bound_.length_hint_ - recv_bound_.buffer_.get_length()),
                               static_cast<size_t>(kFixedIoBufferSize));
+
+    tzhttpd_log_debug("strand read async_read exactly(%lu)... in thread %#lx",
+                      to_read, (long)pthread_self());
 
     set_ops_cancel_timeout();
     async_read(*socket_, boost::asio::buffer(recv_bound_.io_block_, to_read),
@@ -291,7 +292,6 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     // 这里是POST方法，而GET方法在读完头部后就直接再次发起读操作了
     // 再次开始读取请求，可以shared_from_this()保持住连接
     start();
-
 }
 
 bool TcpConnAsync::do_write() {
@@ -318,10 +318,11 @@ bool TcpConnAsync::do_write() {
 
     SAFE_ASSERT(send_bound_.buffer_.get_length() > 0);
 
-    tzhttpd_log_debug("strand write async_write exactly... in thread thread %#lx", (long)pthread_self());
-
     size_t to_write = std::min(static_cast<size_t>(send_bound_.buffer_.get_length()),
                                static_cast<size_t>(kFixedIoBufferSize));
+
+    tzhttpd_log_debug("strand write async_write exactly (%lu)... in thread thread %#lx",
+                      to_write, (long)pthread_self());
 
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
 
