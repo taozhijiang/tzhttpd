@@ -39,7 +39,6 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socke
     ops_cancel_timer_(),
     session_cancel_timer_(),
     http_server_(server),
-    http_parser_(new HttpParser()),
     strand_(std::make_shared<boost::asio::io_service::strand>(server.io_service_)) {
 
     set_tcp_nodelay(true);
@@ -107,42 +106,53 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
     request_.consume(bytes_transferred); // skip the already head
 
-    if (!http_parser_->parse_request_header(head_str.c_str())) {
+
+    auto http_parser = std::make_shared<HttpParser>();
+    if (!http_parser) {
+        tzhttpd_log_err("Create HttpParser object failed.");
+        goto error_return;
+    }
+
+    if (!http_parser->parse_request_header(head_str.c_str())) {
         tzhttpd_log_err( "Parse request error: %s", head_str.c_str());
         goto error_return;
     }
 
     // Header must already recv here, do the uri parse work,
     // And store the items in params
-    if (!http_parser_->parse_request_uri()) {
-        std::string uri = http_parser_->find_request_header(http_proto::header_options::request_uri);
+    if (!http_parser->parse_request_uri()) {
+        std::string uri = http_parser->find_request_header(http_proto::header_options::request_uri);
         tzhttpd_log_err("Prase request uri failed: %s", uri.c_str());
         goto error_return;
     }
 
-    if (http_parser_->get_method() == HTTP_METHOD::GET)
+    if (http_parser->get_method() == HTTP_METHOD::GET)
     {
         // HTTP GET handler
-        SAFE_ASSERT(http_parser_->find_request_header(http_proto::header_options::content_length).empty());
+        SAFE_ASSERT(http_parser->find_request_header(http_proto::header_options::content_length).empty());
 
-        std::string real_path_info = http_parser_->find_request_header(http_proto::header_options::request_path_info);
+        std::string real_path_info = http_parser->find_request_header(http_proto::header_options::request_path_info);
         std::string vhost_name = StrUtil::drop_host_port(
-                http_parser_->find_request_header(http_proto::header_options::host));
+                http_parser->find_request_header(http_proto::header_options::host));
 
         std::shared_ptr<HttpReqInstance> http_req_instance
-                    = std::make_shared<HttpReqInstance>(http_parser_->get_method(), shared_from_this(),
+                    = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
                                                         vhost_name, real_path_info,
-                                                        http_parser_, "");
+                                                        http_parser, "");
         Dispatcher::instance().handle_http_request(http_req_instance);
 
         // 再次开始读取请求，可以shared_from_this()保持住连接
+        //
+        // 我们不支持pipeline流水线机制，所以根据HTTP的鸟性，及时是长连接，客户端的下
+        // 一次请求过来，也是等到服务端发送完请求后才会有数据
+        //
         start();
         return;
     }
-    else if (http_parser_->get_method() == HTTP_METHOD::POST )
+    else if (http_parser->get_method() == HTTP_METHOD::POST )
     {
 
-        size_t len = ::atoi(http_parser_->find_request_header(http_proto::header_options::content_length).c_str());
+        size_t len = ::atoi(http_parser->find_request_header(http_proto::header_options::content_length).c_str());
         recv_bound_.length_hint_ = len;  // 登记需要读取的长度
         size_t additional_size = request_.size(); // net additional body size
 
@@ -168,11 +178,11 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
                 return;
             }
 
-            do_read_body();
+            do_read_body(http_parser);
         }
         else {
             // call the process callback directly
-            read_body_handler(ec, 0);   // already updated r_size_
+            read_body_handler(http_parser, ec, 0);   // already updated r_size_
         }
 
         return;
@@ -181,13 +191,13 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     else
     {
         tzhttpd_log_err("Invalid or unsupport request method: %s",
-                http_parser_->find_request_header(http_proto::header_options::request_method).c_str());
-        fill_std_http_for_send(http_proto::StatusCode::client_error_bad_request);
+                http_parser->find_request_header(http_proto::header_options::request_method).c_str());
+        fill_std_http_for_send(http_parser, http_proto::StatusCode::client_error_bad_request);
         goto write_return;
     }
 
 error_return:
-    fill_std_http_for_send(http_proto::StatusCode::server_error_internal_server_error);
+    fill_std_http_for_send(http_parser, http_proto::StatusCode::server_error_internal_server_error);
     request_.consume(request_.size());
 
 write_return:
@@ -204,14 +214,14 @@ write_return:
     // 在这个路径返回的，基本都是异常情况导致的错误返回，此时根据情况看是否发起请求
     // 读操作必须在写操作之前，否则可能会导致引用计数消失
 
-    do_write();
+    do_write(http_parser);
 
-    if (keep_continue()) {
+    if (keep_continue(http_parser)) {
         start();
     }
 }
 
-void TcpConnAsync::do_read_body() {
+void TcpConnAsync::do_read_body(std::shared_ptr<HttpParser> http_parser) {
 
     if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
@@ -223,7 +233,7 @@ void TcpConnAsync::do_read_body() {
     }
 
     if (recv_bound_.length_hint_ == 0) {
-        recv_bound_.length_hint_ = ::atoi(http_parser_->find_request_header(http_proto::header_options::content_length).c_str());
+        recv_bound_.length_hint_ = ::atoi(http_parser->find_request_header(http_proto::header_options::content_length).c_str());
     }
 
     size_t to_read = std::min(static_cast<size_t>(recv_bound_.length_hint_ - recv_bound_.buffer_.get_length()),
@@ -238,13 +248,15 @@ void TcpConnAsync::do_read_body() {
                              strand_->wrap(
                                  std::bind(&TcpConnAsync::read_body_handler,
                                      shared_from_this(),
+                                     http_parser,
                                      std::placeholders::_1,
                                      std::placeholders::_2)));
     return;
 }
 
 
-void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t bytes_transferred) {
+void TcpConnAsync::read_body_handler(std::shared_ptr<HttpParser> http_parser,
+                                     const boost::system::error_code& ec, size_t bytes_transferred) {
 
     revoke_ops_cancel_timeout();
 
@@ -262,21 +274,21 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
 
     if (recv_bound_.buffer_.get_length() < recv_bound_.length_hint_) {
         // need to read more, do again!
-        do_read_body();
+        do_read_body(http_parser);
         return;
     }
 
-    std::string real_path_info = http_parser_->find_request_header(http_proto::header_options::request_path_info);
+    std::string real_path_info = http_parser->find_request_header(http_proto::header_options::request_path_info);
     std::string vhost_name = StrUtil::drop_host_port(
-                                      http_parser_->find_request_header(http_proto::header_options::host));
+                                      http_parser->find_request_header(http_proto::header_options::host));
 
     std::string post_body;
     recv_bound_.buffer_.consume(post_body, recv_bound_.length_hint_);
 
     std::shared_ptr<HttpReqInstance> http_req_instance
-                = std::make_shared<HttpReqInstance>(http_parser_->get_method(), shared_from_this(),
+                = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
                                                     vhost_name, real_path_info,
-                                                    http_parser_, post_body);
+                                                    http_parser, post_body);
 
 
     Dispatcher::instance().handle_http_request(http_req_instance);
@@ -294,7 +306,7 @@ void TcpConnAsync::read_body_handler(const boost::system::error_code& ec, size_t
     start();
 }
 
-bool TcpConnAsync::do_write() {
+bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
 
     if (get_conn_stat() != ConnStat::kWorking) {
         tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
@@ -306,7 +318,7 @@ bool TcpConnAsync::do_write() {
         // 看是否关闭主动关闭连接
         // 因为在读取请求的时候默认就当作长连接发起再次读了，所以如果这里检测到是
         // 短连接，就采取主动关闭操作，否则就让之前的长连接假设继续生效
-        if (!keep_continue()) {
+        if (!keep_continue(http_parser)) {
 
             revoke_ops_cancel_timeout();
             ops_cancel();
@@ -330,15 +342,17 @@ bool TcpConnAsync::do_write() {
     async_write(*socket_, boost::asio::buffer(send_bound_.io_block_, to_write),
                     boost::asio::transfer_exactly(to_write),
                               strand_->wrap(
-                                 std::bind(&TcpConnAsync::write_handler,
+                                 std::bind(&TcpConnAsync::self_write_handler,
                                      shared_from_this(),
+                                     http_parser,
                                      std::placeholders::_1,
                                      std::placeholders::_2)));
     return true;
 }
 
 
-void TcpConnAsync::write_handler(const boost::system::error_code& ec, size_t bytes_transferred) {
+void TcpConnAsync::self_write_handler(std::shared_ptr<HttpParser> http_parser,
+                                      const boost::system::error_code& ec, size_t bytes_transferred) {
 
     revoke_ops_cancel_timeout();
 
@@ -353,34 +367,63 @@ void TcpConnAsync::write_handler(const boost::system::error_code& ec, size_t byt
     // 再次触发写，如果为空就直接返回
     // 函数中会检查，如果内容为空，就直接返回不执行写操作
 
-    do_write();
+
+    // Bug 这里会有竞争条件 !!!
+    // 当使用http客户端长连接的时候，下面的do_write()如果没有数据会触发
+    // keep_continue()调用，而该实现是遍历http_parser的head来实现的，
+    // 但是此时可能在write_handler调用之前或之中就触发了客户端新的head解析，导致
+    // 该调用访问http_parser会产生问题
+
+    do_write(http_parser);
 }
 
 
-void TcpConnAsync::fill_http_for_send(const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
+void TcpConnAsync::fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                                      const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
 
-    string content = http_proto::http_response_generate(str, status_line, keep_continue(), additional_header);
+    bool keep_next = false;
+    std::string str_uri = "UNKNOWN";
+    std::string str_method = "UNKNOWN";
+
+    if (http_parser) {
+        keep_next = keep_continue(http_parser);
+        str_uri = http_parser->get_uri();
+        str_method = HTTP_METHOD_STRING(http_parser->get_method());
+    }
+
+    string content = http_proto::http_response_generate(str, status_line, keep_next, additional_header);
     send_bound_.buffer_.append_internal(content);
 
-    std::string str_method = HTTP_METHOD_STRING(http_parser_->get_method());
     tzhttpd_log_info("\n =====> \"%s %s\" %s",
-                     str_method.c_str(), http_parser_->get_uri().c_str(), status_line.c_str());
+                     str_method.c_str(), str_uri.c_str(), status_line.c_str());
 
     return;
 }
 
 
-void TcpConnAsync::fill_std_http_for_send(enum http_proto::StatusCode code) {
+void TcpConnAsync::fill_std_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                                          enum http_proto::StatusCode code) {
 
-    string http_ver = http_parser_->get_version();
+    bool keep_next = false;
+    std::string http_ver = "UNKNOWN";
+    std::string str_uri = "UNKNOWN";
+    std::string str_method = "UNKNOWN";
+
+    if (http_parser) {
+        keep_next = keep_continue(http_parser);
+        http_ver = http_parser->get_version();
+        str_uri = http_parser->get_uri();
+        str_method = HTTP_METHOD_STRING(http_parser->get_method());
+    }
+
+
     std::string status_line = generate_response_status_line(http_ver, code);
-    string content = http_proto::http_std_response_generate(http_ver, status_line, keep_continue());
+    string content = http_proto::http_std_response_generate(http_ver, status_line, keep_next);
 
     send_bound_.buffer_.append_internal(content);
 
-    std::string str_method = HTTP_METHOD_STRING(http_parser_->get_method());
     tzhttpd_log_info("\n =====> \"%s %s\" %s",
-                     str_method.c_str(), http_parser_->get_uri().c_str(), status_line.c_str());
+                     str_method.c_str(), str_uri.c_str(), status_line.c_str());
 
     return;
 }
@@ -417,9 +460,12 @@ bool TcpConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
 }
 
 // 测试方法 while:; do echo -e "GET / HTTP/1.1\nhost: test.domain\n\n"; sleep 3; done | telnet 127.0.0.1 8899
-bool TcpConnAsync::keep_continue() {
+bool TcpConnAsync::keep_continue(const std::shared_ptr<HttpParser>& http_parser) {
 
-    std::string connection =  http_parser_->find_request_header(http_proto::header_options::connection);
+    if (!http_parser)
+        return false;
+
+    std::string connection =  http_parser->find_request_header(http_proto::header_options::connection);
     if (!connection.empty()) {
         if (boost::iequals(connection, "Close")) {
             return false;
@@ -430,7 +476,7 @@ bool TcpConnAsync::keep_continue() {
         }
     }
 
-    if (http_parser_->get_version() > "1.0" ) {
+    if (http_parser->get_version() > "1.0" ) {
         return true;
     }
 

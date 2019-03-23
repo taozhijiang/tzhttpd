@@ -4,7 +4,7 @@ This is a high-performance while easy-to-be-used HTTP service framework, which c
 ### Key Points of tzhttpd
 1. Developed with Boost.Asio, which means high-concurrency and high-performance. My little very poor virtual machine (1C1G) can support up to 1.5K QPS, so I believe it can satisfy performance requirement for most cases in production.   
 2. Just supporting HTTP basic GET/POST methods, but can feed the need of most backend application gateway development. Parameters and post body are well handled and structed. Routing handlers based on uri regex-match, easy for configuration.   
-3. Connection can be keep-alived, long-connection means higher performance, and can get ride of TIME-WAIT disasters, and the server also can be tuned to be automatically timed out and removed.   
+3. Connection can be keep-alived, long-connection means higher performance (about 2x more), and can get ride of TIME-WAIT disasters, and the server also can be tuned to be automatically timed out and removed.   
 4. Support loading handlers through .so library, this feature simulates legacy CGI deployment conveniently. This library try its best loading and updating handler with less impact for others. And much more amazing thing is that you can just build one tzhttpd instance and copy it everywhere, and write your handlers, build them to individual so file, add them to configure files and update configuration dynamically, just like plugins.   
 5. Based on Boost library and C++0x standard, so can used in legacy but widely-deploied RHEL-6.x environment, also RHEL-7.x is officially supported.   
 6. Support regex-based Http Basic Authorization.   

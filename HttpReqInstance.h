@@ -58,8 +58,8 @@ struct HttpReqInstance {
     void http_std_response(enum http_proto::StatusCode code) {
 
         if (auto sock = full_socket_.lock()) {
-            sock->fill_std_http_for_send(code);
-            sock->do_write();
+            sock->fill_std_http_for_send(http_parser_, code);
+            sock->do_write(http_parser_);
             return;
         }
 
@@ -71,8 +71,8 @@ struct HttpReqInstance {
                        const std::vector<std::string>& headers) {
 
         if (auto sock = full_socket_.lock()) {
-            sock->fill_http_for_send(response_str, status_str, headers);
-            sock->do_write();
+            sock->fill_http_for_send(http_parser_, response_str, status_str, headers);
+            sock->do_write(http_parser_);
             return;
         }
 

@@ -67,6 +67,8 @@ void* perf_run(void* x_void_ptr) {
         // increment success case
         count ++;
     }
+
+    return NULL;
 }
 
 int main(int argc, char* argv[]) {
@@ -99,7 +101,7 @@ int main(int argc, char* argv[]) {
     start_time = ::time(NULL);
     start = true;
 
-    int ch = getchar();
+    int ch = getchar(); (void)ch;
     stop = true;
     time_t stop_time = ::time(NULL);
 

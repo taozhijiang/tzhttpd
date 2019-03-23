@@ -32,6 +32,14 @@ public:
         lock_(new std::mutex()), items_() {
     }
 
+    // not support initilized_list
+    explicit KVVec(Container& init):
+        items_({}) {
+        for (auto iter = init.begin(); iter != init.end(); ++iter) {
+            items_.push_back(*iter);
+        }
+    }
+
     ~KVVec() {
     }
 
@@ -44,6 +52,14 @@ public:
 
     iterator END() {
         return items_.end();
+    }
+
+    const_iterator CBEGIN() const {
+        return items_.cbegin();
+    }
+
+    const_iterator CEND() const {
+        return items_.cend();
     }
 
     void PUSH_BACK(const K& k, const V& v) {
