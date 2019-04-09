@@ -34,7 +34,7 @@ public:
     HttpParser() :
         request_headers_(),
         request_uri_params_(),
-        method_(HTTP_METHOD::UNKNOWN) {
+        method_(HTTP_METHOD::UNDETECTED) {
     }
 
     HttpParser(const HttpParser&) = delete;
@@ -233,12 +233,25 @@ private:
         std::string::size_type index;
 
         while (std::getline(resp, item) && item != "\r") {
-            index = item.find(':', 0);
-            if (index != std::string::npos) { // 直接Key-Value
-                request_headers_.insert(std::make_pair(
-                                            boost::algorithm::trim_copy(item.substr(0, index)),
-                                            boost::algorithm::trim_copy(item.substr(index + 1))));
-            } else { // HTTP 请求行，特殊处理
+
+            // 重新编写，支持url中带有特殊字符
+            if (boost::istarts_with(item, "GET ")     ||
+                boost::istarts_with(item, "HEAD ")    ||
+                boost::istarts_with(item, "POST ")    ||
+                boost::istarts_with(item, "PUT ")     ||
+                boost::istarts_with(item, "DELETE ")  ||
+                boost::istarts_with(item, "CONNECT ") ||
+                boost::istarts_with(item, "OPTIONS ") ||
+                boost::istarts_with(item, "TRACE ")   ||
+                boost::istarts_with(item, "MOVE ")    ||
+                boost::istarts_with(item, "COPY ")    ||
+                boost::istarts_with(item, "LINK ")    ||
+                boost::istarts_with(item, "UNLINK ")  ||
+                boost::istarts_with(item, "WRAPPED ") ||
+                boost::istarts_with(item, "Extension-method ")
+                )
+            {
+                // HTTP 标准头
                 boost::smatch what;
                 if (boost::regex_match(item, what,
                                        boost::regex("([a-zA-Z]+)[ ]+([^ ]+)([ ]+(.*))?"))) {
@@ -252,7 +265,7 @@ private:
                     } else if (boost::iequals(find_request_header(http_proto::header_options::request_method), "POST")) {
                         method_ = HTTP_METHOD::POST;
                     } else {
-                        method_ = HTTP_METHOD::UNKNOWN;
+                        method_ = HTTP_METHOD::UNDETECTED;
                     }
 
                     uri_ = normalize_request_uri(std::string(what[2]));
@@ -261,6 +274,17 @@ private:
                                                            boost::algorithm::trim_copy(std::string(what[3]))));
 
                     version_ = boost::algorithm::trim_copy(std::string(what[3]));
+                }
+            }
+            else
+            {
+                index = item.find(':', 0);
+                if (index != std::string::npos) { // 直接Key-Value
+                    request_headers_.insert(std::make_pair(
+                                                boost::algorithm::trim_copy(item.substr(0, index)),
+                                                boost::algorithm::trim_copy(item.substr(index + 1))));
+                } else {
+                    tzhttpd_log_err("unabled to handle line: %s", item.c_str());
                 }
             }
         }

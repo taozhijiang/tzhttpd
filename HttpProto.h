@@ -19,7 +19,7 @@ enum class HTTP_METHOD : uint8_t {
     GET = 1,
     POST = 2,
     ALL = 98,   // internal use
-    UNKNOWN = 99,
+    UNDETECTED = 99,
 };
 
 static inline
@@ -30,7 +30,7 @@ std::string HTTP_METHOD_STRING(enum HTTP_METHOD method) {
         return "POST";
     }
 
-    return "UNKNOWN";
+    return "UNDETECTED_METHOD";
 }
 
 namespace http_proto {

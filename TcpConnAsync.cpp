@@ -382,8 +382,8 @@ void TcpConnAsync::fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
                                       const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
 
     bool keep_next = false;
-    std::string str_uri = "UNKNOWN";
-    std::string str_method = "UNKNOWN";
+    std::string str_uri = "UNDETECTED_URI";
+    std::string str_method = "UNDETECTED_METHOD";
 
     if (http_parser) {
         keep_next = keep_continue(http_parser);
@@ -405,9 +405,9 @@ void TcpConnAsync::fill_std_http_for_send(std::shared_ptr<HttpParser> http_parse
                                           enum http_proto::StatusCode code) {
 
     bool keep_next = false;
-    std::string http_ver = "UNKNOWN";
-    std::string str_uri = "UNKNOWN";
-    std::string str_method = "UNKNOWN";
+    std::string http_ver = "HTTP/1.1";
+    std::string str_uri = "UNDETECTED_URI";
+    std::string str_method = "UNDETECTED_METHOD";
 
     if (http_parser) {
         keep_next = keep_continue(http_parser);
