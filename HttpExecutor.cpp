@@ -32,7 +32,7 @@
 namespace tzhttpd {
 namespace http_handler {
 // init only once at startup, these are the default value
-std::string              http_server_version = "2.3.0";
+std::string              http_server_version = "2.3.1";
 } // end namespace http_handler
 
 
