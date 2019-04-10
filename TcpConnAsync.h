@@ -26,8 +26,8 @@ class TcpConnAsync;
 class HttpReqInstance;
 
 class HttpServer;
-class TcpConnAsync: public ConnIf,
-                    public std::enable_shared_from_this<TcpConnAsync> {
+class TcpConnAsync : public ConnIf,
+    public std::enable_shared_from_this<TcpConnAsync> {
 
     friend class HttpReqInstance;
 
@@ -51,19 +51,29 @@ public:
 
 private:
 
-    virtual bool do_read() override { SAFE_ASSERT(false); return false;}
+    virtual bool do_read() override { SAFE_ASSERT(false);
+        return false;}
     virtual void read_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) override {
         SAFE_ASSERT(false);
     }
 
-    virtual bool do_write() override;
-    virtual void write_handler(const boost::system::error_code &ec, std::size_t bytes_transferred) override;
+    virtual bool do_write() override { SAFE_ASSERT(false);
+        return false;}
+    virtual void write_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) override {
+        SAFE_ASSERT(false);
+    }
 
     void do_read_head();
-    void read_head_handler(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void read_head_handler(const boost::system::error_code& ec, std::size_t bytes_transferred);
 
-    void do_read_body();
-    void read_body_handler(const boost::system::error_code &ec, std::size_t bytes_transferred);
+    void do_read_body(std::shared_ptr<HttpParser> http_parser);
+    void read_body_handler(std::shared_ptr<HttpParser> http_parser,
+                           const boost::system::error_code& ec, std::size_t bytes_transferred);
+
+    bool do_write(std::shared_ptr<HttpParser> http_parser);
+    // std::bind无法使用重载函数，所以这里另起函数名
+    void self_write_handler(std::shared_ptr<HttpParser> http_parser,
+                            const boost::system::error_code& ec, std::size_t bytes_transferred);
 
     void set_session_cancel_timeout();
     void revoke_session_cancel_timeout();
@@ -84,28 +94,35 @@ private:
     void ops_cancel_timeout_call(const boost::system::error_code& ec);
 
     // 是否Connection长连接
-    bool keep_continue();
+    bool keep_continue(const std::shared_ptr<HttpParser>& http_parser);
 
-    void fill_http_for_send(const char* data, size_t len, const string& status) {
+    void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                            const char* data, size_t len, const string& status) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
-        fill_http_for_send(msg, status, {});
+        fill_http_for_send(http_parser, msg, status, { });
     }
 
-    void fill_http_for_send(const string& str, const string& status) {
-        fill_http_for_send(str, status, {});
+    void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                            const string& str, const string& status) {
+        fill_http_for_send(http_parser, str, status, { });
     }
 
-    void fill_http_for_send(const char* data, size_t len, const string& status, const std::vector<std::string>& additional_header) {
+    void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                            const char* data, size_t len, const string& status,
+                            const std::vector<std::string>& additional_header) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
-        return fill_http_for_send(msg, status, additional_header);
+        return fill_http_for_send(http_parser, msg, status, additional_header);
     }
 
-    void fill_http_for_send(const string& str, const string& status, const std::vector<std::string>& additional_header);
+    void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                            const string& str, const string& status,
+                            const std::vector<std::string>& additional_header);
 
     // 标准的HTTP响应头和响应体
-    void fill_std_http_for_send(enum http_proto::StatusCode code);
+    void fill_std_http_for_send(std::shared_ptr<HttpParser> http_parser,
+                                enum http_proto::StatusCode code);
 
 private:
 
@@ -127,7 +144,6 @@ private:
 private:
 
     HttpServer& http_server_;
-    std::shared_ptr<HttpParser> http_parser_;
 
     // Of course, the handlers may still execute concurrently with other handlers that
     // were not dispatched through an boost::asio::strand, or were dispatched through

@@ -15,11 +15,11 @@
 namespace tzhttpd {
 
 // currently supported http methods
-enum HTTP_METHOD {
+enum class HTTP_METHOD : uint8_t {
     GET = 1,
     POST = 2,
     ALL = 98,   // internal use
-    UNKNOWN = 99,
+    UNDETECTED = 99,
 };
 
 static inline
@@ -30,7 +30,7 @@ std::string HTTP_METHOD_STRING(enum HTTP_METHOD method) {
         return "POST";
     }
 
-    return "UNKNOWN";
+    return "UNDETECTED_METHOD";
 }
 
 namespace http_proto {
@@ -123,7 +123,7 @@ namespace header_options {  // header key words
 } // namespace header_options
 
 
-enum class StatusCode {
+enum class StatusCode : uint16_t {
     unknown = 0,
     information_continue = 100,
     information_switching_protocols,
