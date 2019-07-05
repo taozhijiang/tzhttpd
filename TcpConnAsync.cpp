@@ -51,7 +51,7 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socke
 TcpConnAsync::~TcpConnAsync() {
 
     --current_concurrency_;
-    roo::log_info("TcpConnAsync SOCKET RELEASED!!!");
+    // roo::log_info("TcpConnAsync SOCKET RELEASED!!!");
 }
 
 void TcpConnAsync::start() {
@@ -78,7 +78,7 @@ void TcpConnAsync::do_read_head() {
         return;
     }
 
-    roo::log_info("strand read read_until ... in thread %#lx", (long)pthread_self());
+    // roo::log_info("strand read read_until ... in thread %#lx", (long)pthread_self());
 
     set_session_cancel_timeout();
     async_read_until(*socket_, request_,
@@ -234,8 +234,8 @@ void TcpConnAsync::do_read_body(std::shared_ptr<HttpParser> http_parser) {
     size_t to_read = std::min(static_cast<size_t>(recv_bound_.length_hint_ - recv_bound_.buffer_.get_length()),
                               static_cast<size_t>(kFixedIoBufferSize));
 
-    roo::log_info("strand read async_read exactly(%lu)... in thread %#lx",
-                  to_read, (long)pthread_self());
+    // roo::log_info("strand read async_read exactly(%lu)... in thread %#lx",
+    //              to_read, (long)pthread_self());
 
     set_ops_cancel_timeout();
     async_read(*socket_, boost::asio::buffer(recv_bound_.io_block_, to_read),
@@ -328,8 +328,8 @@ bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
     size_t to_write = std::min(static_cast<size_t>(send_bound_.buffer_.get_length()),
                                static_cast<size_t>(kFixedIoBufferSize));
 
-    roo::log_info("strand write async_write exactly (%lu)... in thread thread %#lx",
-                  to_write, (long)pthread_self());
+    // roo::log_info("strand write async_write exactly (%lu)... in thread thread %#lx",
+    //              to_write, (long)pthread_self());
 
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
 

@@ -134,6 +134,9 @@ typedef std::shared_ptr<boost::asio::ip::tcp::socket>    SocketPtr;
 
 class HttpServer : public std::enable_shared_from_this<HttpServer> {
 
+
+    __noncopyable__(HttpServer)
+
     friend class TcpConnAsync;  // can not work with typedef, ugly ...
 
 public:
@@ -142,10 +145,7 @@ public:
 
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
-    ~HttpServer() { };
-
-    HttpServer(const HttpServer&) = delete;
-    HttpServer& operator=(const HttpServer&) = delete;
+    ~HttpServer() = default;
 
     bool init();
 

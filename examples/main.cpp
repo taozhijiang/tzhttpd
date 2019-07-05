@@ -71,7 +71,34 @@ int main(int argc, char* argv[]) {
     }
 
 
-    libconfig::Config cfg;
+    auto setting = std::make_shared<roo::Setting>();
+    if (!setting || !setting->init(cfgFile)) {
+        fprintf(stderr, "Create and init roo::Setting with cfg %s failed.", cfgFile);
+        return false;
+    }
+
+    auto setting_ptr = setting->get_setting();
+    if (!setting_ptr) {
+        fprintf(stderr, "roo::Setting return null pointer, maybe your conf file ill???");
+        return false;
+    }
+
+    int log_level = 0;
+    setting_ptr->lookupValue("log_level", log_level);
+    if (log_level <= 0 || log_level > 7) {
+        fprintf(stderr, "Invalid log_level %d, reset to default 7(DEBUG).", log_level);
+        log_level = 7;
+    }
+
+    std::string log_path;
+    setting_ptr->lookupValue("log_path", log_path);
+    if (log_path.empty())
+        log_path = "./log";
+
+    roo::log_init(log_level, "", log_path, LOG_LOCAL6);
+    roo::log_warning("Initialized roo::Log with level %d, path %s.", log_level, log_path.c_str());
+    
+    
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
 
     // daemonize should before any thread creation...

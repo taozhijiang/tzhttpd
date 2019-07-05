@@ -9,6 +9,7 @@ g++ -std=c++0x -g -O0 -DNP_DEBUG -Wall  main.cpp setup.cpp \
     -ltzhttpd libRoo.a \
     -lboost_system -lboost_thread -lboost_chrono -lboost_regex \
     -lpthread -lrt -rdynamic -ldl -lconfig++ -lssl -lcryptopp -lcrypto \
+    -lglog_syslog \
     -o httpsrv
 
 echo "build fast_client..."

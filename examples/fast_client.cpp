@@ -23,7 +23,7 @@ extern char* program_invocation_short_name;
 static void usage() {
     std::stringstream ss;
 
-    ss << program_invocation_short_name << " [thread_num] " << std::endl;
+    ss << program_invocation_short_name << " [thread_num] url " << std::endl;
     ss << std::endl;
 
     std::cerr << ss.str();
@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
 
 
     int thread_num = 0;
-    if (argc < 2 || (thread_num = ::atoi(argv[1])) <= 0) {
+    if (argc < 3 || (thread_num = ::atoi(argv[1])) <= 0) {
         usage();
         return 0;
     }

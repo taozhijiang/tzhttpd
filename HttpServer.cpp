@@ -15,6 +15,7 @@
 
 #include <boost/format.hpp>
 
+#include <system/ConstructException.h>
 #include <crypto/SslSetup.h>
 
 
@@ -159,6 +160,12 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
     acceptor_(),
     cfgfile_(cfgfile),
     conf_() {
+
+    (void)Global::instance();
+    (void)Dispatcher::instance();
+
+    if (!Global::instance().init(cfgfile_))
+        throw roo::ConstructException("Init Global instance failed.");
 }
 
 
@@ -166,18 +173,11 @@ extern bool system_manage_page_init(HttpServer& server);
 
 bool HttpServer::init() {
 
-    (void)Dispatcher::instance();
-
     // incase not forget
     ::signal(SIGPIPE, SIG_IGN);
 
     if (!roo::Ssl_thread_setup()) {
         roo::log_err("Ssl_thread_setup failed!");
-        return false;
-    }
-
-    if (!Global::instance().init(cfgfile_)) {
-        roo::log_err("Init Global instance failed.");
         return false;
     }
 

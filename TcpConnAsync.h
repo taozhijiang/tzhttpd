@@ -29,6 +29,7 @@ class HttpServer;
 class TcpConnAsync : public ConnIf,
     public std::enable_shared_from_this<TcpConnAsync> {
 
+    __noncopyable__(TcpConnAsync)
     friend class HttpReqInstance;
 
 public:
@@ -39,9 +40,6 @@ public:
     /// Construct a connection with the given socket.
     TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket, HttpServer& server);
     virtual ~TcpConnAsync();
-
-    TcpConnAsync(const TcpConnAsync&) = delete;
-    TcpConnAsync& operator=(const TcpConnAsync&) = delete;
 
     virtual void start();
     void stop();
