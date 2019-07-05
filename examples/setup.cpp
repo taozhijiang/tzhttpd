@@ -9,10 +9,9 @@
 #include <boost/format.hpp>
 #include <linux/limits.h>
 
-#include "Log.h"
+#include <other/Log.h>
 
-#include "ConfHelper.h"
-#include "Status.h"
+#include "Global.h"
 
 // API for main
 
@@ -21,31 +20,31 @@ void usage();
 int create_process_pid();
 
 
-static void interrupted_callback(int signal){
-    tzhttpd::tzhttpd_log_alert("Signal %d received ...", signal);
-    switch(signal) {
+static void interrupted_callback(int signal) {
+    roo::log_warning("Signal %d received ...", signal);
+    switch (signal) {
         case SIGHUP:
-            tzhttpd::tzhttpd_log_notice("SIGHUP recv, do update_run_conf... ");
-            tzhttpd::ConfHelper::instance().update_runtime_conf();
+            roo::log_warning("SIGHUP recv, do update_run_conf... ");
+            tzhttpd::Global::instance().setting_ptr_->update_runtime_setting();
             break;
 
         case SIGUSR1:
-            tzhttpd::tzhttpd_log_notice("SIGUSR recv, do module_status ... ");
+            roo::log_warning("SIGUSR recv, do module_status ... ");
             {
                 std::string output;
-                tzhttpd::Status::instance().collect_status(output);
+                tzhttpd::Global::instance().status_ptr_->collect_status(output);
                 std::cout << output << std::endl;
-                tzhttpd::tzhttpd_log_notice("%s", output.c_str());
+                roo::log_warning("%s", output.c_str());
             }
             break;
 
         default:
-            tzhttpd::tzhttpd_log_err("Unhandled signal: %d", signal);
+            roo::log_err("Unhandled signal: %d", signal);
             break;
     }
 }
 
-void init_signal_handle(){
+void init_signal_handle() {
 
     ::signal(SIGPIPE, SIG_IGN);
     ::signal(SIGUSR1, interrupted_callback);
@@ -54,7 +53,7 @@ void init_signal_handle(){
     return;
 }
 
-extern char * program_invocation_short_name;
+extern char* program_invocation_short_name;
 void usage() {
     std::stringstream ss;
 
@@ -78,7 +77,7 @@ int create_process_pid() {
     FILE* fp = fopen(pid_file, "w+");
 
     if (!fp) {
-        tzhttpd::tzhttpd_log_err("Create pid file %s failed!", pid_file);
+        roo::log_err("Create pid file %s failed!", pid_file);
         return -1;
     }
 

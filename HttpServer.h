@@ -24,10 +24,9 @@ using boost::asio::steady_timer;
 #include <algorithm>
 
 #include <other/Log.h>
-#include "EQueue.h"
-#include "ThreadPool.h"
+#include <container/EQueue.h>
+#include <concurrency/ThreadPool.h>
 
-#include <concurrency/Timer.h>
 #include <scaffold/Status.h>
 #include <scaffold/Setting.h>
 
@@ -73,7 +72,7 @@ class HttpConf {
 
     bool check_safe_ip(const std::string& ip) {
         std::lock_guard<std::mutex> lock(lock_);
-        return ( safe_ip_.empty() || (safe_ip_.find(ip) != safe_ip_.cend()) );
+        return (safe_ip_.empty() || (safe_ip_.find(ip) != safe_ip_.cend()));
     }
 
     bool get_http_service_token() {
@@ -96,15 +95,15 @@ class HttpConf {
             return false;
         }
 
-        -- service_token_;
+        --service_token_;
         return true;
     }
 
     void withdraw_http_service_token() {    // 支持将令牌还回去
-        ++ service_token_;
+        ++service_token_;
     }
 
-    void feed_http_service_token(){
+    void feed_http_service_token() {
         service_token_ = service_speed_;
     }
 
@@ -112,7 +111,7 @@ class HttpConf {
     void timed_feed_token_handler(const boost::system::error_code& ec);
 
     // 默认初始化良好的数据
-    HttpConf():
+    HttpConf() :
         service_enabled_(true),
         service_speed_(0),
         service_token_(0),
@@ -120,14 +119,14 @@ class HttpConf {
         session_cancel_time_out_(0),
         ops_cancel_time_out_(0),
         lock_(),
-        safe_ip_({}),
+        safe_ip_({ }),
         bind_addr_(),
         bind_port_(0),
         backlog_size_(0),
         io_thread_number_(0) {
     }
 
-} __attribute__ ((aligned (4))) ;  // end class HttpConf
+} __attribute__((aligned(4)));  // end class HttpConf
 
 
 typedef std::shared_ptr<boost::asio::ip::tcp::socket>    SocketPtr;
@@ -143,7 +142,7 @@ public:
 
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
-    ~HttpServer() {};
+    ~HttpServer() { };
 
     HttpServer(const HttpServer&) = delete;
     HttpServer& operator=(const HttpServer&) = delete;
@@ -159,17 +158,9 @@ public:
     int add_http_post_handler(const std::string& uri_regex, const HttpPostHandler& handler,
                               bool built_in = false, const std::string hostname = "");
 
-    int register_http_status_callback(const std::string& name, StatusCallable func) {
-        return Status::instance().register_status_callback(name, func);
-    }
-
-    int register_http_runtime_callback(const std::string& name, ConfUpdateCallable func) {
-        return ConfHelper::instance().register_runtime_callback(name, func);
-    }
-
-    int update_http_runtime_conf() {
-        return ConfHelper::instance().update_runtime_conf();
-    }
+    int register_http_status_callback(const std::string& name, roo::StatusCallable func);
+    int register_http_runtime_callback(const std::string& name, roo::SettingUpdateCallable func);
+    int update_http_runtime_conf();
 
 private:
     const std::string instance_name_;
@@ -196,8 +187,8 @@ public:
     }
 
 public:
-    ThreadPool io_service_threads_;
-    void io_service_run(ThreadObjPtr ptr);  // main task loop
+    roo::ThreadPool io_service_threads_;
+    void io_service_run(roo::ThreadObjPtr ptr);  // main task loop
     int io_service_stop_graceful();
     int io_service_join();
 

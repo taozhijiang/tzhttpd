@@ -12,6 +12,8 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include <string/StrUtil.h>
+
 #include "HttpParser.h"
 #include "HttpServer.h"
 #include "HttpProto.h"
@@ -31,7 +33,7 @@ extern int default_http_get_handler(const HttpParser& http_parser,
 boost::atomic<int32_t> TcpConnAsync::current_concurrency_(0);
 
 TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket,
-                           HttpServer& server):
+                           HttpServer& server) :
     ConnIf(p_socket),
     was_cancelled_(false),
     ops_cancel_mutex_(),
@@ -43,12 +45,12 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socke
     set_tcp_nodelay(true);
     set_tcp_nonblocking(true);
 
-    ++ current_concurrency_;
+    ++current_concurrency_;
 }
 
 TcpConnAsync::~TcpConnAsync() {
 
-    -- current_concurrency_;
+    --current_concurrency_;
     roo::log_info("TcpConnAsync SOCKET RELEASED!!!");
 }
 
@@ -80,12 +82,12 @@ void TcpConnAsync::do_read_head() {
 
     set_session_cancel_timeout();
     async_read_until(*socket_, request_,
-                        http_proto::header_crlfcrlf_str,
-                             strand_->wrap(
-                                 std::bind(&TcpConnAsync::read_head_handler,
-                                     shared_from_this(),
-                                     std::placeholders::_1,
-                                     std::placeholders::_2)));
+                     http_proto::header_crlfcrlf_str,
+                     strand_->wrap(
+                         std::bind(&TcpConnAsync::read_head_handler,
+                                   shared_from_this(),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2)));
     return;
 }
 
@@ -100,8 +102,8 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
     SAFE_ASSERT(bytes_transferred > 0);
 
-    std::string head_str (boost::asio::buffers_begin(request_.data()),
-                          boost::asio::buffers_begin(request_.data()) + request_.size());
+    std::string head_str(boost::asio::buffers_begin(request_.data()),
+                         boost::asio::buffers_begin(request_.data()) + request_.size());
 
     request_.consume(bytes_transferred); // skip the already head
 
@@ -113,7 +115,7 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     }
 
     if (!http_parser->parse_request_header(head_str.c_str())) {
-        roo::log_err( "Parse request error: %s", head_str.c_str());
+        roo::log_err("Parse request error: %s", head_str.c_str());
         goto error_return;
     }
 
@@ -125,19 +127,18 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         goto error_return;
     }
 
-    if (http_parser->get_method() == HTTP_METHOD::GET)
-    {
+    if (http_parser->get_method() == HTTP_METHOD::GET) {
         // HTTP GET handler
         SAFE_ASSERT(http_parser->find_request_header(http_proto::header_options::content_length).empty());
 
         std::string real_path_info = http_parser->find_request_header(http_proto::header_options::request_path_info);
-        std::string vhost_name = StrUtil::drop_host_port(
-                http_parser->find_request_header(http_proto::header_options::host));
+        std::string vhost_name = roo::StrUtil::drop_host_port(
+            http_parser->find_request_header(http_proto::header_options::host));
 
         std::shared_ptr<HttpReqInstance> http_req_instance
-                    = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
-                                                        vhost_name, real_path_info,
-                                                        http_parser, "");
+            = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
+                                                vhost_name, real_path_info,
+                                                http_parser, "");
         Dispatcher::instance().handle_http_request(http_req_instance);
 
         // 再次开始读取请求，可以shared_from_this()保持住连接
@@ -147,22 +148,20 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         //
         start();
         return;
-    }
-    else if (http_parser->get_method() == HTTP_METHOD::POST )
-    {
+    } else if (http_parser->get_method() == HTTP_METHOD::POST) {
 
         size_t len = ::atoi(http_parser->find_request_header(http_proto::header_options::content_length).c_str());
         recv_bound_.length_hint_ = len;  // 登记需要读取的长度
         size_t additional_size = request_.size(); // net additional body size
 
-        SAFE_ASSERT( additional_size <= len );
+        SAFE_ASSERT(additional_size <= len);
 
         // first async_read_until may read more additional data, if so
         // then move additional data possible
-        if( additional_size ) {
+        if (additional_size) {
 
-            std::string additional (boost::asio::buffers_begin(request_.data()),
-                                    boost::asio::buffers_begin(request_.data()) + additional_size);
+            std::string additional(boost::asio::buffers_begin(request_.data()),
+                                   boost::asio::buffers_begin(request_.data()) + additional_size);
             recv_bound_.buffer_.append_internal(additional);
             request_.consume(additional_size);
         }
@@ -178,28 +177,25 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
             }
 
             do_read_body(http_parser);
-        }
-        else {
+        } else {
             // call the process callback directly
             read_body_handler(http_parser, ec, 0);   // already updated r_size_
         }
 
         return;
 
-    }
-    else
-    {
+    } else {
         roo::log_err("Invalid or unsupport request method: %s",
-                http_parser->find_request_header(http_proto::header_options::request_method).c_str());
+                     http_parser->find_request_header(http_proto::header_options::request_method).c_str());
         fill_std_http_for_send(http_parser, http_proto::StatusCode::client_error_bad_request);
         goto write_return;
     }
 
-error_return:
+ error_return:
     fill_std_http_for_send(http_parser, http_proto::StatusCode::server_error_internal_server_error);
     request_.consume(request_.size());
 
-write_return:
+ write_return:
 
     // If HTTP 1.0 or HTTP 1.1 without Keep-Alived, close the connection directly
     // Else, trigger the next generation read again!
@@ -239,17 +235,17 @@ void TcpConnAsync::do_read_body(std::shared_ptr<HttpParser> http_parser) {
                               static_cast<size_t>(kFixedIoBufferSize));
 
     roo::log_info("strand read async_read exactly(%lu)... in thread %#lx",
-                      to_read, (long)pthread_self());
+                  to_read, (long)pthread_self());
 
     set_ops_cancel_timeout();
     async_read(*socket_, boost::asio::buffer(recv_bound_.io_block_, to_read),
-                    boost::asio::transfer_at_least(to_read),
-                             strand_->wrap(
-                                 std::bind(&TcpConnAsync::read_body_handler,
-                                     shared_from_this(),
-                                     http_parser,
-                                     std::placeholders::_1,
-                                     std::placeholders::_2)));
+               boost::asio::transfer_at_least(to_read),
+               strand_->wrap(
+                   std::bind(&TcpConnAsync::read_body_handler,
+                             shared_from_this(),
+                             http_parser,
+                             std::placeholders::_1,
+                             std::placeholders::_2)));
     return;
 }
 
@@ -278,16 +274,16 @@ void TcpConnAsync::read_body_handler(std::shared_ptr<HttpParser> http_parser,
     }
 
     std::string real_path_info = http_parser->find_request_header(http_proto::header_options::request_path_info);
-    std::string vhost_name = StrUtil::drop_host_port(
-                                      http_parser->find_request_header(http_proto::header_options::host));
+    std::string vhost_name = roo::StrUtil::drop_host_port(
+        http_parser->find_request_header(http_proto::header_options::host));
 
     std::string post_body;
     recv_bound_.buffer_.consume(post_body, recv_bound_.length_hint_);
 
     std::shared_ptr<HttpReqInstance> http_req_instance
-                = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
-                                                    vhost_name, real_path_info,
-                                                    http_parser, post_body);
+        = std::make_shared<HttpReqInstance>(http_parser->get_method(), shared_from_this(),
+                                            vhost_name, real_path_info,
+                                            http_parser, post_body);
 
 
     Dispatcher::instance().handle_http_request(http_req_instance);
@@ -312,7 +308,7 @@ bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
         return false;
     }
 
-    if(send_bound_.buffer_.get_length() == 0) {
+    if (send_bound_.buffer_.get_length() == 0) {
 
         // 看是否关闭主动关闭连接
         // 因为在读取请求的时候默认就当作长连接发起再次读了，所以如果这里检测到是
@@ -333,19 +329,19 @@ bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
                                static_cast<size_t>(kFixedIoBufferSize));
 
     roo::log_info("strand write async_write exactly (%lu)... in thread thread %#lx",
-                      to_write, (long)pthread_self());
+                  to_write, (long)pthread_self());
 
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
 
     set_ops_cancel_timeout();
     async_write(*socket_, boost::asio::buffer(send_bound_.io_block_, to_write),
-                    boost::asio::transfer_exactly(to_write),
-                              strand_->wrap(
-                                 std::bind(&TcpConnAsync::self_write_handler,
-                                     shared_from_this(),
-                                     http_parser,
-                                     std::placeholders::_1,
-                                     std::placeholders::_2)));
+                boost::asio::transfer_exactly(to_write),
+                strand_->wrap(
+                    std::bind(&TcpConnAsync::self_write_handler,
+                              shared_from_this(),
+                              http_parser,
+                              std::placeholders::_1,
+                              std::placeholders::_2)));
     return true;
 }
 
@@ -429,7 +425,7 @@ void TcpConnAsync::fill_std_http_for_send(std::shared_ptr<HttpParser> http_parse
 
 
 // http://www.boost.org/doc/libs/1_44_0/doc/html/boost_asio/reference/error__basic_errors.html
-bool TcpConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
+bool TcpConnAsync::handle_socket_ec(const boost::system::error_code& ec) {
 
     boost::system::error_code ignore_ec;
     bool close_socket = false;
@@ -437,7 +433,7 @@ bool TcpConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
     if (ec == boost::asio::error::eof ||
         ec == boost::asio::error::connection_reset ||
         ec == boost::asio::error::timed_out ||
-        ec == boost::asio::error::bad_descriptor ) {
+        ec == boost::asio::error::bad_descriptor) {
         roo::log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
         close_socket = true;
     } else if (ec == boost::asio::error::operation_aborted) {
@@ -468,14 +464,14 @@ bool TcpConnAsync::keep_continue(const std::shared_ptr<HttpParser>& http_parser)
     if (!connection.empty()) {
         if (boost::iequals(connection, "Close")) {
             return false;
-        } else if (boost::iequals(connection, "Keep-Alive")){
+        } else if (boost::iequals(connection, "Keep-Alive")) {
             return true;
         } else {
             roo::log_err("unknown connection value: %s", connection.c_str());
         }
     }
 
-    if (http_parser->get_version() > "1.0" ) {
+    if (http_parser->get_version() > "1.0") {
         return true;
     }
 
@@ -486,7 +482,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
 
     std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
 
-    if (http_server_.session_cancel_time_out() == 0){
+    if (http_server_.session_cancel_time_out() == 0) {
         SAFE_ASSERT(!session_cancel_timer_);
         return;
     }
@@ -496,7 +492,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
     if (session_cancel_timer_) {
         session_cancel_timer_->cancel(ignore_ec);
     } else {
-        session_cancel_timer_.reset(new steady_timer (http_server_.io_service_));
+        session_cancel_timer_.reset(new steady_timer(http_server_.io_service_));
     }
 
     SAFE_ASSERT(http_server_.session_cancel_time_out());
@@ -520,7 +516,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
 
     std::lock_guard<std::mutex> lock(ops_cancel_mutex_);
 
-    if (http_server_.ops_cancel_time_out() == 0){
+    if (http_server_.ops_cancel_time_out() == 0) {
         SAFE_ASSERT(!ops_cancel_timer_);
         return;
     }
@@ -530,7 +526,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
     if (ops_cancel_timer_) {
         ops_cancel_timer_->cancel(ignore_ec);
     } else {
-        ops_cancel_timer_.reset(new steady_timer (http_server_.io_service_));
+        ops_cancel_timer_.reset(new steady_timer(http_server_.io_service_));
     }
 
     SAFE_ASSERT(http_server_.ops_cancel_time_out());
@@ -552,11 +548,11 @@ void TcpConnAsync::revoke_ops_cancel_timeout() {
 
 void TcpConnAsync::ops_cancel_timeout_call(const boost::system::error_code& ec) {
 
-    if (ec == 0){
+    if (ec == 0) {
         roo::log_warning("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
         ops_cancel();
         sock_shutdown_and_close(ShutdownType::kBoth);
-    } else if ( ec == boost::asio::error::operation_aborted) {
+    } else if (ec == boost::asio::error::operation_aborted) {
         // normal cancel
     } else {
         roo::log_err("unknown and won't handle error_code: {%d} %s", ec.value(), ec.message().c_str());

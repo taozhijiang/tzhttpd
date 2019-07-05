@@ -6,7 +6,8 @@
  */
 
 #include <other/Log.h>
-#include "ConfHelper.h"
+
+#include "Global.h"
 
 #include "Executor.h"
 #include "HttpExecutor.h"
@@ -33,7 +34,7 @@ bool Dispatcher::init() {
 
     // HttpExecutor层次的初始化，包括了虚拟主机配置文件的解析
     // 同时Executor需要的配置信息通过ExecuteConf传递过来
-    if (!default_http_impl|| !default_http_impl->init()) {
+    if (!default_http_impl || !default_http_impl->init()) {
         roo::log_err("create and initialize HttpExecutor for host [default] failed.");
         return false;
     }
@@ -41,7 +42,7 @@ bool Dispatcher::init() {
     // http executor
     default_service_.reset(new Executor(default_http_impl));
     // 进行业务层无关的初始化，比如创建工作线程组，维护请求队列等
-    if (!default_service_|| !default_service_->init()) {
+    if (!default_service_ || !default_service_->init()) {
         roo::log_err("create and initialize host [default] executor failed.");
         return false;
     }
@@ -59,10 +60,10 @@ bool Dispatcher::init() {
     }
 
     // 注册配置动态配置更新接口，由此处分发到各个虚拟主机，不再每个虚拟主机自己注册
-    ConfHelper::instance().register_runtime_callback(
-            "tzhttpd-Dispatcher",
-            std::bind(&Dispatcher::module_runtime, this,
-                      std::placeholders::_1));
+    Global::instance().setting_ptr_->attach_runtime_callback(
+        "tzhttpd-Dispatcher",
+        std::bind(&Dispatcher::module_runtime, this,
+                  std::placeholders::_1));
 
 
     return true;
@@ -78,7 +79,7 @@ void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_i
 
     if (!service) {
         roo::log_info("find http service_impl (virtualhost) for %s failed, using default.",
-                          http_req_instance->hostname_.c_str());
+                      http_req_instance->hostname_.c_str());
         service = default_service_;
     }
 
@@ -198,7 +199,7 @@ int Dispatcher::module_runtime(const libconfig::Config& conf) {
         auto executor = iter->second;
         ret = executor->module_runtime(conf);
         roo::log_warning("module_runtime for host %s return: %d",
-                           executor->instance_name().c_str(), ret);
+                         executor->instance_name().c_str(), ret);
         ret_sum += ret;
     }
 

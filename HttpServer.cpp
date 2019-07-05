@@ -15,18 +15,18 @@
 
 #include <boost/format.hpp>
 
+#include <crypto/SslSetup.h>
+
+
 #include "TcpConnAsync.h"
 
 #include "HttpProto.h"
 #include "HttpParser.h"
 #include "HttpHandler.h"
 #include "HttpServer.h"
-#include "Timer.h"
 #include "Dispatcher.h"
-#include "Status.h"
 
-#include "SslSetup.h"
-
+#include "Global.h"
 
 using namespace boost::asio;
 
@@ -39,7 +39,7 @@ extern std::string              http_server_version;
 
 static const size_t bucket_size_ = 0xFF;
 static size_t bucket_hash_index_call(const std::shared_ptr<ConnType>& ptr) {
-    return std::hash<ConnType *>()(ptr.get());
+    return std::hash<ConnType*>()(ptr.get());
 }
 
 
@@ -57,9 +57,9 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
 
     conf.lookupValue("http.bind_addr", bind_addr_);
     conf.lookupValue("http.bind_port", bind_port_);
-    if (bind_addr_.empty() || bind_port_ <=0 ){
+    if (bind_addr_.empty() || bind_port_ <= 0) {
         roo::log_err("invalid http.bind_addr %s & http.bind_port %d",
-                        bind_addr_.c_str(), bind_port_);
+                     bind_addr_.c_str(), bind_port_);
         return false;
     }
 
@@ -69,7 +69,7 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
         std::vector<std::string> ip_vec;
         std::set<std::string> ip_set;
         boost::split(ip_vec, ip_list, boost::is_any_of(";"));
-        for (std::vector<std::string>::iterator it = ip_vec.begin(); it != ip_vec.cend(); ++it){
+        for (std::vector<std::string>::iterator it = ip_vec.begin(); it != ip_vec.cend(); ++it) {
             std::string tmp = boost::trim_copy(*it);
             if (tmp.empty())
                 continue;
@@ -81,18 +81,18 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
     }
     if (!safe_ip_.empty()) {
         roo::log_warning("safe_ip not empty, totally contain %d items",
-                          static_cast<int>(safe_ip_.size()));
+                         static_cast<int>(safe_ip_.size()));
     }
 
     conf.lookupValue("http.backlog_size", backlog_size_);
     if (backlog_size_ < 0) {
-        roo::log_err( "invalid http.backlog_size %d.", backlog_size_);
+        roo::log_err("invalid http.backlog_size %d.", backlog_size_);
         return false;
     }
 
     conf.lookupValue("http.io_thread_pool_size", io_thread_number_);
     if (io_thread_number_ < 0) {
-        roo::log_err( "invalid http.io_thread_number %d", io_thread_number_);
+        roo::log_err("invalid http.io_thread_number %d", io_thread_number_);
         return false;
     }
 
@@ -104,26 +104,26 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
     }
 
     conf.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_);
-    if (ops_cancel_time_out_ < 0){
+    if (ops_cancel_time_out_ < 0) {
         roo::log_err("invalid http ops_cancel_time_out: %d", ops_cancel_time_out_);
         return false;
     }
 
     conf.lookupValue("http.session_cancel_time_out", session_cancel_time_out_);
-    if (session_cancel_time_out_ < 0){
+    if (session_cancel_time_out_ < 0) {
         roo::log_err("invalid http session_cancel_time_out: %d", session_cancel_time_out_);
         return false;
     }
 
     conf.lookupValue("http.service_enable", service_enabled_);
     conf.lookupValue("http.service_speed", service_speed_);
-    if (service_speed_ < 0){
+    if (service_speed_ < 0) {
         roo::log_err("invalid http.service_speed: %d.", service_speed_);
         return false;
     }
 
     conf.lookupValue("http.service_concurrency", service_concurrency_);
-    if (service_concurrency_ < 0){
+    if (service_concurrency_ < 0) {
         roo::log_err("invalid http.service_concurrency: %d.", service_concurrency_);
         return false;
     }
@@ -146,7 +146,7 @@ void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
     // 再次启动定时器
     timed_feed_token_->expires_from_now(seconds(1)); // 1sec
     timed_feed_token_->async_wait(
-                std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
+        std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
 }
 
 
@@ -162,61 +162,48 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
 }
 
 
-int system_status_handler(const HttpParser& http_parser,
-                          std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
-
-    std::string result;
-    Status::instance().collect_status(result);
-
-    response = result;
-    status_line = http_proto::generate_response_status_line(http_parser.get_version(), http_proto::StatusCode::success_ok);
-
-    return 0;
-}
-
-bool system_manage_page_init(HttpServer& server);
+extern bool system_manage_page_init(HttpServer& server);
 
 bool HttpServer::init() {
 
-    (void)Status::instance();
     (void)Dispatcher::instance();
 
     // incase not forget
     ::signal(SIGPIPE, SIG_IGN);
 
-    if (!Ssl_thread_setup()) {
+    if (!roo::Ssl_thread_setup()) {
         roo::log_err("Ssl_thread_setup failed!");
         return false;
     }
 
-    if(!Timer::instance().init()) {
-        roo::log_err("Timer service init failed.");
+    if (!Global::instance().init(cfgfile_)) {
+        roo::log_err("Init Global instance failed.");
         return false;
     }
 
-    auto conf_ptr = ConfHelper::instance().get_conf();
-    if(!conf_ptr) {
-        roo::log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
+    auto setting_ptr = Global::instance().setting_ptr_->get_setting();
+    if (!setting_ptr) {
+        roo::log_err("roo::Setting return null pointer, maybe your conf file ill???");
         return false;
     }
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
-    if (!conf_.load_conf(conf_ptr)) {
+    if (!conf_.load_conf(setting_ptr)) {
         roo::log_err("Load http conf failed!");
         return false;
     }
 
     ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.bind_port_);
     roo::log_warning("create listen endpoint for %s:%d",
-                      conf_.bind_addr_.c_str(), conf_.bind_port_);
+                     conf_.bind_addr_.c_str(), conf_.bind_port_);
 
     roo::log_info("socket/session conn cancel time_out: %d secs, enabled: %s",
-                      conf_.ops_cancel_time_out_,
-                      conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
+                  conf_.ops_cancel_time_out_,
+                  conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
     if (conf_.service_speed_) {
-        conf_.timed_feed_token_.reset(new steady_timer (io_service_)); // 1sec
+        conf_.timed_feed_token_.reset(new steady_timer(io_service_)); // 1sec
         if (!conf_.timed_feed_token_) {
             roo::log_err("Create timed_feed_token_ failed!");
             return false;
@@ -224,14 +211,14 @@ bool HttpServer::init() {
 
         conf_.timed_feed_token_->expires_from_now(seconds(1));
         conf_.timed_feed_token_->async_wait(
-                    std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
+            std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
     roo::log_info("http service enabled: %s, speed: %d tps", conf_.service_enabled_ ? "true" : "false",
-                      conf_.service_speed_);
+                  conf_.service_speed_);
 
     if (!io_service_threads_.init_threads(
-        std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
-        conf_.io_thread_number_)) {
+            std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
+            conf_.io_thread_number_)) {
         roo::log_err("HttpServer::io_service_run init task failed!");
         return false;
     }
@@ -242,16 +229,16 @@ bool HttpServer::init() {
     }
 
     // 注册配置动态更新的回调函数
-    ConfHelper::instance().register_runtime_callback(
-            "tzhttpd-HttpServer",
-            std::bind(&HttpServer::module_runtime, shared_from_this(),
-                      std::placeholders::_1));
+    Global::instance().setting_ptr_->attach_runtime_callback(
+        "tzhttpd-HttpServer",
+        std::bind(&HttpServer::module_runtime, shared_from_this(),
+                  std::placeholders::_1));
 
     // 系统状态展示相关的初始化
-    Status::instance().register_status_callback(
-            "http_server",
-            std::bind(&HttpServer::module_status, shared_from_this(),
-                      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+    Global::instance().status_ptr_->attach_status_callback(
+        "http_server",
+        std::bind(&HttpServer::module_status, shared_from_this(),
+                  std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     if (!system_manage_page_init(*this)) {
         roo::log_err("init system manage page failed, treat as fatal.");
@@ -264,33 +251,33 @@ bool HttpServer::init() {
 
 
 // main task loop
-void HttpServer::io_service_run(ThreadObjPtr ptr) {
+void HttpServer::io_service_run(roo::ThreadObjPtr ptr) {
 
     roo::log_warning("HttpServer io_service thread %#lx is about to work... ", (long)pthread_self());
 
     while (true) {
 
-        if (unlikely(ptr->status_ == ThreadStatus::kTerminating)) {
+        if (unlikely(ptr->status_ == roo::ThreadStatus::kTerminating)) {
             roo::log_err("thread %#lx is about to terminating...", (long)pthread_self());
             break;
         }
 
         // 线程启动
-        if (unlikely(ptr->status_ == ThreadStatus::kSuspend)) {
-            ::usleep(1*1000*1000);
+        if (unlikely(ptr->status_ == roo::ThreadStatus::kSuspend)) {
+            ::usleep(1 * 1000 * 1000);
             continue;
         }
 
         boost::system::error_code ec;
         io_service_.run(ec);
 
-        if (ec){
+        if (ec) {
             roo::log_err("io_service stopped...");
             break;
         }
     }
 
-    ptr->status_ = ThreadStatus::kDead;
+    ptr->status_ = roo::ThreadStatus::kDead;
     roo::log_warning("HttpServer io_service thread %#lx is about to terminate ... ", (long)pthread_self());
 
     return;
@@ -298,7 +285,7 @@ void HttpServer::io_service_run(ThreadObjPtr ptr) {
 
 void HttpServer::service() {
 
-    acceptor_.reset( new ip::tcp::acceptor(io_service_) );
+    acceptor_.reset(new ip::tcp::acceptor(io_service_));
     acceptor_->open(ep_.protocol());
 
     acceptor_->set_option(ip::tcp::acceptor::reuse_address(true));
@@ -360,7 +347,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 
         if (!conf_.get_http_service_token()) {
             roo::log_err("request http service token failed, enabled: %s, speed: %d",
-                            conf_.service_enabled_ ? "true" : "false", conf_.service_speed_);
+                         conf_.service_enabled_ ? "true" : "false", conf_.service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -370,7 +357,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         if (conf_.service_concurrency_ != 0 &&
             conf_.service_concurrency_ < TcpConnAsync::current_concurrency_) {
             roo::log_err("service_concurrency_ error, limit: %d, current: %d",
-                            conf_.service_concurrency_, TcpConnAsync::current_concurrency_.load());
+                         conf_.service_concurrency_, TcpConnAsync::current_concurrency_.load());
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
             break;
@@ -405,6 +392,19 @@ int HttpServer::io_service_join() {
 }
 
 
+int HttpServer::register_http_status_callback(const std::string& name, roo::StatusCallable func) {
+    return Global::instance().status_ptr_->attach_status_callback(name, func);
+}
+
+int HttpServer::register_http_runtime_callback(const std::string& name, roo::SettingUpdateCallable func) {
+    return Global::instance().setting_ptr_->attach_runtime_callback(name, func);
+}
+
+int HttpServer::update_http_runtime_conf() {
+    return Global::instance().setting_ptr_->update_runtime_setting();
+}
+
+
 int HttpServer::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
 
     strModule = "tzhttpd";
@@ -416,7 +416,7 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
     ss << "\t" << "service_addr: " << conf_.bind_addr_ << "@" << conf_.bind_port_ << std::endl;
     ss << "\t" << "backlog_size: " << conf_.backlog_size_ << std::endl;
     ss << "\t" << "io_thread_pool_size: " << conf_.io_thread_number_ << std::endl;
-    ss << "\t" << "safe_ips: " ;
+    ss << "\t" << "safe_ips: ";
 
     {
         // protect cfg race conditon
@@ -442,7 +442,7 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
 
 int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
-    HttpConf conf {};
+    HttpConf conf{};
     if (!conf.load_conf(cfg)) {
         roo::log_err("load conf for HttpConf failed.");
         return -1;
@@ -450,13 +450,13 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
     if (conf_.session_cancel_time_out_ != conf.session_cancel_time_out_) {
         roo::log_warning("update session_cancel_time_out from %d to %d",
-                           conf_.session_cancel_time_out_, conf.session_cancel_time_out_);
+                         conf_.session_cancel_time_out_, conf.session_cancel_time_out_);
         conf_.session_cancel_time_out_ = conf.session_cancel_time_out_;
     }
 
     if (conf_.ops_cancel_time_out_ != conf.ops_cancel_time_out_) {
         roo::log_warning("update ops_cancel_time_out from %d to %d",
-                           conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
+                         conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
     }
 
@@ -471,7 +471,7 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
     if (conf_.service_speed_ != conf.service_speed_) {
         roo::log_warning("update http_service_speed from %d to %d",
-                           conf_.service_speed_ , conf.service_speed_);
+                         conf_.service_speed_, conf.service_speed_);
         conf_.service_speed_ = conf.service_speed_;
 
         // 检查定时器是否存在
@@ -486,10 +486,8 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
             conf_.timed_feed_token_->expires_from_now(seconds(1));
             conf_.timed_feed_token_->async_wait(
-                        std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
-        }
-        else // speed == 0
-        {
+                std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
+        } else { // speed == 0
             if (conf_.timed_feed_token_) {
                 boost::system::error_code ignore_ec;
                 conf_.timed_feed_token_->cancel(ignore_ec);
@@ -498,14 +496,14 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
         }
     }
 
-    if (conf_.service_concurrency_ != conf.service_concurrency_ ) {
+    if (conf_.service_concurrency_ != conf.service_concurrency_) {
         roo::log_err("update service_concurrency from %d to %d.",
-                        conf_.service_concurrency_, conf.service_concurrency_);
+                     conf_.service_concurrency_, conf.service_concurrency_);
         conf_.service_concurrency_ = conf.service_concurrency_;
     }
 
     roo::log_warning("http service enabled: %s, speed: %d", conf_.service_enabled_ ? "true" : "false",
-                       conf_.service_speed_);
+                     conf_.service_speed_);
 
     return 0;
 }

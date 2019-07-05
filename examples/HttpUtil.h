@@ -15,11 +15,12 @@ namespace HttpUtil {
 
 #define LOG_ERR_ printf
 
+#if 0
 static int GenerateUrl(const std::string& strUrl, const std::map<std::string, std::string>& fields,
                        std::string& strCallUrl) {
 
     if (strUrl.empty())
-        return -1;
+    return -1;
 
     if (fields.empty()) {
         strCallUrl = strUrl;
@@ -29,7 +30,9 @@ static int GenerateUrl(const std::string& strUrl, const std::map<std::string, st
     std::ostringstream oss;
     std::ostringstream ossUrl;
 
-    for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
+    for (auto iter = fields.begin();
+         iter != fields.end();
+         ++iter) {
 
         oss << iter->first << "=";
         oss << iter->second << "&";
@@ -62,7 +65,9 @@ static bool CheckSha1(const std::map<std::string, std::string>& fields, const st
 
     std::ostringstream oss;
 
-    for (auto iter = fields.begin(); iter != fields.end(); ++iter) {
+    for (auto iter = fields.begin();
+         iter != fields.end();
+         ++iter) {
         oss << iter->first << "=";
         oss << tzhttpd::CryptoUtil::url_decode(iter->second) << "&";
     }
@@ -79,6 +84,7 @@ static bool CheckSha1(const std::map<std::string, std::string>& fields, const st
     return sha1value == sign;
 }
 
+#endif
 
 class HttpClient {
 public:
@@ -93,9 +99,9 @@ public:
     HttpClient(const HttpClient&) = delete;
     HttpClient& operator=(const HttpClient&) = delete;
 
-    int GetByHttp(const std::string& strUrl){
+    int GetByHttp(const std::string& strUrl) {
 
-        if (CurlPrelude())return -1;
+        if (CurlPrelude()) return -1;
 
         CURL* curl = curl_ptr_->handle();
         curl_easy_setopt(curl, CURLOPT_ENCODING, "UTF-8");

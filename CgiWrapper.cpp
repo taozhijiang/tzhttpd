@@ -52,18 +52,18 @@ bool CgiGetWrapper::init() {
 int CgiGetWrapper::operator()(const HttpParser& http_parser,
                               std::string& response, std::string& status_line,
                               std::vector<std::string>& add_header) {
-    if(!func_) {
+    if (!func_) {
         roo::log_err("get func not initialized.");
         return -1;
     }
 
-    msg_t param {};
+    msg_t param{};
     std::string param_str = http_parser.get_request_uri_params_string();
     fill_msg(&param, param_str.c_str(), param_str.size());
 
     int ret = -1;
-    msg_t rsp {};
-    msg_t rsp_header {};
+    msg_t rsp{};
+    msg_t rsp_header{};
 
     try {
         ret = func_(&param, &rsp, &rsp_header);
@@ -76,19 +76,19 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
     if (ret == 0) {
         response = std::string(rsp.data, rsp.len);
         status_line = generate_response_status_line(http_parser.get_version(),
-                StatusCode::success_ok);
+                                                    StatusCode::success_ok);
     } else {
         roo::log_err("post func call return: %d", ret);
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
-                StatusCode::server_error_internal_server_error);
+                                                    StatusCode::server_error_internal_server_error);
     }
 
     std::string header(rsp_header.data, rsp_header.len);
     if (!header.empty()) {
         std::vector<std::string> vec{};
         boost::split(vec, header, boost::is_any_of("\n"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
+        for (auto iter = vec.begin(); iter != vec.cend(); ++iter) {
             std::string str = boost::trim_copy(*iter);
             if (!str.empty()) {
                 add_header.push_back(str);
@@ -97,12 +97,13 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
     }
 
     roo::log_info("param: %s,\n"
-                      "response: %s, status: %s, add_header: %s",
-                      param_str.c_str(),
-                      response.c_str(), status_line.c_str(), header.c_str());
+                  "response: %s, status: %s, add_header: %s",
+                  param_str.c_str(),
+                  response.c_str(), status_line.c_str(), header.c_str());
 
     free_msg(&param);
-    free_msg(&rsp); free_msg(&rsp_header);
+    free_msg(&rsp);
+    free_msg(&rsp_header);
     return ret;
 }
 
@@ -123,20 +124,20 @@ bool CgiPostWrapper::init() {
 
 int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string& post_data,
                                std::string& response, std::string& status_line,
-                               std::vector<std::string>& add_header ) {
-    if(!func_){
+                               std::vector<std::string>& add_header) {
+    if (!func_) {
         roo::log_err("get func not initialized.");
         return -1;
     }
 
-    msg_t param {}, post{};
+    msg_t param{}, post{};
     std::string param_str = http_parser.get_request_uri_params_string();
     fill_msg(&param, param_str.c_str(), param_str.size());
     fill_msg(&post, post_data.c_str(), post_data.size());
 
     int ret = -1;
-    msg_t rsp {};
-    msg_t rsp_header {};
+    msg_t rsp{};
+    msg_t rsp_header{};
 
     try {
         ret = func_(&param, &post, &rsp, &rsp_header);
@@ -149,19 +150,19 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
     if (ret == 0) {
         response = std::string(rsp.data, rsp.len);
         status_line = generate_response_status_line(http_parser.get_version(),
-                StatusCode::success_ok);
+                                                    StatusCode::success_ok);
     } else {
         roo::log_err("post func call return: %d", ret);
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
-                StatusCode::server_error_internal_server_error);
+                                                    StatusCode::server_error_internal_server_error);
     }
 
     std::string header(rsp_header.data, rsp_header.len);
     if (!header.empty()) {
         std::vector<std::string> vec{};
         boost::split(vec, header, boost::is_any_of("\n"));
-        for (auto iter = vec.begin(); iter != vec.cend(); ++iter){
+        for (auto iter = vec.begin(); iter != vec.cend(); ++iter) {
             std::string str = boost::trim_copy(*iter);
             if (!str.empty()) {
                 add_header.push_back(str);
@@ -170,12 +171,14 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
     }
 
     roo::log_info("param: %s, post: %s,\n"
-                      "response: %s, status: %s, add_header: %s",
-                      param_str.c_str(), post_data.c_str(),
-                      response.c_str(), status_line.c_str(), header.c_str());
+                  "response: %s, status: %s, add_header: %s",
+                  param_str.c_str(), post_data.c_str(),
+                  response.c_str(), status_line.c_str(), header.c_str());
 
-    free_msg(&param); free_msg(&post);
-    free_msg(&rsp); free_msg(&rsp_header);
+    free_msg(&param);
+    free_msg(&post);
+    free_msg(&rsp);
+    free_msg(&rsp_header);
     return ret;
     return 0;
 }

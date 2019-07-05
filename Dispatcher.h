@@ -45,9 +45,9 @@ public:
 
 private:
 
-    Dispatcher():
+    Dispatcher() :
         initialized_(false),
-        services_({}){
+        services_({ }) {
     }
 
     ~Dispatcher() {

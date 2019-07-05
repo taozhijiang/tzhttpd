@@ -19,7 +19,7 @@
 // (The headers were present in earlier versions, but were unusable.)
 #include <boost/regex.hpp>
 
-#include "KVVec.h"
+#include <container/PairVec.h>
 #include <other/Log.h>
 
 #include "CryptoUtil.h"
@@ -27,7 +27,7 @@
 
 namespace tzhttpd {
 
-typedef KVVec<std::string, std::string> UriParamContainer;
+typedef roo::PairVec<std::string, std::string> UriParamContainer;
 
 class HttpParser {
 public:
@@ -235,22 +235,21 @@ private:
         while (std::getline(resp, item) && item != "\r") {
 
             // 重新编写，支持url中带有特殊字符
-            if (boost::istarts_with(item, "GET ")     ||
-                boost::istarts_with(item, "HEAD ")    ||
-                boost::istarts_with(item, "POST ")    ||
-                boost::istarts_with(item, "PUT ")     ||
-                boost::istarts_with(item, "DELETE ")  ||
+            if (boost::istarts_with(item, "GET ") ||
+                boost::istarts_with(item, "HEAD ") ||
+                boost::istarts_with(item, "POST ") ||
+                boost::istarts_with(item, "PUT ") ||
+                boost::istarts_with(item, "DELETE ") ||
                 boost::istarts_with(item, "CONNECT ") ||
                 boost::istarts_with(item, "OPTIONS ") ||
-                boost::istarts_with(item, "TRACE ")   ||
-                boost::istarts_with(item, "MOVE ")    ||
-                boost::istarts_with(item, "COPY ")    ||
-                boost::istarts_with(item, "LINK ")    ||
-                boost::istarts_with(item, "UNLINK ")  ||
+                boost::istarts_with(item, "TRACE ") ||
+                boost::istarts_with(item, "MOVE ") ||
+                boost::istarts_with(item, "COPY ") ||
+                boost::istarts_with(item, "LINK ") ||
+                boost::istarts_with(item, "UNLINK ") ||
                 boost::istarts_with(item, "WRAPPED ") ||
                 boost::istarts_with(item, "Extension-method ")
-                )
-            {
+               ) {
                 // HTTP 标准头
                 boost::smatch what;
                 if (boost::regex_match(item, what,
@@ -275,9 +274,7 @@ private:
 
                     version_ = boost::algorithm::trim_copy(std::string(what[3]));
                 }
-            }
-            else
-            {
+            } else {
                 index = item.find(':', 0);
                 if (index != std::string::npos) { // 直接Key-Value
                     request_headers_.insert(std::make_pair(

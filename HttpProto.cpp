@@ -22,8 +22,8 @@ extern std::string              http_server_version;
 namespace http_proto {
 
 struct header {
-  std::string name;
-  std::string value;
+    std::string name;
+    std::string value;
 };
 
 
@@ -42,7 +42,7 @@ string http_response_generate(const string& content, const string& stat_str,
 
     std::time_t now = boost::chrono::system_clock::to_time_t(boost::chrono::system_clock::now());
 //    std::string time_str = std::string(std::ctime(&now, NULL));
-    char mbstr[32] {};
+    char mbstr[32]{};
     std::strftime(mbstr, sizeof(mbstr), "%F %T", std::localtime(&now));
     headers[1].value = std::string(mbstr);
 //    headers[1].value = time_str.erase(time_str.find('\n')); // ctime 会在末尾增加一个 \n
@@ -63,14 +63,14 @@ string http_response_generate(const string& content, const string& stat_str,
 
     string str = stat_str;
     str += header_crlf_str;
-    for (size_t i=0; i< headers.size(); ++i) {
+    for (size_t i = 0; i < headers.size(); ++i) {
         str += headers[i].name;
         str += header_name_value_separator_str;
         str += headers[i].value;
         str += header_crlf_str;
     }
 
-    for (auto iter = additional_header.begin(); iter != additional_header.end(); ++ iter) {
+    for (auto iter = additional_header.begin(); iter != additional_header.end(); ++iter) {
         str += *iter;
         str += header_crlf_str;
     }
@@ -91,7 +91,7 @@ string http_response_generate(const char* data, size_t len, const string& stat_s
 
 static std::string get_status_content(enum StatusCode code) {
     const auto iter = status_code_strings.find(code);
-    if(iter != status_code_strings.end()) {
+    if (iter != status_code_strings.end()) {
         return iter->second;
     }
 
@@ -103,14 +103,14 @@ string http_std_response_generate(const std::string& http_ver, const std::string
     std::stringstream content_ss;
 
     content_ss << "<html><head><title>"
-               << stat_str
-               << "</title></head>"
-               << "<body><h1>"
-               << stat_str
-               << "</h1></body></html>";
+        << stat_str
+        << "</title></head>"
+        << "<body><h1>"
+        << stat_str
+        << "</h1></body></html>";
 
     std::string content = content_ss.str();
-    std::vector<std::string> hd {"Content-Type: text/html"};
+    std::vector<std::string> hd{"Content-Type: text/html"};
 
     return http_response_generate(content, stat_str, keepalive, hd);
 }
