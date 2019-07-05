@@ -23,7 +23,7 @@ bool Executor::init() {
     if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
         conf_ = http_executor->get_executor_conf();
     } else {
-        tzhttpd_log_err("cast instance failed.");
+        roo::log_err("cast instance failed.");
         return false;
     }
 
@@ -35,33 +35,33 @@ bool Executor::init() {
         conf_.exec_thread_number_hard_ > 100 ||
         conf_.exec_thread_number_hard_ < conf_.exec_thread_number_ )
     {
-        tzhttpd_log_err("invalid exec_thread_pool_size setting: %d, %d",
+        roo::log_err("invalid exec_thread_pool_size setting: %d, %d",
                         conf_.exec_thread_number_, conf_.exec_thread_number_hard_);
         return false;
     }
 
     if (conf_.exec_thread_step_queue_size_ < 0) {
-        tzhttpd_log_err("invalid exec_thread_step_queue_size setting: %d",
+        roo::log_err("invalid exec_thread_step_queue_size setting: %d",
                         conf_.exec_thread_step_queue_size_);
         return false;
     }
 
     if (!executor_threads_.init_threads(
         std::bind(&Executor::executor_service_run, this, std::placeholders::_1), conf_.exec_thread_number_)) {
-        tzhttpd_log_err("executor_service_run init task for %s failed!", instance_name().c_str());
+        roo::log_err("executor_service_run init task for %s failed!", instance_name().c_str());
         return false;
     }
 
     if (conf_.exec_thread_number_hard_ > conf_.exec_thread_number_ &&
         conf_.exec_thread_step_queue_size_ > 0)
     {
-        tzhttpd_log_debug("we will support thread adjust for %s, with param hard %d, queue_step %d",
+        roo::log_info("we will support thread adjust for %s, with param hard %d, queue_step %d",
                           instance_name().c_str(),
                           conf_.exec_thread_number_hard_, conf_.exec_thread_step_queue_size_);
 
         if (!Timer::instance().add_timer(std::bind(&Executor::executor_threads_adjust, shared_from_this(), std::placeholders::_1),
                                         1*1000, true)) {
-            tzhttpd_log_err("create thread adjust timer failed.");
+            roo::log_err("create thread adjust timer failed.");
             return false;
         }
     }
@@ -78,14 +78,14 @@ bool Executor::init() {
 
 void Executor::executor_service_run(ThreadObjPtr ptr) {
 
-    tzhttpd_log_alert("executor_service thread %#lx about to loop ...", (long)pthread_self());
+    roo::log_warning("executor_service thread %#lx about to loop ...", (long)pthread_self());
 
     while (true) {
 
         std::shared_ptr<HttpReqInstance> http_req_instance {};
 
         if (unlikely(ptr->status_ == ThreadStatus::kTerminating)) {
-            tzhttpd_log_err("thread %#lx is about to terminating...", (long)pthread_self());
+            roo::log_err("thread %#lx is about to terminating...", (long)pthread_self());
             break;
         }
 
@@ -104,7 +104,7 @@ void Executor::executor_service_run(ThreadObjPtr ptr) {
     }
 
     ptr->status_ = ThreadStatus::kDead;
-    tzhttpd_log_info("io_service thread %#lx is about to terminate ... ", (long)pthread_self());
+    roo::log_warning("io_service thread %#lx is about to terminate ... ", (long)pthread_self());
 
     return;
 
@@ -137,7 +137,7 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
     }
 
     if (expect_thread != conf.exec_thread_number_) {
-        tzhttpd_log_notice("start thread number: %d, expect resize to %d",
+        roo::log_warning("start thread number: %d, expect resize to %d",
                            conf.exec_thread_number_, expect_thread);
     }
         
@@ -184,7 +184,7 @@ int Executor::module_runtime(const libconfig::Config& conf) {
     if (ret == 0) {
         if (auto http_executor = dynamic_cast<HttpExecutor *>(service_impl_.get())) {
 
-            tzhttpd_log_notice("update ExecutorConf for host %s", instance_name().c_str());
+            roo::log_warning("update ExecutorConf for host %s", instance_name().c_str());
 
             std::lock_guard<std::mutex> lock(conf_lock_);
             conf_ = http_executor->get_executor_conf();

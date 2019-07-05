@@ -10,7 +10,7 @@
 
 #include <boost/chrono.hpp>
 
-#include "Log.h"
+#include <other/Log.h>
 #include "ThreadPool.h"
 
 // impl details
@@ -44,7 +44,7 @@ public:
     bool init(ThreadRunnable func) {
 
         if (!func) {
-            tzhttpd_log_err("Invalid runnable object!");
+            roo::log_err("Invalid runnable object!");
             return false;
         }
         func_ = func; // record it
@@ -52,17 +52,17 @@ public:
         for (uint32_t i=0; i<pool_size_; ++i) {
             ThreadObjPtr workobj(new ThreadObj(ThreadStatus::kInit));
             if (!workobj) {
-                tzhttpd_log_err("create ThreadObj failed!");
+                roo::log_err("create ThreadObj failed!");
                 return false;
             }
             ThreadPtr worker(new boost::thread(std::bind(&ThreadPool::Impl::callable_wrapper, this, workobj)));
             if (!worker || !workobj) {
-                tzhttpd_log_err("create thread failed!");
+                roo::log_err("create thread failed!");
                 return false;
             }
 
             workers_[worker] = workobj;
-            tzhttpd_log_alert("created task: #%d success ...", i);
+            roo::log_warning("created task: #%d success ...", i);
         }
 
         return true;
@@ -70,7 +70,7 @@ public:
 
     bool init(ThreadRunnable func, uint32_t pool_size) {
 
-        tzhttpd_log_alert("update pool_size from %d to %d", pool_size_, pool_size);
+        roo::log_warning("update pool_size from %d to %d", pool_size_, pool_size);
         pool_size_ = pool_size;
         return init(func);
     }
@@ -156,7 +156,7 @@ public:
 
         it = workers_.find(worker);
         if (it == workers_.end()) {
-            tzhttpd_log_err("target worker not found!");
+            roo::log_err("target worker not found!");
             return false;
         }
 
@@ -170,13 +170,13 @@ public:
         }
 
         if (it->second->status_ != ThreadStatus::kDead) {
-            tzhttpd_log_err("gracefulStop failed!");
+            roo::log_err("gracefulStop failed!");
             it->second->status_ = old_status; // 恢复状态
 
             return false;
         }
 
-         tzhttpd_log_alert("Joined Task Success ...");
+         roo::log_warning("Joined Task Success ...");
 
         // release this thread object
         pool_size_ --;
@@ -196,17 +196,17 @@ public:
             it->first->join();
 
             if (it->second->status_ != ThreadStatus::kDead) {
-                tzhttpd_log_alert("may gracefulStop failed!");
+                roo::log_warning("may gracefulStop failed!");
             }
 
             // release this thread object
             pool_size_ --;
             workers_.erase(it->first);
 
-            tzhttpd_log_err("current size: %ld", workers_.size());
+            roo::log_err("current size: %ld", workers_.size());
         }
 
-        tzhttpd_log_alert("Good! thread pool clean up down!");
+        roo::log_warning("Good! thread pool clean up down!");
     }
 
 private:
@@ -215,24 +215,24 @@ private:
         for (uint32_t i = 0; i < num; ++i) {
             ThreadObjPtr workobj(new ThreadObj(ThreadStatus::kInit));
             if (!workobj) {
-                tzhttpd_log_err("create ThreadObj failed!");
+                roo::log_err("create ThreadObj failed!");
                 return -1;
             }
             ThreadPtr worker(new boost::thread(std::bind(&ThreadPool::Impl::callable_wrapper, this, workobj)));
             if (!worker || !workobj) {
-                tzhttpd_log_err("create thread failed!");
+                roo::log_err("create thread failed!");
                 return -1;
             }
 
             workers_[worker] = workobj;
             pool_size_ ++;
-            tzhttpd_log_alert("Created Additional Task: #%d ...", i);
+            roo::log_warning("Created Additional Task: #%d ...", i);
 
-            tzhttpd_log_alert("Start Additional Task: #%d ...", i);
+            roo::log_warning("Start Additional Task: #%d ...", i);
             workobj->status_ = ThreadStatus::kRunning;
         }
 
-        tzhttpd_log_alert("Current ThreadPool size: %d", pool_size_);
+        roo::log_warning("Current ThreadPool size: %d", pool_size_);
         return 0;
     }
 
@@ -257,7 +257,7 @@ private:
             }
         } while (0);
 
-        tzhttpd_log_alert("current ThreadPool size: %d", pool_size_);
+        roo::log_warning("current ThreadPool size: %d", pool_size_);
         return ((currsize - workers_.size()) >= num) ? 0 : -1;
     }
 
@@ -279,8 +279,8 @@ bool ThreadPool::init_threads(ThreadRunnable func) {
 
 bool ThreadPool::init_threads(ThreadRunnable func, uint32_t pool_size) {
     if (pool_size == 0 || pool_size > kMaxiumThreadPoolSize ){
-        tzhttpd_log_err("Invalid pool_sizeber %d, CRITICAL !!!", pool_size);
-        tzhttpd_log_err("Using default 1");
+        roo::log_err("Invalid pool_sizeber %d, CRITICAL !!!", pool_size);
+        roo::log_err("Using default 1");
         pool_size = 1;
     }
     return impl_ptr_->init(func, pool_size);
@@ -317,13 +317,13 @@ uint32_t ThreadPool::get_pool_size() {
 ThreadPool::ThreadPool(uint32_t pool_size) {
 
     if (pool_size == 0 || pool_size > kMaxiumThreadPoolSize ){
-        tzhttpd_log_err("invalid pool_sizeber %d, CRITICAL !!!", pool_size);
+        roo::log_err("invalid pool_sizeber %d, CRITICAL !!!", pool_size);
         ::abort();
     }
 
     impl_ptr_.reset(new Impl(pool_size));
     if (!impl_ptr_) {
-        tzhttpd_log_err("create thread pool impl failed, CRITICAL!!!!");
+        roo::log_err("create thread pool impl failed, CRITICAL!!!!");
         ::abort();
     }
 }

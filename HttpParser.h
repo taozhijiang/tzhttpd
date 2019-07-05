@@ -20,7 +20,7 @@
 #include <boost/regex.hpp>
 
 #include "KVVec.h"
-#include "Log.h"
+#include <other/Log.h>
 
 #include "CryptoUtil.h"
 #include "HttpProto.h"
@@ -54,7 +54,7 @@ public:
 
     bool parse_request_header(const char* header_ptr) {
         if (!header_ptr || !strlen(header_ptr) || !strstr(header_ptr, "\r\n\r\n")) {
-            tzhttpd_log_err("check raw header package failed ...");
+            roo::log_err("check raw header package failed ...");
             return false;
         }
 
@@ -86,7 +86,7 @@ public:
 
         std::string uri = find_request_header(http_proto::header_options::request_uri);
         if (uri.empty()) {
-            tzhttpd_log_err("Error found, head uri empty!");
+            roo::log_err("Error found, head uri empty!");
             return false;
         }
 
@@ -284,7 +284,7 @@ private:
                                                 boost::algorithm::trim_copy(item.substr(0, index)),
                                                 boost::algorithm::trim_copy(item.substr(index + 1))));
                 } else {
-                    tzhttpd_log_err("unabled to handle line: %s", item.c_str());
+                    roo::log_err("unabled to handle line: %s", item.c_str());
                 }
             }
         }

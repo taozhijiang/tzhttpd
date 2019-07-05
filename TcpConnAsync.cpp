@@ -16,7 +16,6 @@
 #include "HttpServer.h"
 #include "HttpProto.h"
 #include "TcpConnAsync.h"
-#include "CheckPoint.h"
 
 #include "Dispatcher.h"
 #include "HttpReqInstance.h"
@@ -26,7 +25,7 @@ namespace tzhttpd {
 
 namespace http_handler {
 extern int default_http_get_handler(const HttpParser& http_parser,
-                                    std::string& response, string& status, std::vector<std::string>& add_header);
+                                    std::string& response, std::string& status, std::vector<std::string>& add_header);
 } // end namespace http_handler
 
 boost::atomic<int32_t> TcpConnAsync::current_concurrency_(0);
@@ -50,7 +49,7 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socke
 TcpConnAsync::~TcpConnAsync() {
 
     -- current_concurrency_;
-    tzhttpd_log_debug("TcpConnAsync SOCKET RELEASED!!!");
+    roo::log_info("TcpConnAsync SOCKET RELEASED!!!");
 }
 
 void TcpConnAsync::start() {
@@ -69,7 +68,7 @@ void TcpConnAsync::stop() {
 void TcpConnAsync::do_read_head() {
 
     if (get_conn_stat() != ConnStat::kWorking) {
-        tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
+        roo::log_err("Socket Status Error: %d", get_conn_stat());
         return;
     }
 
@@ -77,7 +76,7 @@ void TcpConnAsync::do_read_head() {
         return;
     }
 
-    tzhttpd_log_debug("strand read read_until ... in thread %#lx", (long)pthread_self());
+    roo::log_info("strand read read_until ... in thread %#lx", (long)pthread_self());
 
     set_session_cancel_timeout();
     async_read_until(*socket_, request_,
@@ -109,12 +108,12 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
     auto http_parser = std::make_shared<HttpParser>();
     if (!http_parser) {
-        tzhttpd_log_err("Create HttpParser object failed.");
+        roo::log_err("Create HttpParser object failed.");
         goto error_return;
     }
 
     if (!http_parser->parse_request_header(head_str.c_str())) {
-        tzhttpd_log_err( "Parse request error: %s", head_str.c_str());
+        roo::log_err( "Parse request error: %s", head_str.c_str());
         goto error_return;
     }
 
@@ -122,7 +121,7 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     // And store the items in params
     if (!http_parser->parse_request_uri()) {
         std::string uri = http_parser->find_request_header(http_proto::header_options::request_uri);
-        tzhttpd_log_err("Prase request uri failed: %s", uri.c_str());
+        roo::log_err("Prase request uri failed: %s", uri.c_str());
         goto error_return;
     }
 
@@ -190,7 +189,7 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     }
     else
     {
-        tzhttpd_log_err("Invalid or unsupport request method: %s",
+        roo::log_err("Invalid or unsupport request method: %s",
                 http_parser->find_request_header(http_proto::header_options::request_method).c_str());
         fill_std_http_for_send(http_parser, http_proto::StatusCode::client_error_bad_request);
         goto write_return;
@@ -224,7 +223,7 @@ write_return:
 void TcpConnAsync::do_read_body(std::shared_ptr<HttpParser> http_parser) {
 
     if (get_conn_stat() != ConnStat::kWorking) {
-        tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
+        roo::log_err("Socket Status Error: %d", get_conn_stat());
         return;
     }
 
@@ -239,7 +238,7 @@ void TcpConnAsync::do_read_body(std::shared_ptr<HttpParser> http_parser) {
     size_t to_read = std::min(static_cast<size_t>(recv_bound_.length_hint_ - recv_bound_.buffer_.get_length()),
                               static_cast<size_t>(kFixedIoBufferSize));
 
-    tzhttpd_log_debug("strand read async_read exactly(%lu)... in thread %#lx",
+    roo::log_info("strand read async_read exactly(%lu)... in thread %#lx",
                       to_read, (long)pthread_self());
 
     set_ops_cancel_timeout();
@@ -309,7 +308,7 @@ void TcpConnAsync::read_body_handler(std::shared_ptr<HttpParser> http_parser,
 bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
 
     if (get_conn_stat() != ConnStat::kWorking) {
-        tzhttpd_log_err("Socket Status Error: %d", get_conn_stat());
+        roo::log_err("Socket Status Error: %d", get_conn_stat());
         return false;
     }
 
@@ -333,7 +332,7 @@ bool TcpConnAsync::do_write(std::shared_ptr<HttpParser> http_parser) {
     size_t to_write = std::min(static_cast<size_t>(send_bound_.buffer_.get_length()),
                                static_cast<size_t>(kFixedIoBufferSize));
 
-    tzhttpd_log_debug("strand write async_write exactly (%lu)... in thread thread %#lx",
+    roo::log_info("strand write async_write exactly (%lu)... in thread thread %#lx",
                       to_write, (long)pthread_self());
 
     send_bound_.buffer_.consume(send_bound_.io_block_, to_write);
@@ -379,7 +378,7 @@ void TcpConnAsync::self_write_handler(std::shared_ptr<HttpParser> http_parser,
 
 
 void TcpConnAsync::fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                                      const string& str, const string& status_line, const std::vector<std::string>& additional_header) {
+                                      const std::string& str, const std::string& status_line, const std::vector<std::string>& additional_header) {
 
     bool keep_next = false;
     std::string str_uri = "UNDETECTED_URI";
@@ -391,10 +390,10 @@ void TcpConnAsync::fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
         str_method = HTTP_METHOD_STRING(http_parser->get_method());
     }
 
-    string content = http_proto::http_response_generate(str, status_line, keep_next, additional_header);
+    std::string content = http_proto::http_response_generate(str, status_line, keep_next, additional_header);
     send_bound_.buffer_.append_internal(content);
 
-    tzhttpd_log_info("\n =====> \"%s %s\" %s",
+    roo::log_warning("\n =====> \"%s %s\" %s",
                      str_method.c_str(), str_uri.c_str(), status_line.c_str());
 
     return;
@@ -418,11 +417,11 @@ void TcpConnAsync::fill_std_http_for_send(std::shared_ptr<HttpParser> http_parse
 
 
     std::string status_line = generate_response_status_line(http_ver, code);
-    string content = http_proto::http_std_response_generate(http_ver, status_line, keep_next);
+    std::string content = http_proto::http_std_response_generate(http_ver, status_line, keep_next);
 
     send_bound_.buffer_.append_internal(content);
 
-    tzhttpd_log_info("\n =====> \"%s %s\" %s",
+    roo::log_warning("\n =====> \"%s %s\" %s",
                      str_method.c_str(), str_uri.c_str(), status_line.c_str());
 
     return;
@@ -439,13 +438,13 @@ bool TcpConnAsync::handle_socket_ec(const boost::system::error_code& ec ) {
         ec == boost::asio::error::connection_reset ||
         ec == boost::asio::error::timed_out ||
         ec == boost::asio::error::bad_descriptor ) {
-        tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
+        roo::log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
         close_socket = true;
     } else if (ec == boost::asio::error::operation_aborted) {
         // like itimeout trigger
-        tzhttpd_log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
+        roo::log_err("error_code: {%d} %s", ec.value(), ec.message().c_str());
     } else {
-        tzhttpd_log_err("Undetected error %d, %s ...", ec.value(), ec.message().c_str());
+        roo::log_err("Undetected error %d, %s ...", ec.value(), ec.message().c_str());
         close_socket = true;
     }
 
@@ -472,7 +471,7 @@ bool TcpConnAsync::keep_continue(const std::shared_ptr<HttpParser>& http_parser)
         } else if (boost::iequals(connection, "Keep-Alive")){
             return true;
         } else {
-            tzhttpd_log_err("unknown connection value: %s", connection.c_str());
+            roo::log_err("unknown connection value: %s", connection.c_str());
         }
     }
 
@@ -504,7 +503,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
     session_cancel_timer_->expires_from_now(seconds(http_server_.session_cancel_time_out()));
     session_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
                                                 std::placeholders::_1));
-    tzhttpd_log_debug("register session_cancel_time_out %d sec", http_server_.session_cancel_time_out());
+    roo::log_info("register session_cancel_time_out %d sec", http_server_.session_cancel_time_out());
 }
 
 void TcpConnAsync::revoke_session_cancel_timeout() {
@@ -538,7 +537,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
     ops_cancel_timer_->expires_from_now(seconds(http_server_.ops_cancel_time_out()));
     ops_cancel_timer_->async_wait(std::bind(&TcpConnAsync::ops_cancel_timeout_call, shared_from_this(),
                                             std::placeholders::_1));
-    tzhttpd_log_debug("register ops_cancel_time_out %d sec", http_server_.ops_cancel_time_out());
+    roo::log_info("register ops_cancel_time_out %d sec", http_server_.ops_cancel_time_out());
 }
 
 void TcpConnAsync::revoke_ops_cancel_timeout() {
@@ -554,13 +553,13 @@ void TcpConnAsync::revoke_ops_cancel_timeout() {
 void TcpConnAsync::ops_cancel_timeout_call(const boost::system::error_code& ec) {
 
     if (ec == 0){
-        tzhttpd_log_info("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
+        roo::log_warning("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
         ops_cancel();
         sock_shutdown_and_close(ShutdownType::kBoth);
     } else if ( ec == boost::asio::error::operation_aborted) {
         // normal cancel
     } else {
-        tzhttpd_log_err("unknown and won't handle error_code: {%d} %s", ec.value(), ec.message().c_str());
+        roo::log_err("unknown and won't handle error_code: {%d} %s", ec.value(), ec.message().c_str());
     }
 }
 

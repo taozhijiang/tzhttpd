@@ -5,7 +5,7 @@
  *
  */
 
-#include "Log.h"
+#include <other/Log.h>
 #include "ConfHelper.h"
 
 #include "Executor.h"
@@ -34,7 +34,7 @@ bool Dispatcher::init() {
     // HttpExecutor层次的初始化，包括了虚拟主机配置文件的解析
     // 同时Executor需要的配置信息通过ExecuteConf传递过来
     if (!default_http_impl|| !default_http_impl->init()) {
-        tzhttpd_log_err("create and initialize HttpExecutor for host [default] failed.");
+        roo::log_err("create and initialize HttpExecutor for host [default] failed.");
         return false;
     }
 
@@ -42,12 +42,12 @@ bool Dispatcher::init() {
     default_service_.reset(new Executor(default_http_impl));
     // 进行业务层无关的初始化，比如创建工作线程组，维护请求队列等
     if (!default_service_|| !default_service_->init()) {
-        tzhttpd_log_err("create and initialize host [default] executor failed.");
+        roo::log_err("create and initialize host [default] executor failed.");
         return false;
     }
 
     default_service_->executor_start();
-    tzhttpd_log_debug("start host [default] Executor: %s success",  default_service_->instance_name().c_str());
+    roo::log_info("start host [default] Executor: %s success",  default_service_->instance_name().c_str());
 
 
     // HttpExecutor和Executor在register_virtual_host的时候已经进行初始化(并成功)了
@@ -55,7 +55,7 @@ bool Dispatcher::init() {
     for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
         auto executor = iter->second;
         executor->executor_start();
-        tzhttpd_log_debug("start Executor for host %s success",  executor->instance_name().c_str());
+        roo::log_info("start Executor for host %s success",  executor->instance_name().c_str());
     }
 
     // 注册配置动态配置更新接口，由此处分发到各个虚拟主机，不再每个虚拟主机自己注册
@@ -77,7 +77,7 @@ void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_i
     }
 
     if (!service) {
-        tzhttpd_log_debug("find http service_impl (virtualhost) for %s failed, using default.",
+        roo::log_info("find http service_impl (virtualhost) for %s failed, using default.",
                           http_req_instance->hostname_.c_str());
         service = default_service_;
     }
@@ -89,30 +89,30 @@ void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_i
 int Dispatcher::add_virtual_host(const std::string& hostname) {
 
     if (initialized_) {
-        tzhttpd_log_err("Dispatcher has already been initialized, but we does not support dynamic addService");
+        roo::log_err("Dispatcher has already been initialized, but we does not support dynamic addService");
         return -1;
     }
 
     if (services_.find(hostname) != services_.end()) {
-        tzhttpd_log_err("already found host %s added, please check.", hostname.c_str());
+        roo::log_err("already found host %s added, please check.", hostname.c_str());
         return -1;
     }
 
     // 此处加载HTTP的相关配置
     auto default_http_impl = std::make_shared<HttpExecutor>(hostname);
     if (!default_http_impl || !default_http_impl->init()) {
-        tzhttpd_log_err("create and initialize HttpExecutor for host %s failed.", hostname.c_str());
+        roo::log_err("create and initialize HttpExecutor for host %s failed.", hostname.c_str());
         return -1;
     }
 
     auto default_http = std::make_shared<Executor>(default_http_impl);
     if (!default_http || !default_http->init()) {
-        tzhttpd_log_err("create and initialize Executor for host %s failed.", hostname.c_str());
+        roo::log_err("create and initialize Executor for host %s failed.", hostname.c_str());
         return -1;
     }
 
     services_[hostname] = default_http;
-    tzhttpd_log_debug("successful add service %s ", default_http->instance_name().c_str());
+    roo::log_info("successful add service %s ", default_http->instance_name().c_str());
 
     return 0;
 }
@@ -130,7 +130,7 @@ int Dispatcher::add_http_get_handler(const std::string& hostname, const std::str
         if (it != services_.end()) {
             service = it->second;
         } else {
-            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            roo::log_err("hostname %s not found.",  hostname.c_str());
             return -1;
         }
     }
@@ -152,7 +152,7 @@ int Dispatcher::add_http_post_handler(const std::string& hostname, const std::st
         if (it != services_.end()) {
             service = it->second;
         } else {
-            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            roo::log_err("hostname %s not found.",  hostname.c_str());
             return -1;
         }
     }
@@ -172,7 +172,7 @@ int Dispatcher::drop_http_handler(const std::string& hostname, const std::string
         if (it != services_.end()) {
             service = it->second;
         } else {
-            tzhttpd_log_err("hostname %s not found.",  hostname.c_str());
+            roo::log_err("hostname %s not found.",  hostname.c_str());
             return -1;
         }
     }
@@ -188,16 +188,16 @@ int Dispatcher::module_runtime(const libconfig::Config& conf) {
     int ret_sum = 0;
     int ret = 0;
 
-    tzhttpd_log_notice("module_runtime begin to handle host [default].");
+    roo::log_warning("module_runtime begin to handle host [default].");
     ret = default_service_->module_runtime(conf);
-    tzhttpd_log_notice("module_runtime for host [default] return: %d", ret);
+    roo::log_warning("module_runtime for host [default] return: %d", ret);
     ret_sum += ret;
 
     for (auto iter = services_.begin(); iter != services_.end(); ++iter) {
 
         auto executor = iter->second;
         ret = executor->module_runtime(conf);
-        tzhttpd_log_notice("module_runtime for host %s return: %d",
+        roo::log_warning("module_runtime for host %s return: %d",
                            executor->instance_name().c_str(), ret);
         ret_sum += ret;
     }

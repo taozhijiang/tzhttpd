@@ -18,13 +18,13 @@ Status& Status::instance() {
 int Status::register_status_callback(const std::string& name, StatusCallable func) {
 
     if (name.empty() || !func){
-        tzhttpd_log_err("invalid name or func param.");
+        roo::log_err("invalid name or func param.");
         return -1;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
     calls_.push_back({name, func});
-    tzhttpd_log_debug("register status for %s success.",  name.c_str());
+    roo::log_info("register status for %s success.",  name.c_str());
 
     return 0;
 }
@@ -62,7 +62,7 @@ int Status::collect_status(std::string& output) {
             std::string real = strModule + ":" + strName;
             results.push_back({real,strValue});
         } else {
-            tzhttpd_log_err("call collect_status of %s failed with: %d",  iter->first.c_str(), ret);
+            roo::log_err("call collect_status of %s failed with: %d",  iter->first.c_str(), ret);
         }
     }
 

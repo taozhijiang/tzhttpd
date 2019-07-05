@@ -17,7 +17,7 @@
 
 #include <boost/optional.hpp>
 
-#include "Log.h"
+#include <other/Log.h>
 
 
 // 值拷贝
@@ -58,13 +58,13 @@ public:
 
         if (conf_update_time_ < ::time(NULL) - 10*60 ) { // 超过10min，重新读取配置文件
 
-            tzhttpd_log_debug("reloading config file, last update interval was %ld secs",
+            roo::log_info("reloading config file, last update interval was %ld secs",
                               ::time(NULL) - conf_update_time_);
 
             auto conf = load_conf_file();
             if (!conf) {
-                tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
-                tzhttpd_log_err("we try best to return old staged value.");
+                roo::log_err("load config file %s failed.", cfgfile_.c_str());
+                roo::log_err("we try best to return old staged value.");
             } else {
                 std::lock_guard<std::mutex> lock(lock_);
                 std::swap(conf, conf_ptr_);
@@ -87,17 +87,17 @@ private:
 
         std::shared_ptr<libconfig::Config> conf = std::make_shared<libconfig::Config>();
         if (!conf) {
-            tzhttpd_log_err("create libconfig::Config instance failed!");
+            roo::log_err("create libconfig::Config instance failed!");
             return conf; // nullptr
         }
 
         try {
             conf->readFile(cfgfile_.c_str());
         } catch(libconfig::FileIOException &fioex) {
-            tzhttpd_log_err("I/O error while reading file: %s.", cfgfile_.c_str());
+            roo::log_err("I/O error while reading file: %s.", cfgfile_.c_str());
             conf.reset();
         } catch(libconfig::ParseException &pex) {
-            tzhttpd_log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
+            roo::log_err("Parse error at %d - %s", pex.getLine(), pex.getError());
             conf.reset();
         }
 

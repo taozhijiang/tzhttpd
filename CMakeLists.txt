@@ -11,7 +11,15 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D__FILENAME__=\"$(notdir $<)\" " )
 # set(CMAKE_CXX_FLAGS_DEBUG   "$ENV{CXXFLAGS} -O0 -g")
 # set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O2 ")
 add_definitions(-DNP_DEBUG)
-include_directories( ../xtra_rhelz.x/include )
+
+set (INCLUDE_DIRS
+    ${PROJECT_SOURCE_DIR}/include/
+    ${PROJECT_SOURCE_DIR}/source/
+    ${PROJECT_SOURCE_DIR}/../xtra_rhelz.x/include/
+    ${PROJECT_SOURCE_DIR}/../xtra_rhelz.x/include/google/
+    ${PROJECT_SOURCE_DIR}/../roo
+)
+include_directories( ${INCLUDE_DIRS} )
 
 # 如果集成在其他项目当中，上面的配置可以继承得到而不用显式配置了
 

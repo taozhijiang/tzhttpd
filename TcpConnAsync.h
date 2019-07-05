@@ -97,19 +97,19 @@ private:
     bool keep_continue(const std::shared_ptr<HttpParser>& http_parser);
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const char* data, size_t len, const string& status) {
+                            const char* data, size_t len, const std::string& status) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
         fill_http_for_send(http_parser, msg, status, { });
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const string& str, const string& status) {
+                            const std::string& str, const std::string& status) {
         fill_http_for_send(http_parser, str, status, { });
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const char* data, size_t len, const string& status,
+                            const char* data, size_t len, const std::string& status,
                             const std::vector<std::string>& additional_header) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
@@ -117,7 +117,7 @@ private:
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const string& str, const string& status,
+                            const std::string& str, const std::string& status,
                             const std::vector<std::string>& additional_header);
 
     // 标准的HTTP响应头和响应体

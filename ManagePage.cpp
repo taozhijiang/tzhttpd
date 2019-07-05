@@ -31,17 +31,17 @@ static int system_drop_handler(const HttpParser& http_parser,
 bool system_manage_page_init(HttpServer& server) {
 
     if (server.add_http_get_handler("^/internal/status$", system_status_handler, true) != 0) {
-        tzhttpd_log_err("register system status module failed, treat as fatal.");
+        roo::log_err("register system status module failed, treat as fatal.");
         return false;
     }
 
     if (server.add_http_get_handler("^/internal/updateconf$", system_updateconf_handler, true) != 0) {
-        tzhttpd_log_err("register system update runtime conf module failed, treat as fatal.");
+        roo::log_err("register system update runtime conf module failed, treat as fatal.");
         return false;
     }
 
     if (server.add_http_get_handler("^/internal/drop$", system_drop_handler, true) != 0) {
-        tzhttpd_log_err("register system handler control failed, treat as fatal.");
+        roo::log_err("register system handler control failed, treat as fatal.");
         return false;
     }
 
@@ -88,7 +88,7 @@ static int system_drop_handler(const HttpParser& http_parser,
     std::string uri      = params.VALUE("uri");
     std::string method   = params.VALUE("method");
     if (uri.empty() || (!method.empty() && method != "GET" && method != "POST" && method != "ALL")) {
-        tzhttpd_log_err("param check failed!");
+        roo::log_err("param check failed!");
         response = content_bad_request;
         status_line = generate_response_status_line(http_parser.get_version(),
                                                     StatusCode::client_error_bad_request);

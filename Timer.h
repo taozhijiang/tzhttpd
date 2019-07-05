@@ -16,7 +16,7 @@
 using boost::asio::steady_timer;
 
 #include "EQueue.h"
-#include "Log.h"
+#include <other/Log.h>
 
 
 // 提供定时回调接口服务
@@ -40,7 +40,7 @@ public:
 
     ~TimerObject() {
         revoke_timer();
-        tzhttpd_log_debug("Good, Timer released...");
+        roo::log_info("Good, Timer released...");
     }
 
 
@@ -137,7 +137,7 @@ private:
 
     void io_service_run() {
 
-        tzhttpd_log_notice("Timer io_service thread running...");
+        roo::log_warning("Timer io_service thread running...");
 
         // io_service would not have had any work to do,
         // and consequently io_service::run() would have returned immediately.
@@ -145,8 +145,8 @@ private:
         boost::system::error_code ec;
         io_service_.run(ec);
 
-        tzhttpd_log_notice("Timer io_service thread terminated ...");
-        tzhttpd_log_notice("error_code: {%d} %s", ec.value(), ec.message().c_str());
+        roo::log_warning("Timer io_service thread terminated ...");
+        roo::log_warning("error_code: {%d} %s", ec.value(), ec.message().c_str());
     }
 
 };

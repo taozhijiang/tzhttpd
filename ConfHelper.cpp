@@ -21,7 +21,7 @@ bool ConfHelper::init(std::string cfgfile) {
 
     conf_ptr_.reset( new libconfig::Config() );
     if (!conf_ptr_) {
-        tzhttpd_log_err("create libconfig failed.");
+        roo::log_err("create libconfig failed.");
         return false;
     }
 
@@ -30,11 +30,11 @@ bool ConfHelper::init(std::string cfgfile) {
         conf_ptr_->readFile(cfgfile.c_str());
     } catch(libconfig::FileIOException &fioex) {
         fprintf(stderr, "I/O error while reading file: %s.", cfgfile.c_str());
-        tzhttpd_log_err( "I/O error while reading file: %s.", cfgfile.c_str());
+        roo::log_err( "I/O error while reading file: %s.", cfgfile.c_str());
         conf_ptr_.reset();
     } catch(libconfig::ParseException &pex) {
         fprintf(stderr, "Parse error at %d - %s", pex.getLine(), pex.getError());
-        tzhttpd_log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
+        roo::log_err( "Parse error at %d - %s", pex.getLine(), pex.getError());
         conf_ptr_.reset();
     }
 
@@ -55,19 +55,19 @@ bool ConfHelper::init(std::string cfgfile) {
 int ConfHelper::update_runtime_conf() {
 
     if (cfgfile_.empty()) {
-        tzhttpd_log_err("param cfg_file is not set, may not init HttpConfHelper ???");
+        roo::log_err("param cfg_file is not set, may not init HttpConfHelper ???");
         return -1;
     }
 
     if (in_process_) {
-        tzhttpd_log_err("!!! already in process, please try again later!");
+        roo::log_err("!!! already in process, please try again later!");
         return 0;
     }
 
     auto conf = load_conf_file();
     if (!conf) {
         in_process_ = false;
-        tzhttpd_log_err("load config file %s failed.", cfgfile_.c_str());
+        roo::log_err("load config file %s failed.", cfgfile_.c_str());
         return false;
     }
 
@@ -82,7 +82,7 @@ int ConfHelper::update_runtime_conf() {
         ret += (it->second)(*conf_ptr_); // call it!
     }
 
-    tzhttpd_log_alert("ConfHelper::update_runtime_conf total callback return: %d", ret);
+    roo::log_warning("ConfHelper::update_runtime_conf total callback return: %d", ret);
     in_process_ = false;
 
     return ret;
@@ -91,13 +91,13 @@ int ConfHelper::update_runtime_conf() {
 int ConfHelper::register_runtime_callback(const std::string& name, ConfUpdateCallable func) {
 
     if (name.empty() || !func){
-        tzhttpd_log_err("invalid name or func param.");
+        roo::log_err("invalid name or func param.");
         return -1;
     }
 
     std::lock_guard<std::mutex> lock(lock_);
     calls_.push_back({name, func});
-    tzhttpd_log_debug("register runtime for %s success.",  name.c_str());
+    roo::log_info("register runtime for %s success.",  name.c_str());
     return 0;
 }
 

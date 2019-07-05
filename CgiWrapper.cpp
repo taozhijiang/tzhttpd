@@ -26,7 +26,7 @@ bool CgiWrapper::load_dl() {
     }
 
     if (!dl_->init()) {
-        tzhttpd_log_err("init dl %s failed!", dl_->get_dl_path().c_str());
+        roo::log_err("init dl %s failed!", dl_->get_dl_path().c_str());
         return false;
     }
 
@@ -39,11 +39,11 @@ bool CgiWrapper::load_dl() {
 
 bool CgiGetWrapper::init() {
     if (!load_dl()) {
-        tzhttpd_log_err("load dl failed!");
+        roo::log_err("load dl failed!");
         return false;
     }
     if (!dl_->load_func<cgi_get_handler_t>("cgi_get_handler", &func_)) {
-        tzhttpd_log_err("Load cgi_get_handler func for %s failed.", dl_path_.c_str());
+        roo::log_err("Load cgi_get_handler func for %s failed.", dl_path_.c_str());
         return false;
     }
     return true;
@@ -53,7 +53,7 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
                               std::string& response, std::string& status_line,
                               std::vector<std::string>& add_header) {
     if(!func_) {
-        tzhttpd_log_err("get func not initialized.");
+        roo::log_err("get func not initialized.");
         return -1;
     }
 
@@ -68,9 +68,9 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
     try {
         ret = func_(&param, &rsp, &rsp_header);
     } catch (const std::exception& e) {
-        tzhttpd_log_err("post func call std::exception detect: %s.", e.what());
+        roo::log_err("post func call std::exception detect: %s.", e.what());
     } catch (...) {
-        tzhttpd_log_err("get func call exception detect.");
+        roo::log_err("get func call exception detect.");
     }
 
     if (ret == 0) {
@@ -78,7 +78,7 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
         status_line = generate_response_status_line(http_parser.get_version(),
                 StatusCode::success_ok);
     } else {
-        tzhttpd_log_err("post func call return: %d", ret);
+        roo::log_err("post func call return: %d", ret);
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
                 StatusCode::server_error_internal_server_error);
@@ -96,7 +96,7 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
         }
     }
 
-    tzhttpd_log_debug("param: %s,\n"
+    roo::log_info("param: %s,\n"
                       "response: %s, status: %s, add_header: %s",
                       param_str.c_str(),
                       response.c_str(), status_line.c_str(), header.c_str());
@@ -111,11 +111,11 @@ int CgiGetWrapper::operator()(const HttpParser& http_parser,
 
 bool CgiPostWrapper::init() {
     if (!load_dl()) {
-        tzhttpd_log_err("load dl failed!");
+        roo::log_err("load dl failed!");
         return false;
     }
     if (!dl_->load_func<cgi_post_handler_t>("cgi_post_handler", &func_)) {
-        tzhttpd_log_err("Load cgi_post_handler func for %s failed.", dl_path_.c_str());
+        roo::log_err("Load cgi_post_handler func for %s failed.", dl_path_.c_str());
         return false;
     }
     return true;
@@ -125,7 +125,7 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
                                std::string& response, std::string& status_line,
                                std::vector<std::string>& add_header ) {
     if(!func_){
-        tzhttpd_log_err("get func not initialized.");
+        roo::log_err("get func not initialized.");
         return -1;
     }
 
@@ -141,9 +141,9 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
     try {
         ret = func_(&param, &post, &rsp, &rsp_header);
     } catch (const std::exception& e) {
-        tzhttpd_log_err("post func call std::exception detect: %s.", e.what());
+        roo::log_err("post func call std::exception detect: %s.", e.what());
     } catch (...) {
-        tzhttpd_log_err("post func call exception detect.");
+        roo::log_err("post func call exception detect.");
     }
 
     if (ret == 0) {
@@ -151,7 +151,7 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
         status_line = generate_response_status_line(http_parser.get_version(),
                 StatusCode::success_ok);
     } else {
-        tzhttpd_log_err("post func call return: %d", ret);
+        roo::log_err("post func call return: %d", ret);
         response = http_proto::content_error;
         status_line = generate_response_status_line(http_parser.get_version(),
                 StatusCode::server_error_internal_server_error);
@@ -169,7 +169,7 @@ int CgiPostWrapper::operator()(const HttpParser& http_parser, const std::string&
         }
     }
 
-    tzhttpd_log_debug("param: %s, post: %s,\n"
+    roo::log_info("param: %s, post: %s,\n"
                       "response: %s, status: %s, add_header: %s",
                       param_str.c_str(), post_data.c_str(),
                       response.c_str(), status_line.c_str(), header.c_str());

@@ -18,7 +18,7 @@
 #include <string>
 #include <sstream>
 
-#include "Log.h"
+#include <other/Log.h>
 
 
 namespace tzhttpd {

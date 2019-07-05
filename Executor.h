@@ -10,7 +10,7 @@
 
 #include <xtra_rhel.h>
 
-#include "Log.h"
+#include <other/Log.h>
 #include "EQueue.h"
 #include "ServiceIf.h"
 
@@ -89,14 +89,14 @@ public:
 
     int executor_start() {
 
-        tzhttpd_log_notice("about to start executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to start executor for host %s ... ", instance_name().c_str());
         executor_threads_.start_threads();
         return 0;
     }
 
     int executor_stop_graceful() {
 
-        tzhttpd_log_notice("about to stop executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to stop executor for host %s ... ", instance_name().c_str());
         executor_threads_.graceful_stop_threads();
 
         return 0;
@@ -104,7 +104,7 @@ public:
 
     int executor_join() {
 
-        tzhttpd_log_notice("about to join executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to join executor for host %s ... ", instance_name().c_str());
         executor_threads_.join_threads();
         return 0;
     }

@@ -63,7 +63,7 @@ struct HttpReqInstance {
             return;
         }
 
-        tzhttpd_log_err("connection already released before.");
+        roo::log_err("connection already released before.");
     }
 
     void http_response(const std::string& response_str,
@@ -76,7 +76,7 @@ struct HttpReqInstance {
             return;
         }
 
-        tzhttpd_log_err("connection already released before.");
+        roo::log_err("connection already released before.");
     }
 };
 

@@ -78,12 +78,6 @@ int main(int argc, char* argv[]) {
     libconfig::Config cfg;
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
 
-    // default syslog
-    tzhttpd::set_checkpoint_log_store_func(syslog);
-    // setup in default DEBUG level, then reinialize when conf prased
-    tzhttpd::tzhttpd_log_init(7);
-    tzhttpd::tzhttpd_log_debug("first stage log init with default DEBUG finished.");
-
     // daemonize should before any thread creation...
     if (daemonize) {
         tzhttpd::tzhttpd_log_notice("we will daemonize this service...");

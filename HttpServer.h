@@ -23,12 +23,13 @@ using boost::asio::steady_timer;
 #include <functional>
 #include <algorithm>
 
-#include "Log.h"
+#include <other/Log.h>
 #include "EQueue.h"
 #include "ThreadPool.h"
 
-#include "Status.h"
-#include "ConfHelper.h"
+#include <concurrency/Timer.h>
+#include <scaffold/Status.h>
+#include <scaffold/Setting.h>
 
 #include "HttpHandler.h"
 
@@ -82,7 +83,7 @@ class HttpConf {
         // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
 
         if (!service_enabled_) {
-            tzhttpd_log_alert("http_service not enabled ...");
+            roo::log_warning("http_service not enabled ...");
             return false;
         }
 
@@ -91,7 +92,7 @@ class HttpConf {
             return true;
 
         if (service_token_ <= 0) {
-            tzhttpd_log_alert("http_service not speed over ...");
+            roo::log_warning("http_service not speed over ...");
             return false;
         }
 

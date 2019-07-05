@@ -11,7 +11,7 @@
 #include <dlfcn.h>
 #include <linux/limits.h>
 
-#include "Log.h"
+#include <other/Log.h>
 #include "CgiHelper.h"
 
 
@@ -37,7 +37,7 @@ public:
         // RTLD_NOW: All unresolved symbols resolved when dlopen() is called.
         dl_handle_ = dlopen(dl_path_.c_str(), RTLD_LAZY);
         if (!dl_handle_) {
-            tzhttpd_log_err("Load library %s failed: %s.", dl_path_.c_str(), dlerror());
+            roo::log_err("Load library %s failed: %s.", dl_path_.c_str(), dlerror());
             return false;
         }
 
@@ -47,24 +47,24 @@ public:
 
         module_init_ = (module_init_t)dlsym(dl_handle_, "module_init");
         if ((err_info = dlerror()) != NULL ) {
-            tzhttpd_log_err("Load func module_init failed: %s", err_info);
+            roo::log_err("Load func module_init failed: %s", err_info);
             return false;
         }
 
         // 调用module_init函数
         int ret_code = (*module_init_)();
         if( ret_code != 0) {
-            tzhttpd_log_err("call module_init failed: %d", ret_code);
+            roo::log_err("call module_init failed: %d", ret_code);
             return false;
         }
 
         module_exit_ = (module_exit_t)dlsym(dl_handle_, "module_exit");
         if ((err_info = dlerror()) != NULL ) {
-            tzhttpd_log_err("Load func module_exit failed: %s", err_info);
+            roo::log_err("Load func module_exit failed: %s", err_info);
             return false;
         }
 
-        tzhttpd_log_alert("module %s load ok!", dl_path_.c_str());
+        roo::log_warning("module %s load ok!", dl_path_.c_str());
         return true;
     }
 
@@ -81,12 +81,12 @@ public:
 
         FuncType func_t = (FuncType)dlsym(dl_handle_, func_name.c_str());
         if ((err_info = dlerror()) != NULL ) {
-            tzhttpd_log_err("Load func %s failed: %s", func_name.c_str(), err_info);
+            roo::log_err("Load func %s failed: %s", func_name.c_str(), err_info);
             return false;
         }
 
         *func = func_t;
-        tzhttpd_log_alert("load func %s from %s ok!", func_name.c_str(), dl_path_.c_str());
+        roo::log_warning("load func %s from %s ok!", func_name.c_str(), dl_path_.c_str());
         return true;
     }
 
@@ -96,12 +96,12 @@ public:
             if(module_exit_) {
                 (*module_exit_)();
                 module_exit_ = NULL;
-                tzhttpd_log_alert("module_exit from %s called!", dl_path_.c_str());
+                roo::log_warning("module_exit from %s called!", dl_path_.c_str());
             }
 
             dlclose(dl_handle_);
             dl_handle_ = NULL;
-            tzhttpd_log_alert("dlclose from %s called!", dl_path_.c_str());
+            roo::log_warning("dlclose from %s called!", dl_path_.c_str());
         }
     }
 

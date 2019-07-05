@@ -58,7 +58,7 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
     conf.lookupValue("http.bind_addr", bind_addr_);
     conf.lookupValue("http.bind_port", bind_port_);
     if (bind_addr_.empty() || bind_port_ <=0 ){
-        tzhttpd_log_err("invalid http.bind_addr %s & http.bind_port %d",
+        roo::log_err("invalid http.bind_addr %s & http.bind_port %d",
                         bind_addr_.c_str(), bind_port_);
         return false;
     }
@@ -80,19 +80,19 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
         std::swap(ip_set, safe_ip_);
     }
     if (!safe_ip_.empty()) {
-        tzhttpd_log_alert("safe_ip not empty, totally contain %d items",
+        roo::log_warning("safe_ip not empty, totally contain %d items",
                           static_cast<int>(safe_ip_.size()));
     }
 
     conf.lookupValue("http.backlog_size", backlog_size_);
     if (backlog_size_ < 0) {
-        tzhttpd_log_err( "invalid http.backlog_size %d.", backlog_size_);
+        roo::log_err( "invalid http.backlog_size %d.", backlog_size_);
         return false;
     }
 
     conf.lookupValue("http.io_thread_pool_size", io_thread_number_);
     if (io_thread_number_ < 0) {
-        tzhttpd_log_err( "invalid http.io_thread_number %d", io_thread_number_);
+        roo::log_err( "invalid http.io_thread_number %d", io_thread_number_);
         return false;
     }
 
@@ -105,37 +105,37 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
 
     conf.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_);
     if (ops_cancel_time_out_ < 0){
-        tzhttpd_log_err("invalid http ops_cancel_time_out: %d", ops_cancel_time_out_);
+        roo::log_err("invalid http ops_cancel_time_out: %d", ops_cancel_time_out_);
         return false;
     }
 
     conf.lookupValue("http.session_cancel_time_out", session_cancel_time_out_);
     if (session_cancel_time_out_ < 0){
-        tzhttpd_log_err("invalid http session_cancel_time_out: %d", session_cancel_time_out_);
+        roo::log_err("invalid http session_cancel_time_out: %d", session_cancel_time_out_);
         return false;
     }
 
     conf.lookupValue("http.service_enable", service_enabled_);
     conf.lookupValue("http.service_speed", service_speed_);
     if (service_speed_ < 0){
-        tzhttpd_log_err("invalid http.service_speed: %d.", service_speed_);
+        roo::log_err("invalid http.service_speed: %d.", service_speed_);
         return false;
     }
 
     conf.lookupValue("http.service_concurrency", service_concurrency_);
     if (service_concurrency_ < 0){
-        tzhttpd_log_err("invalid http.service_concurrency: %d.", service_concurrency_);
+        roo::log_err("invalid http.service_concurrency: %d.", service_concurrency_);
         return false;
     }
 
-    tzhttpd_log_debug("HttpConf parse conf OK!");
+    roo::log_info("HttpConf parse conf OK!");
     return true;
 }
 
 void HttpConf::timed_feed_token_handler(const boost::system::error_code& ec) {
 
     if (service_speed_ == 0) {
-        tzhttpd_log_alert("unlock speed jail, close the timer.");
+        roo::log_warning("unlock speed jail, close the timer.");
         timed_feed_token_.reset();
         return;
     }
@@ -159,23 +159,6 @@ HttpServer::HttpServer(const std::string& cfgfile, const std::string& instance_n
     acceptor_(),
     cfgfile_(cfgfile),
     conf_() {
-
-   bool ret = ConfHelper::instance().init(cfgfile_);
-   if (!ret) {
-       tzhttpd_log_err("init conf failed.");
-       return;
-   }
-
-   auto conf_ptr = ConfHelper::instance().get_conf();
-   int log_level = 0;
-   conf_ptr->lookupValue("log_level", log_level);
-    if (log_level <= 0 || log_level > 7) {
-        tzhttpd_log_notice("invalid log_level value, reset to default 7.");
-        log_level = 7;
-    }
-
-    tzhttpd_log_init(log_level);
-    tzhttpd_log_notice("initialized log with level: %d", log_level);
 }
 
 
@@ -202,40 +185,40 @@ bool HttpServer::init() {
     ::signal(SIGPIPE, SIG_IGN);
 
     if (!Ssl_thread_setup()) {
-        tzhttpd_log_err("Ssl_thread_setup failed!");
+        roo::log_err("Ssl_thread_setup failed!");
         return false;
     }
 
     if(!Timer::instance().init()) {
-        tzhttpd_log_err("Timer service init failed.");
+        roo::log_err("Timer service init failed.");
         return false;
     }
 
     auto conf_ptr = ConfHelper::instance().get_conf();
     if(!conf_ptr) {
-        tzhttpd_log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
+        roo::log_err("ConfHelper return null conf pointer, maybe your conf file ill!");
         return false;
     }
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
     if (!conf_.load_conf(conf_ptr)) {
-        tzhttpd_log_err("Load http conf failed!");
+        roo::log_err("Load http conf failed!");
         return false;
     }
 
     ep_ = ip::tcp::endpoint(ip::address::from_string(conf_.bind_addr_), conf_.bind_port_);
-    tzhttpd_log_alert("create listen endpoint for %s:%d",
+    roo::log_warning("create listen endpoint for %s:%d",
                       conf_.bind_addr_.c_str(), conf_.bind_port_);
 
-    tzhttpd_log_debug("socket/session conn cancel time_out: %d secs, enabled: %s",
+    roo::log_info("socket/session conn cancel time_out: %d secs, enabled: %s",
                       conf_.ops_cancel_time_out_,
                       conf_.ops_cancel_time_out_ > 0 ? "true" : "false");
 
     if (conf_.service_speed_) {
         conf_.timed_feed_token_.reset(new steady_timer (io_service_)); // 1sec
         if (!conf_.timed_feed_token_) {
-            tzhttpd_log_err("Create timed_feed_token_ failed!");
+            roo::log_err("Create timed_feed_token_ failed!");
             return false;
         }
 
@@ -243,18 +226,18 @@ bool HttpServer::init() {
         conf_.timed_feed_token_->async_wait(
                     std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
-    tzhttpd_log_debug("http service enabled: %s, speed: %d tps", conf_.service_enabled_ ? "true" : "false",
+    roo::log_info("http service enabled: %s, speed: %d tps", conf_.service_enabled_ ? "true" : "false",
                       conf_.service_speed_);
 
     if (!io_service_threads_.init_threads(
         std::bind(&HttpServer::io_service_run, shared_from_this(), std::placeholders::_1),
         conf_.io_thread_number_)) {
-        tzhttpd_log_err("HttpServer::io_service_run init task failed!");
+        roo::log_err("HttpServer::io_service_run init task failed!");
         return false;
     }
 
     if (!Dispatcher::instance().init()) {
-        tzhttpd_log_err("Init HttpDispatcher failed.");
+        roo::log_err("Init HttpDispatcher failed.");
         return false;
     }
 
@@ -271,7 +254,7 @@ bool HttpServer::init() {
                       std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
     if (!system_manage_page_init(*this)) {
-        tzhttpd_log_err("init system manage page failed, treat as fatal.");
+        roo::log_err("init system manage page failed, treat as fatal.");
         return false;
     }
 
@@ -283,12 +266,12 @@ bool HttpServer::init() {
 // main task loop
 void HttpServer::io_service_run(ThreadObjPtr ptr) {
 
-    tzhttpd_log_info("HttpServer io_service thread %#lx is about to work... ", (long)pthread_self());
+    roo::log_warning("HttpServer io_service thread %#lx is about to work... ", (long)pthread_self());
 
     while (true) {
 
         if (unlikely(ptr->status_ == ThreadStatus::kTerminating)) {
-            tzhttpd_log_err("thread %#lx is about to terminating...", (long)pthread_self());
+            roo::log_err("thread %#lx is about to terminating...", (long)pthread_self());
             break;
         }
 
@@ -302,13 +285,13 @@ void HttpServer::io_service_run(ThreadObjPtr ptr) {
         io_service_.run(ec);
 
         if (ec){
-            tzhttpd_log_err("io_service stopped...");
+            roo::log_err("io_service stopped...");
             break;
         }
     }
 
     ptr->status_ = ThreadStatus::kDead;
-    tzhttpd_log_info("HttpServer io_service thread %#lx is about to terminate ... ", (long)pthread_self());
+    roo::log_warning("HttpServer io_service thread %#lx is about to terminate ... ", (long)pthread_self());
 
     return;
 }
@@ -353,22 +336,22 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
     do {
 
         if (ec) {
-            tzhttpd_log_err("Error during accept with %d, %s", ec.value(), ec.message().c_str());
+            roo::log_err("Error during accept with %d, %s", ec.value(), ec.message().c_str());
             break;
         }
 
         boost::system::error_code ignore_ec;
         auto remote = sock_ptr->remote_endpoint(ignore_ec);
         if (ignore_ec) {
-            tzhttpd_log_err("get remote info failed:%d, %s", ignore_ec.value(), ignore_ec.message().c_str());
+            roo::log_err("get remote info failed:%d, %s", ignore_ec.value(), ignore_ec.message().c_str());
             break;
         }
 
         std::string remote_ip = remote.address().to_string(ignore_ec);
-        tzhttpd_log_debug("Remote Client Info: %s:%d", remote_ip.c_str(), remote.port());
+        roo::log_info("Remote Client Info: %s:%d", remote_ip.c_str(), remote.port());
 
         if (!conf_.check_safe_ip(remote_ip)) {
-            tzhttpd_log_err("check safe_ip failed for: %s", remote_ip.c_str());
+            roo::log_err("check safe_ip failed for: %s", remote_ip.c_str());
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -376,7 +359,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
         }
 
         if (!conf_.get_http_service_token()) {
-            tzhttpd_log_err("request http service token failed, enabled: %s, speed: %d",
+            roo::log_err("request http service token failed, enabled: %s, speed: %d",
                             conf_.service_enabled_ ? "true" : "false", conf_.service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
@@ -386,7 +369,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 
         if (conf_.service_concurrency_ != 0 &&
             conf_.service_concurrency_ < TcpConnAsync::current_concurrency_) {
-            tzhttpd_log_err("service_concurrency_ error, limit: %d, current: %d",
+            roo::log_err("service_concurrency_ error, limit: %d, current: %d",
                             conf_.service_concurrency_, TcpConnAsync::current_concurrency_.load());
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -406,7 +389,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
 
 int HttpServer::io_service_stop_graceful() {
 
-    tzhttpd_log_err("about to stop io_service... ");
+    roo::log_err("about to stop io_service... ");
 
     io_service_.stop();
     io_service_threads_.graceful_stop_threads();
@@ -415,7 +398,7 @@ int HttpServer::io_service_stop_graceful() {
 
 int HttpServer::io_service_join() {
 
-    tzhttpd_log_err("about to join io_service... ");
+    roo::log_err("about to join io_service... ");
 
     io_service_threads_.join_threads();
     return 0;
@@ -461,24 +444,24 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
 
     HttpConf conf {};
     if (!conf.load_conf(cfg)) {
-        tzhttpd_log_err("load conf for HttpConf failed.");
+        roo::log_err("load conf for HttpConf failed.");
         return -1;
     }
 
     if (conf_.session_cancel_time_out_ != conf.session_cancel_time_out_) {
-        tzhttpd_log_notice("update session_cancel_time_out from %d to %d",
+        roo::log_warning("update session_cancel_time_out from %d to %d",
                            conf_.session_cancel_time_out_, conf.session_cancel_time_out_);
         conf_.session_cancel_time_out_ = conf.session_cancel_time_out_;
     }
 
     if (conf_.ops_cancel_time_out_ != conf.ops_cancel_time_out_) {
-        tzhttpd_log_notice("update ops_cancel_time_out from %d to %d",
+        roo::log_warning("update ops_cancel_time_out from %d to %d",
                            conf_.ops_cancel_time_out_, conf.ops_cancel_time_out_);
         conf_.ops_cancel_time_out_ = conf.ops_cancel_time_out_;
     }
 
 
-    tzhttpd_log_notice("swap safe_ips...");
+    roo::log_warning("swap safe_ips...");
 
     {
         // protect cfg race conditon
@@ -487,7 +470,7 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
     }
 
     if (conf_.service_speed_ != conf.service_speed_) {
-        tzhttpd_log_notice("update http_service_speed from %d to %d",
+        roo::log_warning("update http_service_speed from %d to %d",
                            conf_.service_speed_ , conf.service_speed_);
         conf_.service_speed_ = conf.service_speed_;
 
@@ -497,7 +480,7 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
             // 直接重置定时器，无论有没有
             conf_.timed_feed_token_.reset(new steady_timer(io_service_)); // 1sec
             if (!conf_.timed_feed_token_) {
-                tzhttpd_log_err("Create timed_feed_token_ failed!");
+                roo::log_err("Create timed_feed_token_ failed!");
                 return -1;
             }
 
@@ -516,12 +499,12 @@ int HttpServer::module_runtime(const libconfig::Config& cfg) {
     }
 
     if (conf_.service_concurrency_ != conf.service_concurrency_ ) {
-        tzhttpd_log_err("update service_concurrency from %d to %d.",
+        roo::log_err("update service_concurrency from %d to %d.",
                         conf_.service_concurrency_, conf.service_concurrency_);
         conf_.service_concurrency_ = conf.service_concurrency_;
     }
 
-    tzhttpd_log_notice("http service enabled: %s, speed: %d", conf_.service_enabled_ ? "true" : "false",
+    roo::log_warning("http service enabled: %s, speed: %d", conf_.service_enabled_ ? "true" : "false",
                        conf_.service_speed_);
 
     return 0;

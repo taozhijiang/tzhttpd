@@ -10,7 +10,7 @@
 #include <openssl/err.h>
 
 #include "SslSetup.h"
-#include "Log.h"
+#include <other/Log.h>
 
 namespace tzhttpd {
 
@@ -26,7 +26,7 @@ SSL_CTX* global_ssl_ctx = NULL;
 static void pthreads_locking_callback(int mode, int type, char *file,
          int line) {
 #if 0
-    tzhttpd_log_err("thread=%4d mode=%s lock=%s %s:%d\n",
+    roo::log_err("thread=%4d mode=%s lock=%s %s:%d\n",
         CRYPTO_thread_id(),
         (mode&CRYPTO_LOCK)?"l":"u",
         (type&CRYPTO_READ)?"r":"w",file,line);
@@ -41,7 +41,7 @@ static void pthreads_locking_callback(int mode, int type, char *file,
 
 #if 0
 static void handle_error(const char *file, int lineno, const char *msg) {
-    tzhttpd_log_err("** SSL error %s:%d %s\n", file, lineno, msg);
+    roo::log_err("** SSL error %s:%d %s\n", file, lineno, msg);
     ERR_print_errors_fp(stderr);
 }
 #endif
@@ -70,7 +70,7 @@ bool Ssl_thread_setup() {
     mutex_count = (long *)OPENSSL_malloc(CRYPTO_num_locks() * sizeof(long));
 
     if (!mutex_buf || !mutex_count) {
-        tzhttpd_log_err("Alloc Ssl thread resource failed!");
+        roo::log_err("Alloc Ssl thread resource failed!");
         return false;
     }
 
@@ -84,14 +84,14 @@ bool Ssl_thread_setup() {
 
     // SSL common routine setup
     if (!SSL_library_init()) {
-        tzhttpd_log_err("Load SSL library failed!");
+        roo::log_err("Load SSL library failed!");
         return false;
     }
 
     SSL_load_error_strings();
 
     if (!ssl_setup_client_ctx()) {
-        tzhttpd_log_err("Create global SSL_CTX failed!");
+        roo::log_err("Create global SSL_CTX failed!");
         return false;
     }
 
@@ -103,14 +103,14 @@ bool Ssl_thread_setup() {
     SSL_CTX_set_options(global_ssl_ctx, SSL_MODE_AUTO_RETRY);
 
 
-    tzhttpd_log_alert("SSL env setup successful!");
+    roo::log_warning("SSL env setup successful!");
     return true;
 }
 
 void Ssl_thread_clean() {
 
     if (!mutex_buf) {
-        tzhttpd_log_err("Ssl already cleaned up??");
+        roo::log_err("Ssl already cleaned up??");
         return;
     }
 
@@ -124,7 +124,7 @@ void Ssl_thread_clean() {
     for (int i=0; i<CRYPTO_num_locks(); ++i)
     {
         pthread_mutex_destroy(&(mutex_buf[i]));
-        tzhttpd_log_err("%8ld:%s\n", mutex_count[i],
+        roo::log_err("%8ld:%s\n", mutex_count[i],
             CRYPTO_get_lock_name(i));
     }
 
@@ -134,7 +134,7 @@ void Ssl_thread_clean() {
     mutex_buf = NULL;
     mutex_count = 0;
 
-    tzhttpd_log_alert("SSL env cleanup successful!");
+    roo::log_warning("SSL env cleanup successful!");
 
     return;
 }
