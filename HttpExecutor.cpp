@@ -794,8 +794,12 @@ int HttpExecutor::http_redirect_handler(
 
 void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) {
 
-    HttpHandlerObjectPtr handler_object{};
+    if (http_req_instance->method_ == HTTP_METHOD::OPTIONS) {
+        http_req_instance->http_std_response(http_proto::StatusCode::success_no_content);
+        return;
+    }
 
+    HttpHandlerObjectPtr handler_object{};
     if (do_find_handler(http_req_instance->method_,  http_req_instance->uri_, handler_object) != 0) {
         roo::log_err("find handler for %s, %s failed.",
                      HTTP_METHOD_STRING(http_req_instance->method_).c_str(),
@@ -815,6 +819,7 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
     }
 
     if (http_req_instance->method_ == HTTP_METHOD::GET) {
+
         HttpGetHandler handler = handler_object->http_get_handler_;
         if (!handler) {
             http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
@@ -852,7 +857,9 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
             }
 
         }
+
     } else if (http_req_instance->method_ == HTTP_METHOD::POST) {
+
         HttpPostHandler handler = handler_object->http_post_handler_;
         if (!handler) {
             http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
@@ -895,9 +902,12 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
 //            std::string key = hostname_ + "_POST_" + status_str;
 //            ReportEvent::report_event(key, 1);
         }
+
     } else {
+
         roo::log_err("what? %s", HTTP_METHOD_STRING(http_req_instance->method_).c_str());
         http_req_instance->http_std_response(http_proto::StatusCode::server_error_internal_server_error);
+
     }
 
 }

@@ -127,7 +127,9 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         goto error_return;
     }
 
-    if (http_parser->get_method() == HTTP_METHOD::GET) {
+    if (http_parser->get_method() == HTTP_METHOD::GET ||
+        http_parser->get_method() == HTTP_METHOD::OPTIONS )
+    {
         // HTTP GET handler
         SAFE_ASSERT(http_parser->find_request_header(http_proto::header_options::content_length).empty());
 
@@ -374,7 +376,8 @@ void TcpConnAsync::self_write_handler(std::shared_ptr<HttpParser> http_parser,
 
 
 void TcpConnAsync::fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                                      const std::string& str, const std::string& status_line, const std::vector<std::string>& additional_header) {
+                                      const std::string& str, const std::string& status_line,
+                                      const std::vector<std::string>& additional_header) {
 
     bool keep_next = false;
     std::string str_uri = "UNDETECTED_URI";
@@ -413,7 +416,8 @@ void TcpConnAsync::fill_std_http_for_send(std::shared_ptr<HttpParser> http_parse
 
 
     std::string status_line = generate_response_status_line(http_ver, code);
-    std::string content = http_proto::http_std_response_generate(http_ver, status_line, keep_next);
+    std::string content =
+        http_proto::http_std_response_generate(http_ver, status_line, code, keep_next);
 
     send_bound_.buffer_.append_internal(content);
 

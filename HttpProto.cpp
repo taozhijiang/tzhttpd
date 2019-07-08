@@ -98,19 +98,35 @@ static std::string get_status_content(enum StatusCode code) {
     return "";
 }
 
-string http_std_response_generate(const std::string& http_ver, const std::string& stat_str, bool keepalive) {
+string http_std_response_generate(const std::string& http_ver, const std::string& stat_str,
+                                  enum StatusCode code, bool keepalive) {
+
+    // 不需要返回body响应内容的情况
+    if (code == StatusCode::success_no_content) {
+
+        // 返回的内容允许no-cors访问
+        std::vector<std::string> hd {
+//            "Access-Control-Allow-Origin: *", // 已经在默认Header中了
+            "Access-Control-Allow-Methods: POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers: X-PINGOTHER, Content-Type",
+            "Access-Control-Max-Age: 86400",
+            "Vary: Accept-Encoding, Origin",
+        };
+
+        return http_response_generate("", stat_str, keepalive, hd);
+    }
+
 
     std::stringstream content_ss;
-
     content_ss << "<html><head><title>"
-        << stat_str
-        << "</title></head>"
-        << "<body><h1>"
-        << stat_str
-        << "</h1></body></html>";
+    << stat_str
+    << "</title></head>"
+    << "<body><h1>"
+    << stat_str
+    << "</h1></body></html>";
 
     std::string content = content_ss.str();
-    std::vector<std::string> hd{"Content-Type: text/html"};
+    std::vector<std::string> hd {"Content-Type: text/html"};
 
     return http_response_generate(content, stat_str, keepalive, hd);
 }

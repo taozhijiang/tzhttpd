@@ -18,6 +18,8 @@ namespace tzhttpd {
 enum class HTTP_METHOD : uint8_t {
     GET = 1,
     POST = 2,
+    OPTIONS = 3,
+
     ALL = 98,   // internal use
     UNDETECTED = 99,
 };
@@ -28,6 +30,8 @@ std::string HTTP_METHOD_STRING(enum HTTP_METHOD method) {
         return "GET";
     } else if (method == HTTP_METHOD::POST) {
         return "POST";
+    } else if (method == HTTP_METHOD::OPTIONS) {
+        return "OPTIONS";
     }
 
     return "UNDETECTED_METHOD";
@@ -286,7 +290,9 @@ string http_response_generate(const std::string& content, const std::string& sta
                               bool keepalive, const std::vector<std::string>& additional_header);
 string http_response_generate(const char* data, size_t len, const string& stat_str,
                               bool keepalive, const std::vector<std::string>& additional_header);
-string http_std_response_generate(const std::string& http_ver, const std::string& stat_str, bool keepalive);
+
+string http_std_response_generate(const std::string& http_ver, const std::string& stat_str,
+                                  enum StatusCode code, bool keepalive);
 
 } // end namespace http_proto
 

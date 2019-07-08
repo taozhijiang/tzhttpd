@@ -263,6 +263,8 @@ private:
                         method_ = HTTP_METHOD::GET;
                     } else if (boost::iequals(find_request_header(http_proto::header_options::request_method), "POST")) {
                         method_ = HTTP_METHOD::POST;
+                    } else if (boost::iequals(find_request_header(http_proto::header_options::request_method), "OPTIONS")) {
+                        method_ = HTTP_METHOD::OPTIONS;
                     } else {
                         method_ = HTTP_METHOD::UNDETECTED;
                     }
