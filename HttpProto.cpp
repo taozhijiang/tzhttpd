@@ -108,7 +108,8 @@ string http_std_response_generate(const std::string& http_ver, const std::string
         std::vector<std::string> hd {
 //            "Access-Control-Allow-Origin: *", // 已经在默认Header中了
             "Access-Control-Allow-Methods: POST, GET, OPTIONS",
-            "Access-Control-Allow-Headers: X-PINGOTHER, Content-Type",
+            "Access-Control-Allow-Headers: Accept, Accept-Language, Content-Language, Content-Type, X-PINGOTHER, "
+                "Reserved-Header1, Reserved-Header2, Reserved-Header3, Reserved-Header4, Reserved-Header5 ",
             "Access-Control-Max-Age: 86400",
             "Vary: Accept-Encoding, Origin",
         };

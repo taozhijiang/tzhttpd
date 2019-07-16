@@ -100,6 +100,8 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
         return;
     }
 
+
+    boost::system::error_code call_ec;
     SAFE_ASSERT(bytes_transferred > 0);
 
     std::string head_str(boost::asio::buffers_begin(request_.data()),
@@ -116,6 +118,13 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
 
     if (!http_parser->parse_request_header(head_str.c_str())) {
         roo::log_err("Parse request error: %s", head_str.c_str());
+        goto error_return;
+    }
+
+    // 保存远程客户端信息
+    http_parser->remote_ = socket_->remote_endpoint(call_ec);
+    if (call_ec) {
+        roo::log_err("Request remote address failed.");
         goto error_return;
     }
 

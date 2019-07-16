@@ -13,6 +13,7 @@
 #include <iterator>
 #include <string>
 
+#include <boost/asio.hpp>
 #include <boost/algorithm/string.hpp>
 
 // The GNU C++ standard library supports <regex>, but not until version 4.9.0.
@@ -200,6 +201,7 @@ public:
         return static_cast<char>(digit);
     }
 
+
 private:
 
     std::string normalize_request_uri(const std::string& uri) {
@@ -292,11 +294,16 @@ private:
     }
 
 private:
+
     std::map<std::string, std::string> request_headers_;
     UriParamContainer request_uri_params_;
+
     enum HTTP_METHOD method_;
     std::string version_;
     std::string uri_;
+
+public:
+    boost::asio::ip::tcp::endpoint remote_;
 };
 
 } // end namespace tzhttpd
