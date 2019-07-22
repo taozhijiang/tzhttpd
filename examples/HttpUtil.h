@@ -7,7 +7,7 @@
 #include <string>
 #include <cstring>
 
-#include <curl/curl.h>
+#include <curl.h>
 
 #include "CryptoUtil.h"
 

@@ -18,5 +18,5 @@ g++ -std=c++0x -g -O0 -DNP_DEBUG -Wall fast_client.cpp \
     -I../ -I../../xtra_rhelz.x/include -I../../xtra_rhelz.x/include/curl_7.53.1 \
     -L../../xtra_rhelz.x/libs \
     -L../../xtra_rhelz.x/libs/curl_7.53.1 -L../../xtra_rhelz.x/libs/boost/ \
-    -lboost_system -lssl -lcryptopp -lcrypto -lcurl -lssh2 -lrt \
+    -lboost_system -lssl -lcryptopp -lcrypto -lcurl -lssh2 -lrt -lz -lpthread \
     -o fast_client

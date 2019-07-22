@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_SERVICE_IF_H__
 #define __TZHTTPD_SERVICE_IF_H__
 
-#include <libconfig.h++>
+#include <libconfig/libconfig.h++>
 
 #include <string>
 #include "HttpHandler.h"

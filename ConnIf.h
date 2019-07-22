@@ -8,7 +8,7 @@
 #ifndef __TZHTTPD_CONN_IF_H__
 #define __TZHTTPD_CONN_IF_H__
 
-
+#include <mutex>
 #include "Buffer.h"
 
 namespace tzhttpd {

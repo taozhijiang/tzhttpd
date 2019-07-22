@@ -11,7 +11,7 @@
 
 #include <xtra_rhel.h>
 
-#include <libconfig.h++>
+#include <libconfig/libconfig.h++>
 
 #include <boost/thread/locks.hpp>
 #include <string/UriRegex.h>

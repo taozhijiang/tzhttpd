@@ -14,7 +14,7 @@ using boost::asio::steady_timer;
 
 #include <boost/asio.hpp>
 
-#include <libconfig.h++>
+#include <libconfig/libconfig.h++>
 
 #include <set>
 #include <map>
