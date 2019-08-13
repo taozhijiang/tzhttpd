@@ -60,7 +60,7 @@ bool Dispatcher::init() {
     }
 
     // 注册配置动态配置更新接口，由此处分发到各个虚拟主机，不再每个虚拟主机自己注册
-    Global::instance().setting_ptr_->attach_runtime_callback(
+    Global::instance().setting_ptr()->attach_runtime_callback(
         "tzhttpd-Dispatcher",
         std::bind(&Dispatcher::module_runtime, this,
                   std::placeholders::_1));
@@ -90,7 +90,7 @@ void Dispatcher::handle_http_request(std::shared_ptr<HttpReqInstance> http_req_i
 int Dispatcher::add_virtual_host(const std::string& hostname) {
 
     if (initialized_) {
-        roo::log_err("Dispatcher has already been initialized, but we does not support dynamic addService");
+        roo::log_err("Dispatcher has already been initialized, but we does not support add virtualhost dynamiclly.");
         return -1;
     }
 

@@ -52,7 +52,7 @@ bool system_manage_page_init(HttpServer& server) {
 static int system_updateconf_handler(const HttpParser& http_parser,
                                      std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
-    int ret = Global::instance().setting_ptr_->update_runtime_setting();
+    int ret = Global::instance().setting_ptr()->update_runtime_setting();
 
     string http_ver = http_parser.get_version();
     if (ret == 0) {
@@ -70,7 +70,7 @@ static int system_status_handler(const HttpParser& http_parser,
                                  std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     std::string result;
-    Global::instance().status_ptr_->collect_status(result);
+    Global::instance().status_ptr()->collect_status(result);
 
     response = result;
     status_line = http_proto::generate_response_status_line(http_parser.get_version(), http_proto::StatusCode::success_ok);

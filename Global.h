@@ -33,14 +33,27 @@ private:
     Global& operator=(const Global&) = delete;
     
     bool initialized_;
-    
 
 public:
+    std::unique_ptr<roo::Setting>& setting_ptr() {
+        SAFE_ASSERT(setting_ptr_);
+        return setting_ptr_;
+    }
+    std::unique_ptr<roo::Status>&  status_ptr()  {
+        SAFE_ASSERT(status_ptr_);
+        return status_ptr_;
+    }
 
+    std::unique_ptr<roo::Timer>&   timer_ptr()   {
+        SAFE_ASSERT(timer_ptr_);
+        return timer_ptr_;
+    }
+
+private:
     // 使用Roo中的实现，但是都是内部持有独立的实例
-    std::shared_ptr<roo::Setting> setting_ptr_;
-    std::shared_ptr<roo::Status> status_ptr_;
-    std::shared_ptr<roo::Timer> timer_ptr_;
+    std::unique_ptr<roo::Setting> setting_ptr_;
+    std::unique_ptr<roo::Status>  status_ptr_;
+    std::unique_ptr<roo::Timer>   timer_ptr_;
     
 };
 

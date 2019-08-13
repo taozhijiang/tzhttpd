@@ -15,9 +15,9 @@ namespace tzhttpd {
 
 enum class ConnStat : uint8_t {
     kWorking = 1,
-    kPending,
-    kError,
-    kClosed,
+    kPending = 2,
+    kError   = 3,
+    kClosed  = 4,
 };
 
 enum class ShutdownType : uint8_t {
@@ -37,7 +37,7 @@ public:
         set_tcp_nonblocking(false);
     }
 
-    virtual ~ConnIf() { }
+	virtual ~ConnIf() = default;
 
 public:
 
@@ -49,7 +49,6 @@ public:
     virtual void write_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) = 0;
 
 
-    // some general tiny function
     // some general tiny settings function
 
     bool set_tcp_nonblocking(bool set_value) {
@@ -102,7 +101,6 @@ public:
         }
 
         socket_->close(ignore_ec);
-
         conn_stat_ = ConnStat::kClosed;
     }
 
@@ -125,7 +123,7 @@ public:
         conn_stat_ = ConnStat::kClosed;
     }
 
-    enum ConnStat get_conn_stat() { return conn_stat_; }
+    enum ConnStat get_conn_stat() const { return conn_stat_; }
     void set_conn_stat(enum ConnStat stat) { conn_stat_ = stat; }
 
 private:
@@ -136,6 +134,7 @@ protected:
     std::shared_ptr<boost::asio::ip::tcp::socket> socket_;
 };
 
+// 固定的发送、接收缓冲区大小
 const static uint32_t kFixedIoBufferSize = 2048;
 
 struct IOBound {

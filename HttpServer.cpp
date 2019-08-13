@@ -49,28 +49,30 @@ void init_http_version(const std::string& server_version) {
     http_handler::http_server_version = server_version;
 }
 
-bool HttpConf::load_conf(std::shared_ptr<libconfig::Config> conf_ptr) {
-    const auto& conf = *conf_ptr;
-    return load_conf(conf);
+bool HttpConf::load_setting(std::shared_ptr<libconfig::Config> setting_ptr) {
+    const auto& setting = *setting_ptr;
+    return load_setting(setting);
 }
 
-bool HttpConf::load_conf(const libconfig::Config& conf) {
+bool HttpConf::load_setting(const libconfig::Config& setting) {
 
-    conf.lookupValue("http.bind_addr", bind_addr_);
-    conf.lookupValue("http.bind_port", bind_port_);
+    setting.lookupValue("http.bind_addr", bind_addr_);
+    setting.lookupValue("http.bind_port", bind_port_);
     if (bind_addr_.empty() || bind_port_ <= 0) {
-        roo::log_err("invalid http.bind_addr %s & http.bind_port %d",
+        roo::log_err("invalid http.bind_addr %s & http.bind_port %d found!",
                      bind_addr_.c_str(), bind_port_);
         return false;
     }
 
+
+	// IP访问白名单
     std::string ip_list;
-    conf.lookupValue("http.safe_ip", ip_list);
+    setting.lookupValue("http.safe_ip", ip_list);
     if (!ip_list.empty()) {
         std::vector<std::string> ip_vec;
         std::set<std::string> ip_set;
         boost::split(ip_vec, ip_list, boost::is_any_of(";"));
-        for (std::vector<std::string>::iterator it = ip_vec.begin(); it != ip_vec.cend(); ++it) {
+        for (auto it = ip_vec.begin(); it != ip_vec.cend(); ++it) {
             std::string tmp = boost::trim_copy(*it);
             if (tmp.empty())
                 continue;
@@ -81,55 +83,55 @@ bool HttpConf::load_conf(const libconfig::Config& conf) {
         std::swap(ip_set, safe_ip_);
     }
     if (!safe_ip_.empty()) {
-        roo::log_warning("safe_ip not empty, totally contain %d items",
+        roo::log_warning("please notice safe_ip not empty, totally contain %d items",
                          static_cast<int>(safe_ip_.size()));
     }
 
-    conf.lookupValue("http.backlog_size", backlog_size_);
+    setting.lookupValue("http.backlog_size", backlog_size_);
     if (backlog_size_ < 0) {
-        roo::log_err("invalid http.backlog_size %d.", backlog_size_);
+        roo::log_err("invalid http.backlog_size %d found.", backlog_size_);
         return false;
     }
 
-    conf.lookupValue("http.io_thread_pool_size", io_thread_number_);
+    setting.lookupValue("http.io_thread_pool_size", io_thread_number_);
     if (io_thread_number_ < 0) {
         roo::log_err("invalid http.io_thread_number %d", io_thread_number_);
         return false;
     }
 
-    // once init
+    // once init，可以保证只被调用一次
     std::string server_version;
-    conf.lookupValue("http.version", server_version);
+    setting.lookupValue("http.version", server_version);
     if (!server_version.empty()) {
         std::call_once(http_version_once, init_http_version, server_version);
     }
 
-    conf.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_);
+    setting.lookupValue("http.ops_cancel_time_out", ops_cancel_time_out_);
     if (ops_cancel_time_out_ < 0) {
         roo::log_err("invalid http ops_cancel_time_out: %d", ops_cancel_time_out_);
         return false;
     }
 
-    conf.lookupValue("http.session_cancel_time_out", session_cancel_time_out_);
+    setting.lookupValue("http.session_cancel_time_out", session_cancel_time_out_);
     if (session_cancel_time_out_ < 0) {
         roo::log_err("invalid http session_cancel_time_out: %d", session_cancel_time_out_);
         return false;
     }
 
-    conf.lookupValue("http.service_enable", service_enabled_);
-    conf.lookupValue("http.service_speed", service_speed_);
+    setting.lookupValue("http.service_enable", service_enabled_);
+    setting.lookupValue("http.service_speed", service_speed_);
     if (service_speed_ < 0) {
         roo::log_err("invalid http.service_speed: %d.", service_speed_);
         return false;
     }
 
-    conf.lookupValue("http.service_concurrency", service_concurrency_);
+    setting.lookupValue("http.service_concurrency", service_concurrency_);
     if (service_concurrency_ < 0) {
         roo::log_err("invalid http.service_concurrency: %d.", service_concurrency_);
         return false;
     }
 
-    roo::log_info("HttpConf parse conf OK!");
+    roo::log_info("HttpConf parse settings successfully!");
     return true;
 }
 
@@ -181,7 +183,7 @@ bool HttpServer::init() {
         return false;
     }
 
-    auto setting_ptr = Global::instance().setting_ptr_->get_setting();
+    auto setting_ptr = Global::instance().setting_ptr()->get_setting();
     if (!setting_ptr) {
         roo::log_err("roo::Setting return null pointer, maybe your conf file ill???");
         return false;
@@ -189,7 +191,7 @@ bool HttpServer::init() {
 
     // protect cfg race conditon
     std::lock_guard<std::mutex> lock(conf_.lock_);
-    if (!conf_.load_conf(setting_ptr)) {
+    if (!conf_.load_setting(setting_ptr)) {
         roo::log_err("Load http conf failed!");
         return false;
     }
@@ -213,7 +215,8 @@ bool HttpServer::init() {
         conf_.timed_feed_token_->async_wait(
             std::bind(&HttpConf::timed_feed_token_handler, &conf_, std::placeholders::_1));
     }
-    roo::log_info("http service enabled: %s, speed: %d tps", conf_.service_enabled_ ? "true" : "false",
+    roo::log_info("http service enabled: %s, speed: %d tps",
+				  conf_.service_enabled_ ? "true" : "false",
                   conf_.service_speed_);
 
     if (!io_service_threads_.init_threads(
@@ -223,20 +226,21 @@ bool HttpServer::init() {
         return false;
     }
 
+	// 执行任务分发使用
     if (!Dispatcher::instance().init()) {
         roo::log_err("Init HttpDispatcher failed.");
         return false;
     }
 
     // 注册配置动态更新的回调函数
-    Global::instance().setting_ptr_->attach_runtime_callback(
+    Global::instance().setting_ptr()->attach_runtime_callback(
         "tzhttpd-HttpServer",
         std::bind(&HttpServer::module_runtime, shared_from_this(),
                   std::placeholders::_1));
 
     // 系统状态展示相关的初始化
-    Global::instance().status_ptr_->attach_status_callback(
-        "http_server",
+    Global::instance().status_ptr()->attach_status_callback(
+        "tzhttpd-HttpServer",
         std::bind(&HttpServer::module_status, shared_from_this(),
                   std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 
@@ -245,6 +249,7 @@ bool HttpServer::init() {
         return false;
     }
 
+	roo::log_info("HttpServer initialized successfully!");
     return true;
 }
 
@@ -334,6 +339,7 @@ void HttpServer::accept_handler(const boost::system::error_code& ec, SocketPtr s
             break;
         }
 
+		// 远程访问客户端的地址信息
         std::string remote_ip = remote.address().to_string(ignore_ec);
         roo::log_info("Remote Client Info: %s:%d", remote_ip.c_str(), remote.port());
 
@@ -393,15 +399,15 @@ int HttpServer::io_service_join() {
 
 
 int HttpServer::register_http_status_callback(const std::string& name, roo::StatusCallable func) {
-    return Global::instance().status_ptr_->attach_status_callback(name, func);
+    return Global::instance().status_ptr()->attach_status_callback(name, func);
 }
 
 int HttpServer::register_http_runtime_callback(const std::string& name, roo::SettingUpdateCallable func) {
-    return Global::instance().setting_ptr_->attach_runtime_callback(name, func);
+    return Global::instance().setting_ptr()->attach_runtime_callback(name, func);
 }
 
 int HttpServer::update_http_runtime_conf() {
-    return Global::instance().setting_ptr_->update_runtime_setting();
+    return Global::instance().setting_ptr()->update_runtime_setting();
 }
 
 
@@ -440,10 +446,10 @@ int HttpServer::module_status(std::string& strModule, std::string& strKey, std::
 }
 
 
-int HttpServer::module_runtime(const libconfig::Config& cfg) {
+int HttpServer::module_runtime(const libconfig::Config& setting) {
 
     HttpConf conf{};
-    if (!conf.load_conf(cfg)) {
+    if (!conf.load_setting(setting)) {
         roo::log_err("load conf for HttpConf failed.");
         return -1;
     }

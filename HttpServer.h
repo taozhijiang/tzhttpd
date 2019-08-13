@@ -10,11 +10,7 @@
 
 #include <boost/asio/steady_timer.hpp>
 using boost::asio::steady_timer;
-
-
 #include <boost/asio.hpp>
-
-#include <libconfig/libconfig.h++>
 
 #include <set>
 #include <map>
@@ -44,12 +40,12 @@ class HttpConf {
 
     friend class HttpServer;
 
-    bool        service_enabled_;   // 服务开关
+    bool        service_enabled_;            // 服务开关
     int32_t     service_speed_;
 
     int32_t     service_token_;
 
-    int32_t     service_concurrency_;       // 最大连接并发控制
+    int32_t     service_concurrency_;        // 最大连接并发控制
 
     int32_t     session_cancel_time_out_;    // session间隔会话时长
     int32_t     ops_cancel_time_out_;        // ops操作超时时长
@@ -66,20 +62,22 @@ class HttpConf {
     int32_t        io_thread_number_;
 
 
-    bool load_conf(std::shared_ptr<libconfig::Config> conf_ptr);
-    bool load_conf(const libconfig::Config& conf);
+    bool load_setting(std::shared_ptr<libconfig::Config> setting_ptr);
+    bool load_setting(const libconfig::Config& setting);
 
 
+	// 如果通过检查，不在受限列表中，就返回true放行
     bool check_safe_ip(const std::string& ip) {
         std::lock_guard<std::mutex> lock(lock_);
         return (safe_ip_.empty() || (safe_ip_.find(ip) != safe_ip_.cend()));
     }
 
+	// 限流模式使用
     bool get_http_service_token() {
 
         // 注意：
         // 如果关闭这个选项，则整个服务都不可用了(包括管理页面)
-        // 此时如果需要变更除非重启服务，或者采用非web方式(比如发送命令)来恢复配置
+        // 此时如果需要变更除非重启整个服务，或者采用非web方式(比如通过发送命令)来恢复配置
 
         if (!service_enabled_) {
             roo::log_warning("http_service not enabled ...");
@@ -103,6 +101,7 @@ class HttpConf {
         ++service_token_;
     }
 
+	// 采用定时器来喂狗
     void feed_http_service_token() {
         service_token_ = service_speed_;
     }
@@ -110,7 +109,7 @@ class HttpConf {
     std::shared_ptr<steady_timer> timed_feed_token_;
     void timed_feed_token_handler(const boost::system::error_code& ec);
 
-    // 默认初始化良好的数据
+    // 默认初始化，生成良好行为的数据
     HttpConf() :
         service_enabled_(true),
         service_speed_(0),
@@ -134,15 +133,16 @@ typedef std::shared_ptr<boost::asio::ip::tcp::socket>    SocketPtr;
 
 class HttpServer : public std::enable_shared_from_this<HttpServer> {
 
-
     __noncopyable__(HttpServer)
 
     friend class TcpConnAsync;  // can not work with typedef, ugly ...
 
 public:
 
-    // PUBLIC API CALL HERE
-
+	//
+    // ALL AVAILABLE PUBLIC API CALL HERE
+    //
+	
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     ~HttpServer() = default;
@@ -193,8 +193,9 @@ public:
     int io_service_join();
 
 public:
-    int module_runtime(const libconfig::Config& conf);
+    int module_runtime(const libconfig::Config& setting);
     int module_status(std::string& strModule, std::string& strKey, std::string& strValue);
+
 };
 
 

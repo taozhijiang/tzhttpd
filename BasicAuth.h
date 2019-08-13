@@ -37,7 +37,7 @@ public:
     bool init(const libconfig::Setting& setting, bool strict = false) {
 
         if (!setting.exists("basic_auth")) {
-            roo::log_err("conf does not contains basic_auth part.");
+            roo::log_err("setting does not contain basic_auth part, ignore following configuration.");
             return true;
         }
 
@@ -47,9 +47,10 @@ public:
         for (int i = 0; i < basic_auth.getLength(); ++i) {
             const libconfig::Setting& basic_auths_item = basic_auth[i];
             if (!basic_auths_item.exists("uri") || !basic_auths_item.exists("auth")) {
-                roo::log_err("required uri and auth not found.");
+                roo::log_err("required uri and auth does not found, ignore this item.");
                 continue;
             }
+			
             std::string auth_uri_regex;
             basic_auths_item.lookupValue("uri", auth_uri_regex);
             auth_uri_regex = roo::StrUtil::pure_uri_path(auth_uri_regex);
@@ -57,7 +58,6 @@ public:
             std::set<std::string> auth_set{};
             const libconfig::Setting& auth = basic_auths_item["auth"];
             for (int j = 0; j < auth.getLength(); ++j) {
-
                 const libconfig::Setting& auth_acct = auth[j];
                 std::string auth_user;
                 std::string auth_passwd;
@@ -67,7 +67,7 @@ public:
 
                 if (auth_user.empty() || auth_passwd.empty()) {
                     if (strict) {
-                        roo::log_err("basic_auth err account item %s, strict error return.", auth_user.c_str());
+                        roo::log_err("basic_auth err account item %s, strict mode will treate as error return.", auth_user.c_str());
                         return false;
                     } else {
                         roo::log_err("basic_auth skip err account item %s, skip this.", auth_user.c_str());
@@ -79,7 +79,7 @@ public:
                 std::string auth_base = CryptoUtil::base64_encode(auth_str);
 
                 auth_set.insert(auth_base);
-                roo::log_info("basic_auth detected valid item for user %s ", auth_user.c_str());
+                roo::log_info("basic_auth detected valid item for user %s.", auth_user.c_str());
             }
 
             if (auth_set.empty()) {
@@ -89,7 +89,7 @@ public:
 
             roo::UriRegex rgx{auth_uri_regex};
             basic_auths_load->push_back({ rgx, auth_set });
-            roo::log_info("success add %d auth items for uri %s.",
+            roo::log_info("successfully add %d auth items for uri %s.",
                           static_cast<int>(auth_set.size()), auth_uri_regex.c_str());
         }
 
@@ -97,6 +97,7 @@ public:
                       static_cast<int>(basic_auths_load->size()));
 
         {
+			// update with new settings here
             std::lock_guard<std::mutex> lock(lock_);
             basic_auths_.swap(basic_auths_load);
         }

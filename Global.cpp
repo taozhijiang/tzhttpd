@@ -24,19 +24,19 @@ bool Global::init(const std::string& setting_file) {
 
     initialized_ = true;
 
-    timer_ptr_ = std::make_shared<roo::Timer>();
+    timer_ptr_ = make_unique<roo::Timer>();
     if (!timer_ptr_ || !timer_ptr_->init()) {
         roo::log_err("Create and init roo::Timer service failed.");
         return false;
     }
 
-    status_ptr_ = std::make_shared<roo::Status>();
+    status_ptr_ = make_unique<roo::Status>();
     if (!status_ptr_) {
         roo::log_err("Create roo::Status failed.");
         return false;
     }
 
-    setting_ptr_ = std::make_shared<roo::Setting>();
+    setting_ptr_ = make_unique<roo::Setting>();
     if (!setting_ptr_ || !setting_ptr_->init(setting_file)) {
         roo::log_err("Create and init roo::Setting with cfg %s failed.", setting_file.c_str());
         return false;

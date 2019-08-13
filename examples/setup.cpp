@@ -25,14 +25,14 @@ static void interrupted_callback(int signal) {
     switch (signal) {
         case SIGHUP:
             roo::log_warning("SIGHUP recv, do update_run_conf... ");
-            tzhttpd::Global::instance().setting_ptr_->update_runtime_setting();
+            tzhttpd::Global::instance().setting_ptr()->update_runtime_setting();
             break;
 
         case SIGUSR1:
             roo::log_warning("SIGUSR recv, do module_status ... ");
             {
                 std::string output;
-                tzhttpd::Global::instance().status_ptr_->collect_status(output);
+                tzhttpd::Global::instance().status_ptr()->collect_status(output);
                 std::cout << output << std::endl;
                 roo::log_warning("%s", output.c_str());
             }

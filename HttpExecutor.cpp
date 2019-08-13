@@ -223,7 +223,7 @@ int HttpExecutor::default_get_handler(const HttpParser& http_parser, std::string
 
 bool HttpExecutor::init() {
 
-    auto conf_ptr = Global::instance().setting_ptr_->get_setting();
+    auto conf_ptr = Global::instance().setting_ptr()->get_setting();
     if (!conf_ptr) {
         roo::log_err("ConfHelper not initialized? return conf_ptr empty!!!");
         return false;

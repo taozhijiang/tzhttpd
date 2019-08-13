@@ -56,14 +56,15 @@ bool Executor::init() {
                       instance_name().c_str(),
                       conf_.exec_thread_number_hard_, conf_.exec_thread_step_queue_size_);
 
-        if (!Global::instance().timer_ptr_->add_timer(std::bind(&Executor::executor_threads_adjust, shared_from_this(), std::placeholders::_1),
-                                                      1 * 1000, true)) {
+        if (!Global::instance().timer_ptr()->add_timer(
+                std::bind(&Executor::executor_threads_adjust, shared_from_this(), std::placeholders::_1),
+                1 * 1000, true)) {
             roo::log_err("create thread adjust timer failed.");
             return false;
         }
     }
 
-    Global::instance().status_ptr_->attach_status_callback(
+    Global::instance().status_ptr()->attach_status_callback(
         "tzhttpd-executor_" + instance_name(),
         std::bind(&Executor::module_status, shared_from_this(),
                   std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
