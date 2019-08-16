@@ -9,7 +9,6 @@
 #define __TZHTTPD_GLOBAL_H__
 
 #include <xtra_rhel.h>
-#include <memory>
 
 #include <concurrency/Timer.h>
 #include <scaffold/Status.h>
@@ -18,6 +17,9 @@
 namespace tzhttpd {
 
 class Global {
+
+    __noncopyable__(Global)
+
 public:
     static Global& instance();
     bool init(const std::string& setting_file);
@@ -29,9 +31,6 @@ private:
 
     ~Global() = default;
 
-    Global(const Global&) = delete;
-    Global& operator=(const Global&) = delete;
-    
     bool initialized_;
 
 public:

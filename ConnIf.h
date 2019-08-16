@@ -11,6 +11,9 @@
 #include <mutex>
 #include "Buffer.h"
 
+#include <boost/system/error_code.hpp>
+#include <boost/asio.hpp>
+
 namespace tzhttpd {
 
 enum class ConnStat : uint8_t {

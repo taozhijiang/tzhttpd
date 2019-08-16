@@ -10,11 +10,11 @@
 #include <thread>
 #include <functional>
 
-#include <boost/algorithm/string.hpp>
 
 #include <string/StrUtil.h>
 
 #include "HttpParser.h"
+#include "HttpConf.h"
 #include "HttpServer.h"
 #include "HttpProto.h"
 #include "TcpConnAsync.h"
@@ -40,7 +40,7 @@ TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socke
     ops_cancel_timer_(),
     session_cancel_timer_(),
     http_server_(server),
-    strand_(std::make_shared<boost::asio::io_service::strand>(server.io_service_)) {
+    strand_(std::make_shared<boost::asio::io_service::strand>(server.io_service())) {
 
     set_tcp_nodelay(true);
     set_tcp_nonblocking(true);
@@ -505,7 +505,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
     if (session_cancel_timer_) {
         session_cancel_timer_->cancel(ignore_ec);
     } else {
-        session_cancel_timer_.reset(new steady_timer(http_server_.io_service_));
+        session_cancel_timer_.reset(new steady_timer(http_server_.io_service()));
     }
 
     SAFE_ASSERT(http_server_.session_cancel_time_out());
@@ -539,7 +539,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
     if (ops_cancel_timer_) {
         ops_cancel_timer_->cancel(ignore_ec);
     } else {
-        ops_cancel_timer_.reset(new steady_timer(http_server_.io_service_));
+        ops_cancel_timer_.reset(new steady_timer(http_server_.io_service()));
     }
 
     SAFE_ASSERT(http_server_.ops_cancel_time_out());

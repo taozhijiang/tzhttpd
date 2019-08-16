@@ -27,19 +27,19 @@ static int system_updateconf_handler(const HttpParser& http_parser,
 static int system_drop_handler(const HttpParser& http_parser,
                                std::string& response, std::string& status_line, std::vector<std::string>& add_header);
 
-bool system_manage_page_init(HttpServer& server) {
+bool system_manage_page_init() {
 
-    if (server.add_http_get_handler("^/internal/status$", system_status_handler, true) != 0) {
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/status$", system_status_handler, true) != 0) {
         roo::log_err("register system status module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/updateconf$", system_updateconf_handler, true) != 0) {
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/updateconf$", system_updateconf_handler, true) != 0) {
         roo::log_err("register system update runtime conf module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/drop$", system_drop_handler, true) != 0) {
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/drop$", system_drop_handler, true) != 0) {
         roo::log_err("register system handler control failed, treat as fatal.");
         return false;
     }
@@ -49,8 +49,9 @@ bool system_manage_page_init(HttpServer& server) {
 
 
 
-static int system_updateconf_handler(const HttpParser& http_parser,
-                                     std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_updatesetting_handler(const HttpParser& http_parser,
+                                 std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     int ret = Global::instance().setting_ptr()->update_runtime_setting();
 
@@ -66,8 +67,9 @@ static int system_updateconf_handler(const HttpParser& http_parser,
     return 0;
 }
 
-static int system_status_handler(const HttpParser& http_parser,
-                                 std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_status_handler(const HttpParser& http_parser,
+                          std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     std::string result;
     Global::instance().status_ptr()->collect_status(result);
@@ -78,8 +80,9 @@ static int system_status_handler(const HttpParser& http_parser,
     return 0;
 }
 
-static int system_drop_handler(const HttpParser& http_parser,
-                               std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_drop_handler(const HttpParser& http_parser,
+                        std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
 

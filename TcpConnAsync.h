@@ -8,8 +8,6 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
-#include <xtra_rhel.h>
-
 #include <boost/asio.hpp>
 #include <boost/atomic/atomic.hpp>
 

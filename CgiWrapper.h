@@ -10,7 +10,6 @@
 
 // 所有的http uri 路由
 
-#include <libconfig/libconfig.h++>
 
 #include <vector>
 #include <string>
@@ -18,6 +17,8 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
+
+#include <scaffold/Setting.h>
 
 namespace tzhttpd {
 

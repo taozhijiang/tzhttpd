@@ -11,7 +11,6 @@
 #include <xtra_rhel.h>
 
 #include <cinttypes>
-#include <memory>
 
 #include <map>
 #include <mutex>

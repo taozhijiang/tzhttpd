@@ -16,6 +16,8 @@ namespace tzhttpd {
 
 class Buffer {
 
+    __noncopyable__(Buffer)
+
 public:
     // 构造函数
 
@@ -100,9 +102,6 @@ public:
     }
 
 private:
-
-    Buffer(const Buffer&) = delete;
-    Buffer& operator=(const Buffer&) = delete;
 
     std::vector<char> data_;
 };

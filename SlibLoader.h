@@ -18,14 +18,18 @@
 namespace tzhttpd {
 
 class SLibLoader {
+
+    __noncopyable__(SLibLoader)
+
 public:
     SLibLoader(const std::string& dl_path) :
         dl_path_(dl_path),
         dl_handle_(NULL) {
     }
 
-    SLibLoader(const SLibLoader&) = delete;
-    SLibLoader& operator=(const SLibLoader&) = delete;
+    ~SLibLoader() {
+        close();
+    }
 
     std::string get_dl_path() {
         return dl_path_;
@@ -105,9 +109,6 @@ public:
         }
     }
 
-    ~SLibLoader() {
-        close();
-    }
 
 private:
 

@@ -10,9 +10,7 @@
 
 #include <memory>
 
-#include "Buffer.h"
 #include "TcpConnAsync.h"
-
 #include "HttpProto.h"
 
 namespace tzhttpd {
