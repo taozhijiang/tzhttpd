@@ -1,12 +1,16 @@
+/*-
+ * Copyright (c) 2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include <unistd.h>
 #include <sstream>
 
-#include <syslog.h>
 #include <cstdio>
 #include <libconfig.h++>
 
-#include "CheckPoint.h"
-#include "Log.h"
 #include "HttpParser.h"
 #include "HttpServer.h"
 
@@ -34,7 +38,7 @@ extern std::string http_server_version;
 } // end namespace tzhttpd
 
 
-extern char * program_invocation_short_name;
+extern char* program_invocation_short_name;
 
 char cfgFile[PATH_MAX] = "httpsrv.conf";
 bool daemonize = false;
@@ -53,9 +57,8 @@ static int module_status(std::string& module, std::string& name, std::string& va
 int main(int argc, char* argv[]) {
 
     int opt_g = 0;
-    while( (opt_g = getopt(argc, argv, "c:dhv")) != -1 ) {
-        switch(opt_g)
-        {
+    while ((opt_g = getopt(argc, argv, "c:dhv")) != -1) {
+        switch (opt_g) {
             case 'c':
                 memset(cfgFile, 0, sizeof(cfgFile));
                 strncpy(cfgFile, optarg, PATH_MAX);
@@ -75,25 +78,46 @@ int main(int argc, char* argv[]) {
     }
 
 
-    libconfig::Config cfg;
-    std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
+    auto setting = std::make_shared<roo::Setting>();
+    if (!setting || !setting->init(cfgFile)) {
+        fprintf(stderr, "Create and init roo::Setting with cfg %s failed.", cfgFile);
+        return false;
+    }
 
-    // default syslog
-    tzhttpd::set_checkpoint_log_store_func(syslog);
-    // setup in default DEBUG level, then reinialize when conf prased
-    tzhttpd::tzhttpd_log_init(7);
-    tzhttpd::tzhttpd_log_debug("first stage log init with default DEBUG finished.");
+    auto setting_ptr = setting->get_setting();
+    if (!setting_ptr) {
+        fprintf(stderr, "roo::Setting return null pointer, maybe your conf file ill???");
+        return false;
+    }
+
+    int log_level = 0;
+    setting_ptr->lookupValue("log_level", log_level);
+    if (log_level <= 0 || log_level > 7) {
+        fprintf(stderr, "Invalid log_level %d, reset to default 7(DEBUG).", log_level);
+        log_level = 7;
+    }
+
+    std::string log_path;
+    setting_ptr->lookupValue("log_path", log_path);
+    if (log_path.empty())
+        log_path = "./log";
+
+    roo::log_init(log_level, "", log_path, LOG_LOCAL6);
+    roo::log_warning("Initialized roo::Log with level %d, path %s.", log_level, log_path.c_str());
+
+
+    std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
 
     // daemonize should before any thread creation...
     if (daemonize) {
-        tzhttpd::tzhttpd_log_notice("we will daemonize this service...");
+        roo::log_warning("we will daemonize this service...");
 
         bool chdir = false; // leave the current working directory in case
                             // the user has specified relative paths for
-                            // the config file, etc
+        // the config file, etc
         bool close = true;  // close stdin, stdout, stderr
         if (::daemon(!chdir, !close) != 0) {
-            tzhttpd::tzhttpd_log_err("call to daemon() failed: %s", strerror(errno));
+            roo::log_err("call to daemon() failed: %s", strerror(errno));
             ::exit(EXIT_FAILURE);
         }
     }
@@ -102,8 +126,8 @@ int main(int argc, char* argv[]) {
     init_signal_handle();
 
     http_server_ptr.reset(new tzhttpd::HttpServer(cfgFile, "example_main"));
-    if (!http_server_ptr ) {
-        tzhttpd::tzhttpd_log_err("create HttpServer failed!");
+    if (!http_server_ptr) {
+        roo::log_err("create HttpServer failed!");
         ::exit(EXIT_FAILURE);
     }
 
@@ -112,8 +136,8 @@ int main(int argc, char* argv[]) {
     http_server_ptr->add_http_vhost("www.example2.com");
     http_server_ptr->add_http_vhost("www.example3.com");
 
-    if(!http_server_ptr->init()){
-        tzhttpd::tzhttpd_log_err("init HttpServer failed!");
+    if (!http_server_ptr->init()) {
+        roo::log_err("init HttpServer failed!");
         ::exit(EXIT_FAILURE);
     }
 
@@ -130,9 +154,9 @@ int main(int argc, char* argv[]) {
 
 namespace boost {
 
-void assertion_failed(char const * expr, char const * function, char const * file, long line) {
+void assertion_failed(char const* expr, char const* function, char const* file, long line) {
     fprintf(stderr, "BAD!!! expr `%s` assert failed at %s(%ld): %s", expr, file, line, function);
-    tzhttpd::tzhttpd_log_err("BAD!!! expr `%s` assert failed at %s(%ld): %s", expr, file, line, function);
+    roo::log_err("BAD!!! expr `%s` assert failed at %s(%ld): %s", expr, file, line, function);
 }
 
 } // end boost

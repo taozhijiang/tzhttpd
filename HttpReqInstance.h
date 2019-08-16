@@ -10,9 +10,7 @@
 
 #include <memory>
 
-#include "Buffer.h"
 #include "TcpConnAsync.h"
-
 #include "HttpProto.h"
 
 namespace tzhttpd {
@@ -23,7 +21,7 @@ struct HttpReqInstance {
                     const std::string& hostname,
                     const std::string& uri,
                     std::shared_ptr<HttpParser> http_parser,
-                    const std::string& data):
+                    const std::string& data) :
         method_(method),
         hostname_(hostname),
         uri_(uri),
@@ -50,7 +48,7 @@ struct HttpReqInstance {
         ss << "method:" << HTTP_METHOD_STRING(method_) << ", ";
         ss << "hostname:" << hostname_ << ", ";
         ss << "uri:" << uri_ << ", ";
-        ss << "data:" << data_ ;
+        ss << "data:" << data_;
 
         return ss.str();
     }
@@ -63,7 +61,7 @@ struct HttpReqInstance {
             return;
         }
 
-        tzhttpd_log_err("connection already released before.");
+        roo::log_err("connection already released before.");
     }
 
     void http_response(const std::string& response_str,
@@ -76,7 +74,7 @@ struct HttpReqInstance {
             return;
         }
 
-        tzhttpd_log_err("connection already released before.");
+        roo::log_err("connection already released before.");
     }
 };
 

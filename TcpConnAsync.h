@@ -8,8 +8,6 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
-#include <xtra_rhel.h>
-
 #include <boost/asio.hpp>
 #include <boost/atomic/atomic.hpp>
 
@@ -29,6 +27,7 @@ class HttpServer;
 class TcpConnAsync : public ConnIf,
     public std::enable_shared_from_this<TcpConnAsync> {
 
+    __noncopyable__(TcpConnAsync)
     friend class HttpReqInstance;
 
 public:
@@ -37,11 +36,8 @@ public:
     static boost::atomic<int32_t> current_concurrency_;
 
     /// Construct a connection with the given socket.
-    TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket, HttpServer& server);
+    TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> socket, HttpServer& server);
     virtual ~TcpConnAsync();
-
-    TcpConnAsync(const TcpConnAsync&) = delete;
-    TcpConnAsync& operator=(const TcpConnAsync&) = delete;
 
     virtual void start();
     void stop();
@@ -51,15 +47,15 @@ public:
 
 private:
 
-    virtual bool do_read() override { SAFE_ASSERT(false);
+    virtual bool do_read()override { SAFE_ASSERT(false);
         return false;}
-    virtual void read_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) override {
+    virtual void read_handler(const boost::system::error_code& ec, std::size_t bytes_transferred)override {
         SAFE_ASSERT(false);
     }
 
-    virtual bool do_write() override { SAFE_ASSERT(false);
+    virtual bool do_write()override { SAFE_ASSERT(false);
         return false;}
-    virtual void write_handler(const boost::system::error_code& ec, std::size_t bytes_transferred) override {
+    virtual void write_handler(const boost::system::error_code& ec, std::size_t bytes_transferred)override {
         SAFE_ASSERT(false);
     }
 
@@ -97,19 +93,19 @@ private:
     bool keep_continue(const std::shared_ptr<HttpParser>& http_parser);
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const char* data, size_t len, const string& status) {
+                            const char* data, size_t len, const std::string& status) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
         fill_http_for_send(http_parser, msg, status, { });
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const string& str, const string& status) {
+                            const std::string& str, const std::string& status) {
         fill_http_for_send(http_parser, str, status, { });
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const char* data, size_t len, const string& status,
+                            const char* data, size_t len, const std::string& status,
                             const std::vector<std::string>& additional_header) {
         SAFE_ASSERT(data && len);
         std::string msg(data, len);
@@ -117,7 +113,7 @@ private:
     }
 
     void fill_http_for_send(std::shared_ptr<HttpParser> http_parser,
-                            const string& str, const string& status,
+                            const std::string& str, const std::string& status,
                             const std::vector<std::string>& additional_header);
 
     // 标准的HTTP响应头和响应体

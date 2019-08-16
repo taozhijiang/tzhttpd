@@ -8,8 +8,9 @@
 #ifndef __TZHTTPD_DISPATCHER_H__
 #define __TZHTTPD_DISPATCHER_H__
 
+#include <xtra_rhel.h>
+
 #include <cinttypes>
-#include <memory>
 
 #include <map>
 #include <mutex>
@@ -22,6 +23,8 @@ class HttpReqInstance;
 class Executor;
 
 class Dispatcher {
+
+    __noncopyable__(Dispatcher)
 
 public:
     static Dispatcher& instance();
@@ -45,16 +48,12 @@ public:
 
 private:
 
-    Dispatcher():
+    Dispatcher() :
         initialized_(false),
-        services_({}){
+        services_({ }) {
     }
 
-    ~Dispatcher() {
-    }
-
-    Dispatcher(const Dispatcher&) = delete;
-    Dispatcher& operator=(const Dispatcher&) = delete;
+    ~Dispatcher() = default;
 
     bool initialized_;
 

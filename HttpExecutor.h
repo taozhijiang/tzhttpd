@@ -11,9 +11,10 @@
 
 #include <xtra_rhel.h>
 
-#include <libconfig.h++>
+#include <scaffold/Setting.h>
 
 #include <boost/thread/locks.hpp>
+#include <string/UriRegex.h>
 
 #include "Executor.h"
 #include "HttpProto.h"
@@ -25,11 +26,11 @@ namespace tzhttpd {
 
 class BasicAuth;
 
-class HttpExecutor: public ServiceIf {
+class HttpExecutor : public ServiceIf {
 
 public:
 
-    explicit HttpExecutor(const std::string& hostname):
+    explicit HttpExecutor(const std::string& hostname) :
         hostname_(hostname),
         EMPTY_STRING(),
         conf_lock_(),
@@ -43,9 +44,9 @@ public:
 
     bool init();
 
-    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override;
+    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance)override;
 
-    std::string instance_name() override {
+    std::string instance_name()override {
         return hostname_;
     }
 
@@ -55,18 +56,18 @@ public:
 
 
     // override
-    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override;
-    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override;
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in)override;
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in)override;
 
-    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method) override;
+    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method)override;
 
     // 对于任何uri，可以先用这个接口进行卸载，然后再使用动态配置增加接口，借此实现接口的动态更新
-    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method) override;
+    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method)override;
 
 
 
-    int module_runtime(const libconfig::Config& conf) override;
-    int module_status(std::string& strModule, std::string& strKey, std::string& strValue) override;
+    int module_runtime(const libconfig::Config& conf)override;
+    int module_status(std::string& module, std::string& key, std::string& value)override;
 
 
 private:
@@ -138,7 +139,7 @@ private:
 
     // 使用vector保存handler，保证是先注册handler具有高优先级
     boost::shared_mutex rwlock_;
-    std::vector<std::pair<UriRegex, HttpHandlerObjectPtr>> handlers_;
+    std::vector<std::pair<roo::UriRegex, HttpHandlerObjectPtr>> handlers_;
 
 };
 

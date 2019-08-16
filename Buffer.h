@@ -16,14 +16,16 @@ namespace tzhttpd {
 
 class Buffer {
 
+    __noncopyable__(Buffer)
+
 public:
     // 构造函数
 
-    Buffer():
-        data_ ({}) {
+    Buffer() :
+        data_({ }) {
     }
 
-    explicit Buffer(const std::string& data):
+    explicit Buffer(const std::string& data) :
         data_(data.begin(), data.end()) {
     }
 
@@ -62,7 +64,7 @@ public:
             return false;
         }
 
-        ::memcpy(store, data_.data(), sz );
+        ::memcpy(store, data_.data(), sz);
 
         // 之前的设计思路:
         // 先将send_bound_中的数据拷贝到io_block_中进行发送，然后根据传输的结果
@@ -90,9 +92,9 @@ public:
     // 访问成员数据
     char* get_data() {
         if (data_.empty()) {
-            return static_cast<char *>(nullptr);
+            return static_cast<char*>(nullptr);
         }
-        return static_cast<char *>(data_.data());
+        return static_cast<char*>(data_.data());
     }
 
     uint32_t get_length() {
@@ -100,9 +102,6 @@ public:
     }
 
 private:
-
-    Buffer(const Buffer&) = delete;
-    Buffer& operator=(const Buffer&) = delete;
 
     std::vector<char> data_;
 };

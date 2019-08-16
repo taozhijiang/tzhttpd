@@ -38,4 +38,5 @@ curl 'http://127.0.0.1:18430/internal/updateconf'
 With rdynamic and whole-archive link options, dynamic cgi-handler (through .so) can also use main program symbols, but those symbols should be built with --fvisibility=default, or your program in so may complain for undefined symbol. Though so deploy is convenient, but should be using very carefully, please use nm -r to check all U symbols of your \*.so, and use readelf -s to check whether these symbol are DEFAULT visibility in the main program.   
 
 ### Reference project
-[tzmonitor](https://github.com/taozhijiang/tzmonitor) http_face example.   
+[heracles](https://github.com/taozhijiang/heracles) http_face example.   
+[tzhttpd_indepent](https://github.com/taozhijiang/tzhttpd_indepent) use tzhttpd without build from scratch.

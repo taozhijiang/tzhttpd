@@ -10,12 +10,13 @@
 
 #include <xtra_rhel.h>
 
-#include "Log.h"
-#include "EQueue.h"
+#include <other/Log.h>
+#include <container/EQueue.h>
+#include <concurrency/ThreadPool.h>
+
 #include "ServiceIf.h"
 
-#include "ConfHelper.h"
-#include "ThreadPool.h"
+#include "Global.h"
 
 namespace tzhttpd {
 
@@ -28,52 +29,52 @@ struct ExecutorConf {
     int exec_thread_step_queue_size_;
 };
 
-class Executor: public ServiceIf,
-                public std::enable_shared_from_this<Executor> {
+class Executor : public ServiceIf,
+    public std::enable_shared_from_this<Executor> {
 
 public:
 
-    explicit Executor(std::shared_ptr<ServiceIf> service_impl):
+    explicit Executor(std::shared_ptr<ServiceIf> service_impl) :
         service_impl_(service_impl),
         http_req_queue_(),
         conf_lock_(),
-        conf_({}) {
+        conf_({ }) {
     }
 
-    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) override {
+    void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance)override {
         http_req_queue_.PUSH(http_req_instance);
     }
 
-    std::string instance_name() override {
+    std::string instance_name()override {
         return service_impl_->instance_name();
     }
 
-    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in) override {
+    int add_get_handler(const std::string& uri_regex, const HttpGetHandler& handler, bool built_in)override {
         return service_impl_->add_get_handler(uri_regex, handler, built_in);
     }
 
-    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in) override {
+    int add_post_handler(const std::string& uri_regex, const HttpPostHandler& handler, bool built_in)override {
         return service_impl_->add_post_handler(uri_regex, handler, built_in);
     }
 
-    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method) override {
+    bool exist_handler(const std::string& uri_regex, enum HTTP_METHOD method)override {
         return service_impl_->exist_handler(uri_regex, method);
     }
 
-    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method) override {
+    int drop_handler(const std::string& uri_regex, enum HTTP_METHOD method)override {
         return service_impl_->drop_handler(uri_regex, method);
     }
 
 
 
     bool init();
-    int module_runtime(const libconfig::Config& conf) override;
-    int module_status(std::string& strModule, std::string& strKey, std::string& strValue) override;
+    int module_runtime(const libconfig::Config& conf)override;
+    int module_status(std::string& module, std::string& key, std::string& value)override;
 
 private:
     // point to HttpExecutor, forward some request
     std::shared_ptr<ServiceIf> service_impl_;
-    EQueue<std::shared_ptr<HttpReqInstance>> http_req_queue_;
+    roo::EQueue<std::shared_ptr<HttpReqInstance>> http_req_queue_;
 
 
 private:
@@ -82,21 +83,21 @@ private:
     std::mutex   conf_lock_;
     ExecutorConf conf_;
 
-    ThreadPool executor_threads_;
-    void executor_service_run(ThreadObjPtr ptr);  // main task loop
+    roo::ThreadPool executor_threads_;
+    void executor_service_run(roo::ThreadObjPtr ptr);  // main task loop
 
 public:
 
     int executor_start() {
 
-        tzhttpd_log_notice("about to start executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to start executor for host %s ... ", instance_name().c_str());
         executor_threads_.start_threads();
         return 0;
     }
 
     int executor_stop_graceful() {
 
-        tzhttpd_log_notice("about to stop executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to stop executor for host %s ... ", instance_name().c_str());
         executor_threads_.graceful_stop_threads();
 
         return 0;
@@ -104,7 +105,7 @@ public:
 
     int executor_join() {
 
-        tzhttpd_log_notice("about to join executor for host %s ... ", instance_name().c_str());
+        roo::log_warning("about to join executor for host %s ... ", instance_name().c_str());
         executor_threads_.join_threads();
         return 0;
     }

@@ -10,8 +10,7 @@
 #include "HttpServer.h"
 
 #include "Dispatcher.h"
-#include "ConfHelper.h"
-#include "Status.h"
+#include "Global.h"
 
 namespace tzhttpd {
 
@@ -28,20 +27,20 @@ static int system_updateconf_handler(const HttpParser& http_parser,
 static int system_drop_handler(const HttpParser& http_parser,
                                std::string& response, std::string& status_line, std::vector<std::string>& add_header);
 
-bool system_manage_page_init(HttpServer& server) {
+bool system_manage_page_init() {
 
-    if (server.add_http_get_handler("^/internal/status$", system_status_handler, true) != 0) {
-        tzhttpd_log_err("register system status module failed, treat as fatal.");
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/status$", system_status_handler, true) != 0) {
+        roo::log_err("register system status module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/updateconf$", system_updateconf_handler, true) != 0) {
-        tzhttpd_log_err("register system update runtime conf module failed, treat as fatal.");
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/updateconf$", system_updateconf_handler, true) != 0) {
+        roo::log_err("register system update runtime conf module failed, treat as fatal.");
         return false;
     }
 
-    if (server.add_http_get_handler("^/internal/drop$", system_drop_handler, true) != 0) {
-        tzhttpd_log_err("register system handler control failed, treat as fatal.");
+    if (Dispatcher::instance().add_http_get_handler("", "^/internal/drop$", system_drop_handler, true) != 0) {
+        roo::log_err("register system handler control failed, treat as fatal.");
         return false;
     }
 
@@ -50,10 +49,11 @@ bool system_manage_page_init(HttpServer& server) {
 
 
 
-static int system_updateconf_handler(const HttpParser& http_parser,
-                                     std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_updatesetting_handler(const HttpParser& http_parser,
+                                 std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
-    int ret = ConfHelper::instance().update_runtime_conf();
+    int ret = Global::instance().setting_ptr()->update_runtime_setting();
 
     string http_ver = http_parser.get_version();
     if (ret == 0) {
@@ -67,11 +67,12 @@ static int system_updateconf_handler(const HttpParser& http_parser,
     return 0;
 }
 
-static int system_status_handler(const HttpParser& http_parser,
-                                 std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_status_handler(const HttpParser& http_parser,
+                          std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     std::string result;
-    Status::instance().collect_status(result);
+    Global::instance().status_ptr()->collect_status(result);
 
     response = result;
     status_line = http_proto::generate_response_status_line(http_parser.get_version(), http_proto::StatusCode::success_ok);
@@ -79,8 +80,9 @@ static int system_status_handler(const HttpParser& http_parser,
     return 0;
 }
 
-static int system_drop_handler(const HttpParser& http_parser,
-                               std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+static
+int system_drop_handler(const HttpParser& http_parser,
+                        std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     const UriParamContainer& params = http_parser.get_request_uri_params();
 
@@ -88,7 +90,7 @@ static int system_drop_handler(const HttpParser& http_parser,
     std::string uri      = params.VALUE("uri");
     std::string method   = params.VALUE("method");
     if (uri.empty() || (!method.empty() && method != "GET" && method != "POST" && method != "ALL")) {
-        tzhttpd_log_err("param check failed!");
+        roo::log_err("param check failed!");
         response = content_bad_request;
         status_line = generate_response_status_line(http_parser.get_version(),
                                                     StatusCode::client_error_bad_request);

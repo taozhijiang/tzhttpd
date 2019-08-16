@@ -12,11 +12,8 @@
 
 #include <xtra_rhel.h>
 
-#include <libconfig.h++>
+#include <scaffold/Setting.h>
 
-#include <boost/thread/locks.hpp>
-
-#include "StrUtil.h"
 
 #include "HttpProto.h"
 
@@ -27,10 +24,10 @@ namespace tzhttpd {
 
 class HttpParser;
 
-typedef std::function<int (const HttpParser& http_parser, \
-                           std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpGetHandler;
-typedef std::function<int (const HttpParser& http_parser, const std::string& post_data, \
-                           std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpPostHandler;
+typedef std::function<int(const HttpParser& http_parser,\
+                              std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpGetHandler;
+typedef std::function<int(const HttpParser& http_parser, const std::string& post_data,\
+                              std::string& response, std::string& status_line, std::vector<std::string>& add_header)> HttpPostHandler;
 
 struct HttpHandlerObject {
 
@@ -47,7 +44,7 @@ struct HttpHandlerObject {
 
     HttpHandlerObject(const std::string& path,
                       const HttpGetHandler& get_handler,
-                      bool built_in = false):
+                      bool built_in = false) :
         path_(path),
         success_count_(0), fail_count_(0),
         built_in_(built_in),
@@ -56,7 +53,7 @@ struct HttpHandlerObject {
 
     HttpHandlerObject(const std::string& path,
                       const HttpPostHandler& post_handler,
-                      bool built_in = false):
+                      bool built_in = false) :
         path_(path),
         success_count_(0), fail_count_(0),
         built_in_(built_in),
@@ -66,7 +63,7 @@ struct HttpHandlerObject {
     HttpHandlerObject(const std::string& path,
                       const HttpGetHandler& get_handler,
                       const HttpPostHandler& post_handler,
-                      bool built_in = false):
+                      bool built_in = false) :
         path_(path),
         success_count_(0), fail_count_(0),
         built_in_(built_in),

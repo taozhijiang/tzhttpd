@@ -8,9 +8,9 @@
 #ifndef __TZHTTPD_SERVICE_IF_H__
 #define __TZHTTPD_SERVICE_IF_H__
 
-#include <libconfig.h++>
-
 #include <string>
+#include <scaffold/Setting.h>
+
 #include "HttpHandler.h"
 
 // real http vhost should implement this interface class
@@ -22,12 +22,11 @@ class HttpReqInstance;
 
 class ServiceIf {
 
-public:
-    ServiceIf() { }
-    ~ServiceIf() { }
+    __noncopyable__(ServiceIf)
 
-    ServiceIf(const ServiceIf&) = delete;
-    ServiceIf& operator=(const ServiceIf&) = delete;
+public:
+    ServiceIf() = default;
+    ~ServiceIf() = default;
 
     // 根据opCode分发rpc请求的处理
     virtual void handle_http_request(std::shared_ptr<HttpReqInstance> http_req_instance) = 0;
@@ -42,7 +41,7 @@ public:
 
 
     // 收集模块的状态信息
-    virtual int module_status(std::string& strModule, std::string& strKey, std::string& strValue) = 0;
+    virtual int module_status(std::string& module, std::string& key, std::string& value) = 0;
     virtual int module_runtime(const libconfig::Config& cfg) = 0;
 };
 
