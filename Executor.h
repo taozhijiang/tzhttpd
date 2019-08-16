@@ -69,7 +69,7 @@ public:
 
     bool init();
     int module_runtime(const libconfig::Config& conf)override;
-    int module_status(std::string& strModule, std::string& strKey, std::string& strValue)override;
+    int module_status(std::string& module, std::string& key, std::string& value)override;
 
 private:
     // point to HttpExecutor, forward some request

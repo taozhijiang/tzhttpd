@@ -17,7 +17,7 @@
 
 namespace boost {
 namespace asio {
-    class io_service;
+class io_service;
 }
 }
 
@@ -32,30 +32,30 @@ class HttpServer {
 
 public:
 
-	//
+    //
     // ALL AVAILABLE PUBLIC API CALL HERE
     //
-	
+
     /// Construct the server to listen on the specified TCP address and port
     explicit HttpServer(const std::string& cfgfile, const std::string& instance_name);
     ~HttpServer();
 
     // 先构造，再增加主机、handler等信息，再调用该初始化
     bool init();
-    
+
     int service_start();
     int service_join();
     int service_stop_graceful();
-    
+
     // Proxy to Dispatcher ...
     int add_http_vhost(
-            const std::string& hostname);
+        const std::string& hostname);
     int add_http_get_handler(
-            const std::string& uri_regex, const HttpGetHandler& handler,
-            bool built_in = false, const std::string hostname = "");
+        const std::string& uri_regex, const HttpGetHandler& handler,
+        bool built_in = false, const std::string hostname = "");
     int add_http_post_handler(
-            const std::string& uri_regex, const HttpPostHandler& handler,
-            bool built_in = false, const std::string hostname = "");
+        const std::string& uri_regex, const HttpPostHandler& handler,
+        bool built_in = false, const std::string hostname = "");
 
     // Proxy to Global ...
     int register_http_status_callback(const std::string& name, roo::StatusCallable func);

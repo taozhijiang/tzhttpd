@@ -155,11 +155,11 @@ bool HttpServerImpl::init() {
 
     ep_ = ip::tcp::endpoint(ip::address::from_string(conf_ptr_->bind_addr_), conf_ptr_->bind_port_);
     roo::log_warning("create listen endpoint for %s:%d",
-                conf_ptr_->bind_addr_.c_str(), conf_ptr_->bind_port_);
+                     conf_ptr_->bind_addr_.c_str(), conf_ptr_->bind_port_);
 
     roo::log_info("socket/session conn cancel time_out: %d secs, enabled: %s",
-             conf_ptr_->ops_cancel_time_out_,
-             conf_ptr_->ops_cancel_time_out_ > 0 ? "true" : "false");
+                  conf_ptr_->ops_cancel_time_out_,
+                  conf_ptr_->ops_cancel_time_out_ > 0 ? "true" : "false");
 
     if (conf_ptr_->service_speed_) {
         conf_ptr_->timed_feed_token_.reset(new steady_timer(io_service_)); // 1sec
@@ -173,8 +173,8 @@ bool HttpServerImpl::init() {
             std::bind(&HttpConf::timed_feed_token_handler, conf_ptr_, std::placeholders::_1));
     }
     roo::log_info("http service enabled: %s, speed: %d tps",
-             conf_ptr_->service_enabled_ ? "true" : "false",
-             conf_ptr_->service_speed_);
+                  conf_ptr_->service_enabled_ ? "true" : "false",
+                  conf_ptr_->service_speed_);
 
     if (!io_service_threads_.init_threads(
             std::bind(&HttpServerImpl::io_service_run, this, std::placeholders::_1),
@@ -324,7 +324,7 @@ void HttpServerImpl::accept_handler(const boost::system::error_code& ec,
 
         if (!conf_ptr_->get_http_service_token()) {
             roo::log_err("request http service token failed, enabled: %s, speed: %d",
-                    conf_ptr_->service_enabled_ ? "true" : "false", conf_ptr_->service_speed_);
+                         conf_ptr_->service_enabled_ ? "true" : "false", conf_ptr_->service_speed_);
 
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
@@ -334,7 +334,7 @@ void HttpServerImpl::accept_handler(const boost::system::error_code& ec,
         if (conf_ptr_->service_concurrency_ != 0 &&
             conf_ptr_->service_concurrency_ < TcpConnAsync::current_concurrency_) {
             roo::log_err("service_concurrency_ error, limit: %d, current: %d",
-                    conf_ptr_->service_concurrency_, TcpConnAsync::current_concurrency_.load());
+                         conf_ptr_->service_concurrency_, TcpConnAsync::current_concurrency_.load());
             sock_ptr->shutdown(boost::asio::socket_base::shutdown_both, ignore_ec);
             sock_ptr->close(ignore_ec);
             break;
@@ -396,13 +396,13 @@ int HttpServerImpl::module_runtime(const libconfig::Config& setting) {
 
     if (conf_ptr_->session_cancel_time_out_ != conf_ptr->session_cancel_time_out_) {
         roo::log_warning("update session_cancel_time_out from %d to %d",
-                    conf_ptr_->session_cancel_time_out_, conf_ptr->session_cancel_time_out_);
+                         conf_ptr_->session_cancel_time_out_, conf_ptr->session_cancel_time_out_);
         conf_ptr_->session_cancel_time_out_ = conf_ptr->session_cancel_time_out_;
     }
 
     if (conf_ptr_->ops_cancel_time_out_ != conf_ptr->ops_cancel_time_out_) {
         roo::log_warning("update ops_cancel_time_out from %d to %d",
-                    conf_ptr_->ops_cancel_time_out_, conf_ptr->ops_cancel_time_out_);
+                         conf_ptr_->ops_cancel_time_out_, conf_ptr->ops_cancel_time_out_);
         conf_ptr_->ops_cancel_time_out_ = conf_ptr->ops_cancel_time_out_;
     }
 
@@ -417,7 +417,7 @@ int HttpServerImpl::module_runtime(const libconfig::Config& setting) {
 
     if (conf_ptr_->service_speed_ != conf_ptr->service_speed_) {
         roo::log_warning("update http_service_speed from %d to %d",
-                    conf_ptr_->service_speed_, conf_ptr->service_speed_);
+                         conf_ptr_->service_speed_, conf_ptr->service_speed_);
         conf_ptr_->service_speed_ = conf_ptr->service_speed_;
 
         // 检查定时器是否存在
@@ -444,12 +444,12 @@ int HttpServerImpl::module_runtime(const libconfig::Config& setting) {
 
     if (conf_ptr_->service_concurrency_ != conf_ptr->service_concurrency_) {
         roo::log_err("update service_concurrency from %d to %d.",
-                conf_ptr_->service_concurrency_, conf_ptr->service_concurrency_);
+                     conf_ptr_->service_concurrency_, conf_ptr->service_concurrency_);
         conf_ptr_->service_concurrency_ = conf_ptr->service_concurrency_;
     }
 
     roo::log_warning("http service enabled: %s, speed: %d", conf_ptr_->service_enabled_ ? "true" : "false",
-                conf_ptr_->service_speed_);
+                     conf_ptr_->service_speed_);
 
     return 0;
 }

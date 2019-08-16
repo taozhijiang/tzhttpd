@@ -23,10 +23,10 @@ class Global {
 public:
     static Global& instance();
     bool init(const std::string& setting_file);
-    
+
 private:
-    Global():
-        initialized_(false){
+    Global() :
+        initialized_(false) {
     }
 
     ~Global() = default;
@@ -53,7 +53,7 @@ private:
     std::unique_ptr<roo::Setting> setting_ptr_;
     std::unique_ptr<roo::Status>  status_ptr_;
     std::unique_ptr<roo::Timer>   timer_ptr_;
-    
+
 };
 
 } // end namespace tzhttpd

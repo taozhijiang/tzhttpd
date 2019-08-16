@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
+
 #include <unistd.h>
 #include <sstream>
 
@@ -97,8 +104,8 @@ int main(int argc, char* argv[]) {
 
     roo::log_init(log_level, "", log_path, LOG_LOCAL6);
     roo::log_warning("Initialized roo::Log with level %d, path %s.", log_level, log_path.c_str());
-    
-    
+
+
     std::shared_ptr<tzhttpd::HttpServer> http_server_ptr;
 
     // daemonize should before any thread creation...

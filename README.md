@@ -39,3 +39,4 @@ With rdynamic and whole-archive link options, dynamic cgi-handler (through .so) 
 
 ### Reference project
 [heracles](https://github.com/taozhijiang/heracles) http_face example.   
+[tzhttpd_indepent](https://github.com/taozhijiang/tzhttpd_indepent) use tzhttpd without build from scratch.

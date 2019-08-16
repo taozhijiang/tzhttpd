@@ -50,7 +50,7 @@ public:
                 roo::log_err("required uri and auth does not found, ignore this item.");
                 continue;
             }
-			
+
             std::string auth_uri_regex;
             basic_auths_item.lookupValue("uri", auth_uri_regex);
             auth_uri_regex = roo::StrUtil::pure_uri_path(auth_uri_regex);
@@ -97,7 +97,7 @@ public:
                       static_cast<int>(basic_auths_load->size()));
 
         {
-			// update with new settings here
+            // update with new settings here
             std::lock_guard<std::mutex> lock(lock_);
             basic_auths_.swap(basic_auths_load);
         }

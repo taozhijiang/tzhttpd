@@ -14,7 +14,7 @@
 #include "Global.h"
 
 namespace tzhttpd {
-    
+
 Global& Global::instance() {
     static Global instance;
     return instance;
@@ -41,7 +41,7 @@ bool Global::init(const std::string& setting_file) {
         roo::log_err("Create and init roo::Setting with cfg %s failed.", setting_file.c_str());
         return false;
     }
-    
+
     return true;
 }
 

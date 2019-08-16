@@ -41,7 +41,7 @@ public:
 
 
     // 收集模块的状态信息
-    virtual int module_status(std::string& strModule, std::string& strKey, std::string& strValue) = 0;
+    virtual int module_status(std::string& module, std::string& key, std::string& value) = 0;
     virtual int module_runtime(const libconfig::Config& cfg) = 0;
 };
 

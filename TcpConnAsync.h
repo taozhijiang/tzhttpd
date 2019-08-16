@@ -36,7 +36,7 @@ public:
     static boost::atomic<int32_t> current_concurrency_;
 
     /// Construct a connection with the given socket.
-    TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket, HttpServer& server);
+    TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> socket, HttpServer& server);
     virtual ~TcpConnAsync();
 
     virtual void start();

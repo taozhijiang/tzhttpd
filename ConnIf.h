@@ -40,7 +40,7 @@ public:
         set_tcp_nonblocking(false);
     }
 
-	virtual ~ConnIf() = default;
+    virtual ~ConnIf() = default;
 
 public:
 

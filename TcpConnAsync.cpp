@@ -32,9 +32,9 @@ extern int default_http_get_handler(const HttpParser& http_parser,
 
 boost::atomic<int32_t> TcpConnAsync::current_concurrency_(0);
 
-TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> p_socket,
+TcpConnAsync::TcpConnAsync(std::shared_ptr<boost::asio::ip::tcp::socket> socket,
                            HttpServer& server) :
-    ConnIf(p_socket),
+    ConnIf(socket),
     was_cancelled_(false),
     ops_cancel_mutex_(),
     ops_cancel_timer_(),
@@ -137,8 +137,7 @@ void TcpConnAsync::read_head_handler(const boost::system::error_code& ec, size_t
     }
 
     if (http_parser->get_method() == HTTP_METHOD::GET ||
-        http_parser->get_method() == HTTP_METHOD::OPTIONS )
-    {
+        http_parser->get_method() == HTTP_METHOD::OPTIONS) {
         // HTTP GET handler
         SAFE_ASSERT(http_parser->find_request_header(http_proto::header_options::content_length).empty());
 

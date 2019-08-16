@@ -145,10 +145,10 @@ void Executor::executor_threads_adjust(const boost::system::error_code& ec) {
     return;
 }
 
-int Executor::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
+int Executor::module_status(std::string& module, std::string& key, std::string& value) {
 
-    strModule = "tzhttpd";
-    strKey = "executor_" + instance_name();
+    module = "tzhttpd";
+    key = "executor_" + instance_name();
 
     std::stringstream ss;
 
@@ -168,7 +168,7 @@ int Executor::module_status(std::string& strModule, std::string& strKey, std::st
     service_impl_->module_status(nullModule, subKey, subValue);
 
     // collect
-    strValue = ss.str() + subValue;
+    value = ss.str() + subValue;
 
     return 0;
 }

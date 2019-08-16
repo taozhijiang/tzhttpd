@@ -4,6 +4,7 @@
  * Licensed under the BSD-3-Clause license, see LICENSE for full information.
  *
  */
+
 #include <unistd.h>
 
 #include <string>

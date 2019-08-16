@@ -1,3 +1,9 @@
+/*-
+ * Copyright (c) 2019 TAO Zhijiang<taozhijiang@gmail.com>
+ *
+ * Licensed under the BSD-3-Clause license, see LICENSE for full information.
+ *
+ */
 
 #ifndef __TZHTTPD_HTTP_CONF_H__
 #define __TZHTTPD_HTTP_CONF_H__
@@ -12,8 +18,8 @@
 #include <other/Log.h>
 
 namespace tzhttpd {
-    
-    
+
+
 extern void init_http_version_once(const std::string& server_version);
 
 class HttpServer;
@@ -23,7 +29,7 @@ class HttpConf {
 
     friend class HttpServer;
     friend class HttpServerImpl;
-    
+
     bool        service_enabled_;            // 服务开关
     int32_t     service_speed_;
 
@@ -58,7 +64,7 @@ class HttpConf {
         setting.lookupValue("http.bind_port", bind_port_);
         if (bind_addr_.empty() || bind_port_ <= 0) {
             roo::log_err("invalid http.bind_addr %s & http.bind_port %d found!",
-                    bind_addr_.c_str(), bind_port_);
+                         bind_addr_.c_str(), bind_port_);
             return false;
         }
 
@@ -82,7 +88,7 @@ class HttpConf {
         }
         if (!safe_ip_.empty()) {
             roo::log_warning("please notice safe_ip not empty, totally contain %d items",
-                        static_cast<int>(safe_ip_.size()));
+                             static_cast<int>(safe_ip_.size()));
         }
 
         setting.lookupValue("http.backlog_size", backlog_size_);

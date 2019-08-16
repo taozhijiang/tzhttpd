@@ -27,9 +27,9 @@ namespace tzhttpd {
 typedef roo::PairVec<std::string, std::string> UriParamContainer;
 
 class HttpParser {
-    
+
     __noncopyable__(HttpParser)
-    
+
 public:
     HttpParser() :
         request_headers_(),

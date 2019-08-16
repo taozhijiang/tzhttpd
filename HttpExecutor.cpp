@@ -913,7 +913,7 @@ void HttpExecutor::handle_http_request(std::shared_ptr<HttpReqInstance> http_req
 }
 
 
-int HttpExecutor::module_status(std::string& strModule, std::string& strKey, std::string& strValue) {
+int HttpExecutor::module_status(std::string& module, std::string& key, std::string& value) {
 
     std::shared_ptr<HttpExecutorConf> conf_ptr;
     {
@@ -927,7 +927,7 @@ int HttpExecutor::module_status(std::string& strModule, std::string& strKey, std
 
     if (!conf_ptr->redirect_str_.empty()) {
         ss << "\t" << "30x redirect: " << conf_ptr->redirect_str_ << std::endl;
-        strValue = ss.str();
+        value = ss.str();
         return 0;
     }
 
@@ -963,7 +963,7 @@ int HttpExecutor::module_status(std::string& strModule, std::string& strKey, std
         ss << std::endl;
     }
 
-    strValue = ss.str();
+    value = ss.str();
     return 0;
 }
 
