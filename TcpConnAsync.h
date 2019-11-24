@@ -8,15 +8,14 @@
 #ifndef __TZHTTPD_TCP_CONN_ASYNC_H__
 #define __TZHTTPD_TCP_CONN_ASYNC_H__
 
+#include <chrono>
+#include <boost/asio/steady_timer.hpp>
+
 #include <boost/asio.hpp>
 #include <boost/atomic/atomic.hpp>
 
 #include "ConnIf.h"
 #include "HttpParser.h"
-
-#include <boost/chrono.hpp>
-#include <boost/asio/steady_timer.hpp>
-using boost::asio::steady_timer;
 
 namespace tzhttpd {
 
@@ -132,10 +131,10 @@ private:
     std::mutex ops_cancel_mutex_;
 
     // IO操作的最大时长
-    std::unique_ptr<steady_timer> ops_cancel_timer_;
+    std::unique_ptr<boost::asio::steady_timer> ops_cancel_timer_;
 
     // 会话间隔的最大时长
-    std::unique_ptr<steady_timer> session_cancel_timer_;
+    std::unique_ptr<boost::asio::steady_timer> session_cancel_timer_;
 
 private:
 

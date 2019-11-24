@@ -8,8 +8,6 @@
 #include <mutex>
 #include <functional>
 
-#include <boost/chrono.hpp>
-
 #include <other/Log.h>
 #include "Global.h"
 

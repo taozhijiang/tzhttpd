@@ -7,7 +7,7 @@
 
 
 #include <ctime>
-#include <boost/chrono.hpp>
+#include <chrono>
 
 #include <sstream>
 #include "HttpProto.h"
@@ -40,7 +40,7 @@ string http_response_generate(const string& content, const string& stat_str,
     headers[0].value = "tzhttpd server/" + http_handler::http_server_version;
     headers[1].name = "Date";
 
-    std::time_t now = boost::chrono::system_clock::to_time_t(boost::chrono::system_clock::now());
+    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 //    std::string time_str = std::string(std::ctime(&now, NULL));
     char mbstr[32]{};
     std::strftime(mbstr, sizeof(mbstr), "%F %T", std::localtime(&now));

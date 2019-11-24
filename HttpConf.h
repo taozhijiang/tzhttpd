@@ -11,9 +11,6 @@
 #include <set>
 #include <mutex>
 
-#include <boost/asio.hpp>
-#include <boost/asio/steady_timer.hpp>
-
 #include <scaffold/Setting.h>
 #include <other/Log.h>
 
@@ -192,7 +189,7 @@ class HttpConf {
         feed_http_service_token();
 
         // 再次启动定时器
-        timed_feed_token_->expires_from_now(boost::chrono::seconds(1)); // 1sec
+        timed_feed_token_->expires_from_now(std::chrono::seconds(1)); // 1sec
         timed_feed_token_->async_wait(
             std::bind(&HttpConf::timed_feed_token_handler, this, std::placeholders::_1));
     }

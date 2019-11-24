@@ -504,7 +504,7 @@ void TcpConnAsync::set_session_cancel_timeout() {
     if (session_cancel_timer_) {
         session_cancel_timer_->cancel(ignore_ec);
     } else {
-        session_cancel_timer_.reset(new steady_timer(http_server_.io_service()));
+        session_cancel_timer_.reset(new boost::asio::steady_timer(http_server_.io_service()));
     }
 
     SAFE_ASSERT(http_server_.session_cancel_time_out());
@@ -538,7 +538,7 @@ void TcpConnAsync::set_ops_cancel_timeout() {
     if (ops_cancel_timer_) {
         ops_cancel_timer_->cancel(ignore_ec);
     } else {
-        ops_cancel_timer_.reset(new steady_timer(http_server_.io_service()));
+        ops_cancel_timer_.reset(new boost::asio::steady_timer(http_server_.io_service()));
     }
 
     SAFE_ASSERT(http_server_.ops_cancel_time_out());
@@ -560,7 +560,7 @@ void TcpConnAsync::revoke_ops_cancel_timeout() {
 
 void TcpConnAsync::ops_cancel_timeout_call(const boost::system::error_code& ec) {
 
-    if (ec == 0) {
+    if (!ec) {
         roo::log_warning("ops_cancel_timeout_call called with timeout: %d", http_server_.ops_cancel_time_out());
         ops_cancel();
         sock_shutdown_and_close(ShutdownType::kBoth);

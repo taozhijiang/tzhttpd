@@ -13,16 +13,7 @@
 
 #include "HttpHandler.h"
 
-
-
-namespace boost {
-namespace asio {
-class io_service;
-}
-}
-
 namespace tzhttpd {
-
 
 class HttpServerImpl;
 

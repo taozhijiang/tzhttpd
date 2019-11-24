@@ -13,8 +13,6 @@
 #include <thread>
 #include <functional>
 
-#include <boost/asio.hpp>
-#include <boost/asio/steady_timer.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -168,7 +166,7 @@ bool HttpServerImpl::init() {
             return false;
         }
 
-        conf_ptr_->timed_feed_token_->expires_from_now(boost::chrono::seconds(1));
+        conf_ptr_->timed_feed_token_->expires_from_now(std::chrono::seconds(1));
         conf_ptr_->timed_feed_token_->async_wait(
             std::bind(&HttpConf::timed_feed_token_handler, conf_ptr_, std::placeholders::_1));
     }
@@ -430,7 +428,7 @@ int HttpServerImpl::module_runtime(const libconfig::Config& setting) {
                 return -1;
             }
 
-            conf_ptr_->timed_feed_token_->expires_from_now(boost::chrono::seconds(1));
+            conf_ptr_->timed_feed_token_->expires_from_now(std::chrono::seconds(1));
             conf_ptr_->timed_feed_token_->async_wait(
                 std::bind(&HttpConf::timed_feed_token_handler, conf_ptr_, std::placeholders::_1));
         } else { // speed == 0

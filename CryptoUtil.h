@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <istream>
 #include <sstream>
+#include <iostream>
 
 #include <openssl/buffer.h>
 #include <openssl/evp.h>

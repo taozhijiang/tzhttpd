@@ -1,4 +1,6 @@
 _gsdata_/
+.vscode/
+build/
 *.vpj
 *.vpw
 *.vpwhist

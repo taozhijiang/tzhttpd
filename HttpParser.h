@@ -69,6 +69,7 @@ public:
         return request_uri_params_;
     }
 
+    // 简易序列化成一个Json字符串，方便在so接口中传递
     std::string get_request_uri_params_string() const {
         return request_uri_params_.SERIALIZE();
     }

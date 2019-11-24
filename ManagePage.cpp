@@ -50,8 +50,8 @@ bool system_manage_page_init() {
 
 
 static
-int system_updatesetting_handler(const HttpParser& http_parser,
-                                 std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
+int system_updateconf_handler(const HttpParser& http_parser,
+                    	      std::string& response, std::string& status_line, std::vector<std::string>& add_header) {
 
     int ret = Global::instance().setting_ptr()->update_runtime_setting();
 

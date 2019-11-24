@@ -144,10 +144,10 @@ int main(int argc, char* argv[]) {
     http_server_ptr->add_http_get_handler("^/test$", tzhttpd::get_test_handler);
     http_server_ptr->register_http_status_callback("httpsrv", module_status);
 
-    http_server_ptr->io_service_threads_.start_threads();
-    http_server_ptr->service();
+    http_server_ptr->service_start();
 
-    http_server_ptr->io_service_threads_.join_threads();
+    // wait to terminate
+    http_server_ptr->service_join();
 
     return 0;
 }
